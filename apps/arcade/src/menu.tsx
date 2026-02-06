@@ -5,31 +5,202 @@ type MenuProps = {
   onSelectGame?: (gameId: string) => void
 }
 
-const games = [
-  { id: 'neon-runner', title: 'NEON RUNNER', genre: 'RACING', badge: 'NEW', color: '#0099ff', glow: '#00ccff' },
-  { id: 'pixel-blaster', title: 'PIXEL BLASTER', genre: 'SHOOTER', badge: 'HOT', color: '#00ddff', glow: '#00ffff' },
-  { id: 'grid-fighter', title: 'GRID FIGHTER', genre: 'FIGHT', badge: 'VS', color: '#0088ff', glow: '#00aaff' },
-  { id: 'retro-quest', title: 'RETRO QUEST', genre: 'RPG', badge: 'EPIC', color: '#00aaff', glow: '#00ddff' },
-  { id: 'sky-raid', title: 'SKY RAID', genre: 'ARCADE', badge: 'CO-OP', color: '#0077ff', glow: '#00aaff' },
-  { id: 'tank-rush', title: 'TANK RUSH', genre: 'STRATEGY', badge: 'BOSS', color: '#00bbff', glow: '#00eeff' }
+type GameCard = {
+  id: string
+  title: string
+  genre: string
+  badge: string
+  tagline: string
+  image: string
+  accent: string
+  glow: string
+}
+
+const games: GameCard[] = [
+  {
+    id: 'neon-runner',
+    title: 'NEON RUNNER',
+    genre: 'RACING',
+    badge: 'NEW',
+    tagline: 'Street sprint through the midnight skyline.',
+    image: 'https://images.pexels.com/photos/7026427/pexels-photo-7026427.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    accent: '#00c8ff',
+    glow: '#00e5ff'
+  },
+  {
+    id: 'pixel-blaster',
+    title: 'PIXEL BLASTER',
+    genre: 'SHOOTER',
+    badge: 'HOT',
+    tagline: 'Clear waves of enemies in pure arcade chaos.',
+    image: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    accent: '#00ff88',
+    glow: '#9dff00'
+  },
+  {
+    id: 'grid-fighter',
+    title: 'GRID FIGHTER',
+    genre: 'FIGHT',
+    badge: 'VS',
+    tagline: 'Combo battles on an electric retro grid.',
+    image: 'https://images.pexels.com/photos/29096083/pexels-photo-29096083.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    accent: '#ffcf00',
+    glow: '#ffea00'
+  },
+  {
+    id: 'retro-quest',
+    title: 'RETRO QUEST',
+    genre: 'RPG',
+    badge: 'EPIC',
+    tagline: 'Explore dungeons and hunt legendary loot.',
+    image: 'https://images.pexels.com/photos/4835419/pexels-photo-4835419.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    accent: '#ff5e9e',
+    glow: '#ff8ac8'
+  },
+  {
+    id: 'sky-raid',
+    title: 'SKY RAID',
+    genre: 'ARCADE',
+    badge: 'CO-OP',
+    tagline: 'Fly low, dodge fire, and own the horizon.',
+    image: 'https://images.pexels.com/photos/22845394/pexels-photo-22845394.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    accent: '#7dc6ff',
+    glow: '#a8dcff'
+  },
+  {
+    id: 'tank-rush',
+    title: 'TANK RUSH',
+    genre: 'STRATEGY',
+    badge: 'BOSS',
+    tagline: 'Armor up and push through heavy resistance.',
+    image: 'https://images.pexels.com/photos/25626507/pexels-photo-25626507.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    accent: '#00ffea',
+    glow: '#7ffcf2'
+  }
 ]
 
+function wrapIndex(index: number, length: number) {
+  return (index + length) % length
+}
+
+function getRelativeOffset(index: number, activeIndex: number, length: number) {
+  let delta = index - activeIndex
+  if (delta > length / 2) delta -= length
+  if (delta < -length / 2) delta += length
+  return delta
+}
+
 export function MenuScreen({ particles, onSelectGame }: MenuProps) {
+  const [activeIndex, setActiveIndex] = React.useState(0)
+  const [crtFlicker, setCrtFlicker] = React.useState(false)
+  const [scanlineOffset, setScanlineOffset] = React.useState(0)
+  const [pixelShift, setPixelShift] = React.useState(0)
+  const [glitchLine, setGlitchLine] = React.useState(-1)
+  const [scrollText, setScrollText] = React.useState(0)
+  const [coinBlink, setCoinBlink] = React.useState(false)
+
+  const activeGame = games[activeIndex]
+  const oneUpScore = (activeIndex + 1) * 10000
+  const hiScore = 999999
+
+  const goTo = React.useCallback((nextIndex: number) => {
+    setActiveIndex(wrapIndex(nextIndex, games.length))
+  }, [])
+
+  const goPrev = React.useCallback(() => {
+    setActiveIndex(prev => wrapIndex(prev - 1, games.length))
+  }, [])
+
+  const goNext = React.useCallback(() => {
+    setActiveIndex(prev => wrapIndex(prev + 1, games.length))
+  }, [])
+
+  const startSelected = React.useCallback(() => {
+    onSelectGame?.(games[activeIndex].id)
+  }, [activeIndex, onSelectGame])
+
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        goPrev()
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        goNext()
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        startSelected()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [goNext, goPrev, startSelected])
+
+  React.useEffect(() => {
+    const flickerInterval = setInterval(() => {
+      if (Math.random() < 0.03) {
+        setCrtFlicker(true)
+        setTimeout(() => setCrtFlicker(false), 60)
+      }
+    }, 100)
+    return () => clearInterval(flickerInterval)
+  }, [])
+
+  React.useEffect(() => {
+    const scanlineInterval = setInterval(() => {
+      setScanlineOffset(prev => (prev + 1) % 4)
+    }, 50)
+    return () => clearInterval(scanlineInterval)
+  }, [])
+
+  React.useEffect(() => {
+    const shiftInterval = setInterval(() => {
+      if (Math.random() < 0.05) {
+        setPixelShift(Math.random() < 0.5 ? 2 : -2)
+        setTimeout(() => setPixelShift(0), 50)
+      }
+    }, 200)
+    return () => clearInterval(shiftInterval)
+  }, [])
+
+  React.useEffect(() => {
+    const glitchInterval = setInterval(() => {
+      if (Math.random() < 0.1) {
+        setGlitchLine(Math.floor(Math.random() * 20))
+        setTimeout(() => setGlitchLine(-1), 100)
+      }
+    }, 300)
+    return () => clearInterval(glitchInterval)
+  }, [])
+
+  React.useEffect(() => {
+    const scrollInterval = setInterval(() => {
+      setScrollText(prev => prev + 0.5)
+    }, 30)
+    return () => clearInterval(scrollInterval)
+  }, [])
+
+  React.useEffect(() => {
+    const coinBlinkInterval = setInterval(() => {
+      setCoinBlink(prev => !prev)
+    }, 250)
+    return () => clearInterval(coinBlinkInterval)
+  }, [])
+
   return (
-    <div style={{ 
-      background: 'linear-gradient(180deg, #001a40 0%, #000d1f 40%, #000510 70%, #000000 100%)',
+    <div style={{
+      background: 'linear-gradient(180deg, #0a1a2f 0%, #050b16 55%, #020306 100%)',
       minHeight: '100vh',
-      margin: 0,
-      padding: '0',
-      fontFamily: '"Courier New", monospace',
+      fontFamily: '"Press Start 2P", "Courier New", monospace',
       position: 'relative',
       overflow: 'hidden',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
+      filter: crtFlicker ? 'brightness(0.72) contrast(1.25)' : 'brightness(1) contrast(1.1)',
+      transition: 'filter 0.06s',
+      transform: `translateX(${pixelShift}px)`
     }}>
-      
-      {/* STARFIELD */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -39,569 +210,596 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           radial-gradient(2px 2px at 50% 50%, #ffffff, transparent),
           radial-gradient(1px 1px at 80% 10%, #0088ff, transparent),
           radial-gradient(1px 1px at 90% 60%, #00aaff, transparent),
-          radial-gradient(1px 1px at 15% 80%, #00ddff, transparent)
+          radial-gradient(1px 1px at 15% 80%, #00ddff, transparent),
+          radial-gradient(2px 2px at 35% 25%, #ffffff, transparent)
         `,
-        backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px',
-        animation: 'starfield-slow 150s linear infinite',
-        opacity: 0.3,
+        backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px, 280px 280px',
+        backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px',
+        animation: 'starfield-drift 120s linear infinite',
+        opacity: 0.35,
         pointerEvents: 'none'
       }} />
-      
-      {/* RETRO GRID FLOOR */}
+
       <div style={{
         position: 'absolute',
-        bottom: '-20%',
-        left: '-30%',
-        right: '-30%',
-        height: '65%',
+        inset: 0,
         backgroundImage: `
-          repeating-linear-gradient(0deg,
-            transparent 0px,
-            transparent 38px,
-            #0099ff 38px,
-            #0099ff 41px
-          ),
-          repeating-linear-gradient(90deg,
-            transparent 0px,
-            transparent 58px,
-            #0066ff 58px,
-            #0066ff 61px
-          )
+          repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,136,255,0.05) 3px, rgba(0,136,255,0.05) 4px),
+          repeating-linear-gradient(90deg, transparent 0px, transparent 3px, rgba(0,136,255,0.05) 3px, rgba(0,136,255,0.05) 4px)
         `,
-        transform: 'perspective(350px) rotateX(68deg)',
-        backgroundPosition: '0 0',
-        opacity: 0.4,
-        filter: 'blur(0.3px)',
-        boxShadow: '0 -40px 100px rgba(0,136,255,0.3)',
-        animation: 'grid-scroll 3s linear infinite'
+        pointerEvents: 'none'
       }} />
 
-      {/* HORIZON */}
       <div style={{
         position: 'absolute',
-        top: '58%',
-        left: 0,
-        right: 0,
+        inset: '8px',
+        border: '6px solid #1f6fb4',
+        boxShadow: 'inset 0 0 0 3px #0b2642, inset 0 0 0 7px #03101f, 8px 8px 0 rgba(0,0,0,0.7)',
+        zIndex: 1180,
+        pointerEvents: 'none'
+      }} />
+      <div style={{ position: 'absolute', left: '8px', top: '8px', width: '18px', height: '18px', background: '#1f6fb4', zIndex: 1181, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', right: '8px', top: '8px', width: '18px', height: '18px', background: '#1f6fb4', zIndex: 1181, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', left: '8px', bottom: '8px', width: '18px', height: '18px', background: '#1f6fb4', zIndex: 1181, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', right: '8px', bottom: '8px', width: '18px', height: '18px', background: '#1f6fb4', zIndex: 1181, pointerEvents: 'none' }} />
+
+      <div style={{
+        position: 'absolute',
+        bottom: '-18%',
+        left: '-30%',
+        right: '-30%',
+        height: '64%',
+        backgroundImage: `
+          repeating-linear-gradient(0deg, transparent 0px, transparent 38px, #0099ff 38px, #0099ff 41px),
+          repeating-linear-gradient(90deg, transparent 0px, transparent 58px, #0066ff 58px, #0066ff 61px)
+        `,
+        transform: 'perspective(350px) rotateX(68deg)',
+        backgroundPosition: `0 ${(scrollText * 2.5) % 41}px`,
+        opacity: 0.58,
+        filter: 'none',
+        boxShadow: '0 -20px 0 rgba(0,70,140,0.35)',
+        animation: 'grid-pulse 3s ease-in-out infinite',
+        pointerEvents: 'none'
+      }} />
+
+      <div style={{
+        position: 'absolute',
+        top: '46%',
+        left: '-5%',
+        right: '-5%',
         height: '3px',
-        background: 'linear-gradient(90deg, transparent, #0099ff, #00ccff, #0099ff, transparent)',
-        boxShadow: '0 0 25px #0088ff',
-        opacity: 0.7,
-        animation: 'horizon-pulse 2s ease-in-out infinite'
+        background: 'linear-gradient(90deg, transparent, #0066ff 10%, #0099ff 30%, #00ccff 50%, #0099ff 70%, #0066ff 90%, transparent)',
+        boxShadow: '0 0 0 2px rgba(0,102,190,0.45)',
+        opacity: 0.85,
+        animation: 'none',
+        pointerEvents: 'none'
       }} />
-      
-      {/* SCANLINES */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 2px, transparent 2px, transparent 4px)',
-        pointerEvents: 'none',
-        zIndex: 1000,
-        opacity: 0.6
-      }} />
-      
-      {/* CRT VIGNETTE */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'radial-gradient(ellipse at center, transparent 0%, transparent 50%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.9) 100%)',
-        pointerEvents: 'none',
-        zIndex: 999
-      }} />
-      
-      {/* Particles */}
+
       {particles.map(p => (
         <div key={p.id} style={{
           position: 'absolute',
           left: p.x,
           top: p.y,
-          width: '8px',
-          height: '8px',
-          background: p.color,
-          boxShadow: `0 0 12px ${p.color}`,
-          pointerEvents: 'none',
-          borderRadius: '50%'
-        }} />
+        width: '8px',
+        height: '8px',
+        background: p.color,
+        boxShadow: '1px 1px 0 #000000',
+        pointerEvents: 'none'
+      }} />
       ))}
 
-      {/* MAIN ARCADE CABINET */}
       <div style={{
-        position: 'relative',
-        zIndex: 10,
-        width: 'min(1400px, 95vw)',
-        maxWidth: '1400px'
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.42) 0px, rgba(0,0,0,0.42) 2px, transparent 2px, transparent 4px)',
+        pointerEvents: 'none',
+        zIndex: 1200,
+        transform: `translateY(${scanlineOffset}px)`,
+        opacity: 0.75
+      }} />
+
+      {glitchLine >= 0 && (
+        <div style={{
+          position: 'absolute',
+          top: `${glitchLine * 5}%`,
+          left: 0,
+          right: 0,
+          height: '3px',
+          background: 'rgba(0,200,255,0.8)',
+          mixBlendMode: 'screen',
+          zIndex: 1201
+        }} />
+      )}
+
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'radial-gradient(ellipse at center, transparent 0%, transparent 52%, rgba(0,0,0,0.45) 82%, rgba(0,0,0,0.92) 100%)',
+        pointerEvents: 'none',
+        zIndex: 1199
+      }} />
+
+      <div style={{
+        position: 'absolute',
+        top: '16px',
+        left: 0,
+        right: 0,
+        background: 'linear-gradient(180deg, #0066cc, #004499)',
+        borderTop: '2px solid #00aaff',
+        borderBottom: '4px solid #002266',
+        padding: '12px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        letterSpacing: '3px',
+        zIndex: 1300,
+        boxShadow: '0 0 20px rgba(0,136,255,0.4), 0 6px 0 #001133'
       }}>
-        
-        {/* CABINET TOP MARQUEE */}
-        <div style={{
-          background: 'linear-gradient(180deg, #0066cc 0%, #004499 100%)',
-          borderTop: '8px solid #0088ff',
-          borderLeft: '8px solid #0088ff',
-          borderRight: '8px solid #0088ff',
-          borderBottom: '6px solid #00aaff',
-          padding: '20px 30px',
-          position: 'relative',
-          clipPath: 'polygon(5% 0%, 95% 0%, 100% 100%, 0% 100%)',
-          boxShadow: '0 0 40px rgba(0,136,255,0.6), inset 0 0 30px rgba(0,170,255,0.2)'
-        }}>
-          {/* Neon tubes */}
-          <div style={{
-            position: 'absolute',
-            top: '8px',
-            left: '10%',
-            right: '10%',
-            height: '6px',
-            background: 'linear-gradient(90deg, transparent, #00ffff, #ffffff, #00ffff, transparent)',
-            boxShadow: '0 0 20px #00ffff',
-            borderRadius: '3px',
-            animation: 'neon-flicker 3s ease-in-out infinite'
-          }} />
-          
-          <div style={{
-            textAlign: 'center',
-            marginTop: '6px'
-          }}>
-            <div style={{
-              fontSize: '56px',
-              fontWeight: 'black',
-              color: '#ffffff',
-              textShadow: `
-                0 0 30px #00ffff,
-                0 0 60px #0088ff,
-                6px 6px 0 #002244,
-                -2px -2px 0 #004488
-              `,
-              letterSpacing: '14px',
-              lineHeight: '1',
-              fontFamily: '"Impact", "Arial Black", sans-serif'
-            }}>
-              GAME SELECT
-            </div>
-            <div style={{
-              fontSize: '16px',
-              color: '#00ffff',
-              letterSpacing: '6px',
-              marginTop: '8px',
-              textShadow: '0 0 15px #00ffff, 2px 2px 0 #002244'
-            }}>
-              ★ CHOOSE YOUR ADVENTURE ★
-            </div>
-          </div>
+        <div style={{ color: '#ffff00', textShadow: '0 0 10px #ffff00, 2px 2px 0 #002244', animation: 'pixel-pulse 1s ease-in-out infinite' }}>
+          1UP {String(oneUpScore).padStart(8, '0')}
         </div>
+        <div style={{ color: '#00ff88', textShadow: '0 0 10px #00ff88, 2px 2px 0 #002244', animation: 'pixel-pulse 1s ease-in-out infinite 0.5s' }}>
+          HI {String(hiScore).padStart(8, '0')}
+        </div>
+      </div>
 
-        {/* MAIN SCREEN BEZEL */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 1250,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: '86px',
+        paddingBottom: '56px'
+      }}>
         <div style={{
-          background: 'linear-gradient(180deg, #001a33, #000d1f)',
-          border: '12px solid #002244',
-          borderTop: 'none',
-          boxShadow: `
-            0 0 40px rgba(0,0,0,0.9),
-            inset 0 0 60px rgba(0,0,0,0.8),
-            inset 0 20px 40px rgba(0,136,255,0.1)
-          `,
-          padding: '30px',
-          position: 'relative'
+          position: 'relative',
+          width: 'min(1700px, 96vw)',
+          height: 'min(940px, calc(100vh - 150px))',
+          border: '6px solid #0088ff',
+          background: '#000814',
+          boxShadow: '0 0 30px rgba(0,136,255,0.45), inset 0 0 20px rgba(0,136,255,0.2), 8px 8px 0 rgba(0,0,0,0.75)',
+          padding: '6px'
         }}>
-          {/* Screen corner bolts */}
-          {[
-            {top: '15px', left: '15px'},
-            {top: '15px', right: '15px'},
-            {bottom: '15px', left: '15px'},
-            {bottom: '15px', right: '15px'}
-          ].map((pos, i) => (
-            <div key={i} style={{
-              position: 'absolute',
-              ...pos,
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at 30% 30%, #0099ff, #004488)',
-              border: '3px solid #002244',
-              boxShadow: '0 0 12px rgba(0,136,255,0.6), inset 0 0 6px rgba(0,0,0,0.8)'
+          <div style={{
+            border: '4px solid #004488',
+            background: 'linear-gradient(180deg, #001122, #000a14)',
+            boxShadow: 'inset 0 0 30px rgba(0,68,136,0.25)',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{
+              background: 'linear-gradient(180deg, #0088ff, #0066cc)',
+              borderBottom: '3px solid #00aaff',
+              padding: '14px 20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'relative',
+              boxShadow: '0 3px 15px rgba(0,136,255,0.35)'
             }}>
               <div style={{
                 position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '8px',
-                height: '2px',
-                background: '#001122'
+                top: '10px',
+                left: '10px',
+                width: '12px',
+                height: '12px',
+                background: coinBlink ? '#ffff00' : '#666600',
+                border: '2px solid #ffff00',
+                boxShadow: coinBlink ? '0 0 15px #ffff00' : 'none'
               }} />
               <div style={{
                 position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%) rotate(90deg)',
-                width: '8px',
-                height: '2px',
-                background: '#001122'
+                top: '10px',
+                right: '10px',
+                width: '12px',
+                height: '12px',
+                background: coinBlink ? '#ffff00' : '#666600',
+                border: '2px solid #ffff00',
+                boxShadow: coinBlink ? '0 0 15px #ffff00' : 'none'
               }} />
-            </div>
-          ))}
 
-          {/* GAME GRID - Arcade style 2x3 */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gridTemplateRows: 'repeat(2, 1fr)',
-            gap: '24px',
-            background: 'linear-gradient(180deg, #000510, #000000)',
-            padding: '24px',
-            border: '4px solid #0088ff',
-            boxShadow: 'inset 0 0 40px rgba(0,136,255,0.15)',
-            position: 'relative'
-          }}>
-            {/* CRT Glass effect */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(180deg, rgba(0,136,255,0.08) 0%, transparent 20%, transparent 80%, rgba(0,136,255,0.05) 100%)',
-              pointerEvents: 'none',
-              zIndex: 5
-            }} />
+              <div style={{
+                color: '#ffffff',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                letterSpacing: '4px',
+                textShadow: '0 0 15px #00ccff, 3px 3px 0 #002244'
+              }}>
+                ▓▒░ GAME SELECT ░▒▓
+              </div>
 
-            {games.map((game, idx) => (
               <button
-                key={game.id}
                 type="button"
-                onClick={() => onSelectGame?.(game.id)}
-                className="game-slot"
+                onClick={startSelected}
                 style={{
-                  cursor: 'pointer',
-                  background: `
-                    linear-gradient(135deg, 
-                      rgba(0,10,20,0.95) 0%, 
-                      rgba(0,20,40,0.85) 50%, 
-                      rgba(0,10,20,0.95) 100%
-                    ),
-                    radial-gradient(circle at 30% 40%, ${game.glow}40, transparent 70%)
-                  `,
-                  border: `5px solid ${game.color}`,
-                  boxShadow: `
-                    0 0 35px ${game.color},
-                    inset 0 0 30px rgba(0,20,40,0.8),
-                    0 8px 16px rgba(0,0,0,0.6)
-                  `,
-                  padding: '0',
-                  minHeight: '220px',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.15s ease',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'scale(1.05) translateY(-6px)'
-                  e.currentTarget.style.boxShadow = `
-                    0 0 50px ${game.color},
-                    0 0 80px ${game.glow},
-                    inset 0 0 30px rgba(0,20,40,0.7),
-                    0 12px 24px rgba(0,0,0,0.8)
-                  `
-                  e.currentTarget.style.zIndex = '10'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'scale(1) translateY(0)'
-                  e.currentTarget.style.boxShadow = `
-                    0 0 35px ${game.color},
-                    inset 0 0 30px rgba(0,20,40,0.8),
-                    0 8px 16px rgba(0,0,0,0.6)
-                  `
-                  e.currentTarget.style.zIndex = '1'
+                  background: 'linear-gradient(180deg, #00ff88, #00cc66)',
+                  color: '#001122',
+                  padding: '6px 16px',
+                  border: '3px solid #00ff88',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  letterSpacing: '2px',
+                  boxShadow: '0 0 15px rgba(0,255,136,0.45)',
+                  borderRadius: '2px',
+                  cursor: 'pointer'
                 }}
               >
-                {/* Slot number */}
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  left: '8px',
-                  width: '32px',
-                  height: '32px',
-                  background: 'rgba(0,0,0,0.8)',
-                  border: `2px solid ${game.color}`,
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '18px',
-                  fontWeight: 'black',
-                  color: game.color,
-                  textShadow: `0 0 10px ${game.color}`,
-                  zIndex: 3
-                }}>
-                  {idx + 1}
-                </div>
+                START
+              </button>
+            </div>
 
-                {/* Badge */}
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  background: game.color,
-                  color: '#000814',
-                  fontSize: '11px',
-                  fontWeight: 'black',
-                  padding: '4px 10px',
-                  letterSpacing: '1px',
-                  border: '2px solid rgba(0,0,0,0.5)',
-                  boxShadow: `0 0 15px ${game.color}, inset 0 0 8px rgba(255,255,255,0.3)`,
-                  zIndex: 3
-                }}>
-                  {game.badge}
-                </div>
-
-                {/* Game Title Area */}
-                <div style={{
-                  padding: '50px 16px 20px',
-                  textAlign: 'center',
-                  flex: '1',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  zIndex: 2
-                }}>
-                  {/* Title */}
-                  <div style={{
-                    fontSize: '28px',
-                    fontWeight: 'black',
-                    color: '#ffffff',
-                    letterSpacing: '3px',
-                    textShadow: `
-                      0 0 25px ${game.color},
-                      0 0 50px ${game.glow},
-                      4px 4px 0 #000814,
-                      -1px -1px 0 ${game.color}40
-                    `,
-                    lineHeight: '1.2',
-                    marginBottom: '12px',
-                    fontFamily: '"Impact", "Arial Black", sans-serif'
-                  }}>
-                    {game.title}
-                  </div>
-
-                  {/* Genre tag */}
-                  <div style={{
-                    display: 'inline-block',
-                    margin: '0 auto',
-                    padding: '6px 16px',
-                    background: 'rgba(0,0,0,0.7)',
-                    border: `2px solid ${game.color}`,
-                    borderRadius: '3px',
-                    fontSize: '13px',
-                    color: game.color,
-                    letterSpacing: '2px',
-                    fontWeight: 'bold',
-                    textShadow: `0 0 8px ${game.color}`,
-                    boxShadow: `inset 0 0 12px rgba(0,0,0,0.6)`
-                  }}>
-                    {game.genre}
-                  </div>
-                </div>
-
-                {/* Insert Coin footer */}
-                <div style={{
-                  padding: '12px',
-                  background: `linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.8))`,
-                  borderTop: `3px solid ${game.color}`,
-                  textAlign: 'center',
-                  fontSize: '15px',
-                  fontWeight: 'bold',
-                  color: '#00ffff',
-                  letterSpacing: '3px',
-                  textShadow: '0 0 12px #00ffff, 2px 2px 0 #000814',
-                  animation: 'insert-blink 1.5s ease-in-out infinite',
-                  zIndex: 2
-                }}>
-                  ▶ PRESS START
-                </div>
-
-                {/* Animated scan line */}
-                <div style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  height: '2px',
-                  background: `linear-gradient(90deg, transparent, ${game.color}, transparent)`,
-                  boxShadow: `0 0 8px ${game.color}`,
-                  animation: `scan-down-${idx} 3s linear infinite`,
-                  opacity: 0.6,
-                  pointerEvents: 'none',
-                  zIndex: 4
-                }} />
-
-                {/* Pixel grid overlay */}
-                <div style={{
+            <div style={{
+              position: 'relative',
+              flex: 1,
+              background: '#000000',
+              overflow: 'hidden',
+              padding: '14px',
+              perspective: '1800px'
+            }}>
+              <img
+                src={activeGame.image}
+                alt=""
+                style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundImage: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 3px)',
-                  pointerEvents: 'none',
-                  opacity: 0.5,
-                  zIndex: 4
-                }} />
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: 0.2,
+                  filter: 'saturate(0.95) contrast(0.95)',
+                  imageRendering: 'pixelated',
+                  pointerEvents: 'none'
+                }}
+              />
+
+              {games.map((game, index) => {
+                const rel = getRelativeOffset(index, activeIndex, games.length)
+                const isCenter = rel === 0
+                const isVisible = Math.abs(rel) <= 1
+                const frameColor = isCenter ? game.accent : '#1a6db4'
+
+                let transform = 'translate(-50%, -50%) scale(0.6)'
+                let opacity = 0
+                let zIndex = 10
+                let pointerEvents: 'auto' | 'none' = 'none'
+                let filter = 'brightness(0.7)'
+
+                if (isCenter) {
+                  transform = 'translate(-50%, -50%) translateX(0) scale(1) rotateY(0deg)'
+                  opacity = 1
+                  zIndex = 30
+                  pointerEvents = 'auto'
+                  filter = 'none'
+                } else if (rel === -1) {
+                  transform = 'translate(-50%, -50%) translateX(calc(-1 * min(500px, 30vw))) scale(0.78) rotateY(26deg) rotateZ(-1deg)'
+                  opacity = 0.68
+                  zIndex = 20
+                  pointerEvents = 'auto'
+                  filter = 'brightness(0.76)'
+                } else if (rel === 1) {
+                  transform = 'translate(-50%, -50%) translateX(min(500px, 30vw)) scale(0.78) rotateY(-26deg) rotateZ(1deg)'
+                  opacity = 0.68
+                  zIndex = 20
+                  pointerEvents = 'auto'
+                  filter = 'brightness(0.76)'
+                }
+
+                return (
+                  <div
+                    key={game.id}
+                    onClick={() => {
+                      if (!isVisible) return
+                      if (isCenter) return
+                      goTo(index)
+                    }}
+                    style={{
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      width: 'min(1420px, 86vw)',
+                      height: 'min(760px, calc(100vh - 330px))',
+                      border: `6px solid ${frameColor}`,
+                      background: '#000814',
+                      boxShadow: isCenter
+                        ? `0 0 0 3px #001122, 0 0 0 6px ${frameColor}, 0 0 0 10px #000000, 10px 10px 0 rgba(0,0,0,0.75)`
+                        : '0 0 0 3px #001122, 0 0 0 6px #1a6db4, 8px 8px 0 rgba(0,0,0,0.65)',
+                      overflow: 'hidden',
+                      transform,
+                      opacity,
+                      zIndex,
+                      transition: 'transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.35s ease',
+                      pointerEvents,
+                      cursor: isCenter ? 'default' : 'pointer',
+                      filter
+                    }}
+                  >
+                    <img
+                      src={game.image}
+                      alt={game.title}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        imageRendering: 'pixelated',
+                        pointerEvents: 'none'
+                      }}
+                    />
+
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.62) 62%, rgba(0,0,0,0.9) 100%)',
+                      pointerEvents: 'none'
+                    }} />
+
+                    <div style={{ position: 'absolute', left: 0, top: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', right: 0, top: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', left: 0, bottom: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', right: 0, bottom: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
+
+                    <div style={{
+                      position: 'absolute',
+                      top: '16px',
+                      left: '16px',
+                      display: 'flex',
+                      gap: '10px',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{
+                        background: game.accent,
+                        color: '#001122',
+                        padding: '7px 12px',
+                        border: '2px solid rgba(0,0,0,0.65)',
+                        fontSize: '12px',
+                        letterSpacing: '1px',
+                        boxShadow: '2px 2px 0 #000814'
+                      }}>
+                        {game.badge}
+                      </div>
+                      <div style={{
+                        background: 'rgba(0,0,0,0.65)',
+                        color: game.accent,
+                        padding: '7px 12px',
+                        border: `2px solid ${game.accent}`,
+                        fontSize: '12px',
+                        letterSpacing: '2px'
+                      }}>
+                        {game.genre}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      position: 'absolute',
+                      left: '32px',
+                      right: '32px',
+                      bottom: '32px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-end',
+                      gap: '20px'
+                    }}>
+                      <div style={{ maxWidth: '72%' }}>
+                        <div style={{
+                          fontSize: 'clamp(42px, 5vw, 78px)',
+                          lineHeight: '1.03',
+                          color: '#ffffff',
+                          letterSpacing: '3px',
+                          textShadow: '4px 4px 0 #000814',
+                          fontFamily: '"Impact", "Arial Black", sans-serif'
+                        }}>
+                          {game.title}
+                        </div>
+                        <div style={{
+                          marginTop: '12px',
+                          fontSize: '13px',
+                          color: '#d8f7ff',
+                          letterSpacing: '1px'
+                        }}>
+                          {game.tagline}
+                        </div>
+                      </div>
+
+                      {isCenter ? (
+                        <button
+                          type="button"
+                          onClick={startSelected}
+                          style={{
+                            background: game.accent,
+                            color: '#001122',
+                            border: '4px solid #001122',
+                            padding: '16px 22px',
+                            fontSize: '14px',
+                            letterSpacing: '2px',
+                            cursor: 'pointer',
+                            boxShadow: '4px 4px 0 #000000'
+                          }}
+                        >
+                          PLAY NOW
+                        </button>
+                      ) : (
+                        <div style={{
+                          background: 'rgba(0,0,0,0.6)',
+                          color: game.accent,
+                          border: `2px solid ${game.accent}`,
+                          padding: '11px 14px',
+                          fontSize: '11px',
+                          letterSpacing: '2px',
+                          boxShadow: '3px 3px 0 #000000'
+                        }}>
+                          VIEW
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundImage: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.16) 2px, rgba(0,0,0,0.16) 3px)',
+                      pointerEvents: 'none',
+                      opacity: 0.35
+                    }} />
+                  </div>
+                )
+              })}
+
+              <button
+                type="button"
+                onClick={goPrev}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '18px',
+                  transform: 'translateY(-50%)',
+                  zIndex: 1400,
+                  width: '66px',
+                  height: '66px',
+                  borderRadius: '0',
+                  border: `4px solid ${activeGame.accent}`,
+                  background: 'rgba(0,10,25,0.92)',
+                  color: activeGame.accent,
+                  fontSize: '34px',
+                  cursor: 'pointer',
+                  boxShadow: '4px 4px 0 #000000',
+                  imageRendering: 'pixelated'
+                }}
+                aria-label="Previous game"
+              >
+                ‹
               </button>
-            ))}
-          </div>
-        </div>
 
-        {/* CONTROL PANEL */}
-        <div style={{
-          background: 'linear-gradient(180deg, #003366, #001a33)',
-          border: '8px solid #0088ff',
-          borderTop: 'none',
-          padding: '24px 40px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '30px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.8), inset 0 4px 20px rgba(0,136,255,0.2)',
-          clipPath: 'polygon(0% 0%, 100% 0%, 95% 100%, 5% 100%)'
-        }}>
-          {/* Player 1 Controls */}
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            {/* Joystick */}
-            <div style={{
-              width: '70px',
-              height: '70px',
-              background: 'radial-gradient(circle at 40% 40%, #001a33, #000814)',
-              borderRadius: '50%',
-              border: '5px solid #0088ff',
-              boxShadow: '0 0 25px rgba(0,136,255,0.6), inset 0 0 20px rgba(0,0,0,0.8)',
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+              <button
+                type="button"
+                onClick={goNext}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '18px',
+                  transform: 'translateY(-50%)',
+                  zIndex: 1400,
+                  width: '66px',
+                  height: '66px',
+                  borderRadius: '0',
+                  border: `4px solid ${activeGame.accent}`,
+                  background: 'rgba(0,10,25,0.92)',
+                  color: activeGame.accent,
+                  fontSize: '34px',
+                  cursor: 'pointer',
+                  boxShadow: '4px 4px 0 #000000',
+                  imageRendering: 'pixelated'
+                }}
+                aria-label="Next game"
+              >
+                ›
+              </button>
+
               <div style={{
-                width: '30px',
-                height: '30px',
-                background: 'radial-gradient(circle at 30% 30%, #0099ff, #004488)',
-                borderRadius: '50%',
-                border: '3px solid #002244',
-                boxShadow: '0 0 15px rgba(0,153,255,0.8)'
-              }} />
+                position: 'absolute',
+                left: '50%',
+                bottom: '16px',
+                transform: 'translateX(-50%)',
+                zIndex: 1400,
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'center',
+                background: 'rgba(0,0,0,0.5)',
+                border: '3px solid #0088ff',
+                padding: '8px 12px',
+                boxShadow: '4px 4px 0 #000000',
+                imageRendering: 'pixelated'
+              }}>
+                {games.map((game, index) => (
+                  <button
+                    key={game.id}
+                    type="button"
+                    onClick={() => goTo(index)}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '0',
+                      border: `2px solid ${index === activeIndex ? game.accent : '#2f6da6'}`,
+                      background: index === activeIndex ? game.accent : '#00152b',
+                      boxShadow: index === activeIndex ? '2px 2px 0 #000000' : 'none',
+                      cursor: 'pointer',
+                      imageRendering: 'pixelated'
+                    }}
+                    aria-label={`Show ${game.title}`}
+                  />
+                ))}
+              </div>
             </div>
-            
-            {/* Action Buttons */}
-            {['#0099ff', '#00ccff', '#00ddff'].map((color, i) => (
-              <div key={i} style={{
-                width: '50px',
-                height: '50px',
-                borderRadius: '50%',
-                background: `radial-gradient(circle at 35% 35%, ${color}, ${color}bb)`,
-                border: '4px solid #002244',
-                boxShadow: `0 0 20px ${color}aa, inset 0 -3px 8px rgba(0,0,0,0.5)`,
-                position: 'relative',
-                top: i === 1 ? '-8px' : '0'
-              }} />
-            ))}
-          </div>
 
-          {/* Center Display */}
-          <div style={{
-            flex: '1',
-            textAlign: 'center',
-            padding: '12px 24px',
-            background: 'rgba(0,0,0,0.6)',
-            border: '3px solid #0088ff',
-            borderRadius: '4px',
-            boxShadow: 'inset 0 0 20px rgba(0,136,255,0.2)'
-          }}>
             <div style={{
-              fontSize: '14px',
-              color: '#00ffff',
-              letterSpacing: '3px',
-              textShadow: '0 0 12px #00ffff',
-              fontWeight: 'bold'
-            }}>
-              SELECT GAME • PRESS START • INSERT COIN
-            </div>
-          </div>
-
-          {/* Coin Slot */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <div style={{
-              width: '100px',
-              height: '50px',
-              background: 'linear-gradient(180deg, #000814, #001122)',
-              border: '4px solid #0088ff',
-              borderRadius: '6px',
-              boxShadow: '0 0 20px rgba(0,136,255,0.4), inset 0 0 15px rgba(0,0,0,0.9)',
+              background: 'linear-gradient(180deg, #0088ff, #0066cc)',
+              borderTop: '4px solid #00aaff',
+              padding: '16px',
+              textAlign: 'center',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              boxShadow: '0 -3px 20px rgba(0,136,255,0.5)'
             }}>
               <div style={{
                 position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '60px',
-                height: '4px',
-                background: '#002244',
-                boxShadow: 'inset 0 0 4px #000'
+                inset: 0,
+                backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(0,0,0,0.2) 20px, rgba(0,0,0,0.2) 40px)',
+                animation: 'stripe-move 2s linear infinite',
+                opacity: 0.4,
+                pointerEvents: 'none'
               }} />
-            </div>
-            <div style={{
-              fontSize: '11px',
-              color: '#00ffff',
-              letterSpacing: '2px',
-              textShadow: '0 0 8px #00ffff'
-            }}>
-              CREDITS: ∞
+              <div style={{
+                fontSize: '20px',
+                fontWeight: 'bold',
+                color: '#ffffff',
+                letterSpacing: '3px',
+                textShadow: '0 0 20px rgba(255,255,255,0.8), 3px 3px 0 #002244',
+                position: 'relative',
+                zIndex: 1
+              }}>
+                ★ SELECTED: {activeGame.title} ★
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes starfield-slow {
-          from { backgroundPosition: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px; }
-          to { backgroundPosition: 0 300px, 40px 360px, 130px 570px, 70px 400px, 150px 350px, 200px 480px; }
+        @keyframes pixel-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
-        
-        @keyframes grid-scroll {
-          from { backgroundPosition: 0 0; }
-          to { backgroundPosition: 0 41px; }
+        @keyframes stripe-move {
+          from { transform: translateX(0); }
+          to { transform: translateX(40px); }
         }
-        
-        @keyframes horizon-pulse {
-          0%, 100% { opacity: 0.7; boxShadow: 0 0 25px #0088ff; }
-          50% { opacity: 0.9; boxShadow: 0 0 40px #00aaff; }
-        }
-        
-        @keyframes neon-flicker {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.9; }
-          75% { opacity: 0.95; }
-        }
-        
-        @keyframes insert-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
-        }
-        
-        @keyframes scan-down-0 { from { top: 0; } to { top: 100%; } }
-        @keyframes scan-down-1 { from { top: 0; } to { top: 100%; } }
-        @keyframes scan-down-2 { from { top: 0; } to { top: 100%; } }
-        @keyframes scan-down-3 { from { top: 0; } to { top: 100%; } }
-        @keyframes scan-down-4 { from { top: 0; } to { top: 100%; } }
-        @keyframes scan-down-5 { from { top: 0; } to { top: 100%; } }
-        
-        @media (max-width: 1200px) {
-          .game-slot {
-            min-height: 180px !important;
+        @keyframes starfield-drift {
+          from {
+            background-position: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px;
+          }
+          to {
+            background-position: 0 200px, 40px 260px, 130px 470px, 70px 300px, 150px 250px, 200px 380px, 90px 420px;
           }
         }
-        
-        @media (max-width: 900px) {
-          .game-slot {
-            min-height: 160px !important;
+        @keyframes grid-pulse {
+          0%, 100% {
+            opacity: 0.58;
+            box-shadow: 0 -40px 100px rgba(0,136,255,0.4), 0 -80px 150px rgba(0,102,255,0.3);
+          }
+          50% {
+            opacity: 0.75;
+            box-shadow: 0 -40px 120px rgba(0,136,255,0.5), 0 -80px 180px rgba(0,102,255,0.4);
+          }
+        }
+        @keyframes horizon-glow {
+          0%, 100% {
+            box-shadow: 0 0 30px #0088ff, 0 0 60px #0066ff, 0 0 90px rgba(0,136,255,0.3);
+          }
+          50% {
+            box-shadow: 0 0 40px #00aaff, 0 0 80px #0088ff, 0 0 120px rgba(0,136,255,0.5);
           }
         }
       `}</style>

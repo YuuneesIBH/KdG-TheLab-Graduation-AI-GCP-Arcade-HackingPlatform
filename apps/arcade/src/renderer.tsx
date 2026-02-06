@@ -5,6 +5,7 @@ import { MenuScreen } from './menu'
 
 function App() {
   const [isBooting, setIsBooting] = useState(true)
+  const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const [coins, setCoins] = useState(0)
   const [time, setTime] = useState(0)
   const [highScore, setHighScore] = useState(999999)
@@ -221,7 +222,42 @@ function App() {
   }
 
   return (
-    <MenuScreen particles={particles} />
+    selectedGame ? (
+      <div style={{
+        background: 'radial-gradient(circle at 50% 50%, #1a0033, #000000)',
+        minHeight: '100vh',
+        margin: 0,
+        padding: '40px',
+        fontFamily: '"Courier New", monospace',
+        color: '#00ffff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: '20px'
+      }}>
+        <div style={{ fontSize: '40px', textShadow: '0 0 20px #00ffff, 4px 4px 0 #000' }}>
+          LOADING {selectedGame.toUpperCase()}
+        </div>
+        <button
+          type="button"
+          onClick={() => setSelectedGame(null)}
+          style={{
+            background: '#00ffff',
+            color: '#000',
+            border: '4px solid #000',
+            padding: '10px 20px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            letterSpacing: '2px'
+          }}
+        >
+          BACK TO MENU
+        </button>
+      </div>
+    ) : (
+      <MenuScreen particles={particles} onSelectGame={setSelectedGame} />
+    )
   )
 }
 

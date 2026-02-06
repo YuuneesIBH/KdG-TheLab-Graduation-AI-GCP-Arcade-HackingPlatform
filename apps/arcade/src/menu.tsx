@@ -6,480 +6,603 @@ type MenuProps = {
 }
 
 const games = [
-  { id: 'neon-runner', title: 'NEON RUNNER', genre: 'RACING', badge: 'NEW', color: '#00ffff', glow: '#00e5ff' },
-  { id: 'pixel-blaster', title: 'PIXEL BLASTER', genre: 'SHOOTER', badge: 'HOT', color: '#ff00ff', glow: '#ff3cff' },
-  { id: 'grid-fighter', title: 'GRID FIGHTER', genre: 'FIGHT', badge: 'VS', color: '#ffff00', glow: '#ffe400' },
-  { id: 'retro-quest', title: 'RETRO QUEST', genre: 'RPG', badge: 'EPIC', color: '#00ff00', glow: '#00d455' },
-  { id: 'sky-raid', title: 'SKY RAID', genre: 'ARCADE', badge: 'CO-OP', color: '#ff0080', glow: '#ff3a9d' },
-  { id: 'tank-rush', title: 'TANK RUSH', genre: 'STRATEGY', badge: 'BOSS', color: '#80ff00', glow: '#b7ff3a' }
+  { id: 'neon-runner', title: 'NEON RUNNER', genre: 'RACING', badge: 'NEW', color: '#0099ff', glow: '#00ccff' },
+  { id: 'pixel-blaster', title: 'PIXEL BLASTER', genre: 'SHOOTER', badge: 'HOT', color: '#00ddff', glow: '#00ffff' },
+  { id: 'grid-fighter', title: 'GRID FIGHTER', genre: 'FIGHT', badge: 'VS', color: '#0088ff', glow: '#00aaff' },
+  { id: 'retro-quest', title: 'RETRO QUEST', genre: 'RPG', badge: 'EPIC', color: '#00aaff', glow: '#00ddff' },
+  { id: 'sky-raid', title: 'SKY RAID', genre: 'ARCADE', badge: 'CO-OP', color: '#0077ff', glow: '#00aaff' },
+  { id: 'tank-rush', title: 'TANK RUSH', genre: 'STRATEGY', badge: 'BOSS', color: '#00bbff', glow: '#00eeff' }
 ]
 
 export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   return (
     <div style={{ 
-      background: 'radial-gradient(circle at 50% 40%, #1c0030, #050008 55%, #000000)',
+      background: 'linear-gradient(180deg, #001a40 0%, #000d1f 40%, #000510 70%, #000000 100%)',
       minHeight: '100vh',
       margin: 0,
       padding: '0',
       fontFamily: '"Courier New", monospace',
       position: 'relative',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
+      
+      {/* STARFIELD */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `
+          radial-gradient(1px 1px at 20% 30%, #0088ff, transparent),
+          radial-gradient(1px 1px at 60% 70%, #00ccff, transparent),
+          radial-gradient(2px 2px at 50% 50%, #ffffff, transparent),
+          radial-gradient(1px 1px at 80% 10%, #0088ff, transparent),
+          radial-gradient(1px 1px at 90% 60%, #00aaff, transparent),
+          radial-gradient(1px 1px at 15% 80%, #00ddff, transparent)
+        `,
+        backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px',
+        animation: 'starfield-slow 150s linear infinite',
+        opacity: 0.3,
+        pointerEvents: 'none'
+      }} />
+      
+      {/* RETRO GRID FLOOR */}
+      <div style={{
+        position: 'absolute',
+        bottom: '-20%',
+        left: '-30%',
+        right: '-30%',
+        height: '65%',
+        backgroundImage: `
+          repeating-linear-gradient(0deg,
+            transparent 0px,
+            transparent 38px,
+            #0099ff 38px,
+            #0099ff 41px
+          ),
+          repeating-linear-gradient(90deg,
+            transparent 0px,
+            transparent 58px,
+            #0066ff 58px,
+            #0066ff 61px
+          )
+        `,
+        transform: 'perspective(350px) rotateX(68deg)',
+        backgroundPosition: '0 0',
+        opacity: 0.4,
+        filter: 'blur(0.3px)',
+        boxShadow: '0 -40px 100px rgba(0,136,255,0.3)',
+        animation: 'grid-scroll 3s linear infinite'
+      }} />
+
+      {/* HORIZON */}
+      <div style={{
+        position: 'absolute',
+        top: '58%',
+        left: 0,
+        right: 0,
+        height: '3px',
+        background: 'linear-gradient(90deg, transparent, #0099ff, #00ccff, #0099ff, transparent)',
+        boxShadow: '0 0 25px #0088ff',
+        opacity: 0.7,
+        animation: 'horizon-pulse 2s ease-in-out infinite'
+      }} />
+      
       {/* SCANLINES */}
       <div style={{
         position: 'absolute',
         inset: 0,
-        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.4) 0px, rgba(0,0,0,0.4) 3px, transparent 3px, transparent 6px)',
+        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 2px, transparent 2px, transparent 4px)',
         pointerEvents: 'none',
         zIndex: 1000,
-        animation: 'scanline-drift 8s linear infinite'
+        opacity: 0.6
       }} />
-      {/* SOFT NEON HAZE */}
-      <div style={{
-        position: 'absolute',
-        inset: '-10%',
-        background: 'radial-gradient(circle at 20% 30%, rgba(255,0,140,0.12), transparent 50%), radial-gradient(circle at 80% 70%, rgba(0,255,255,0.12), transparent 50%)',
-        animation: 'haze-drift 12s ease-in-out infinite',
-        pointerEvents: 'none',
-        zIndex: 1
-      }} />
-      {/* DOT MATRIX */}
+      
+      {/* CRT VIGNETTE */}
       <div style={{
         position: 'absolute',
         inset: 0,
-        backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)',
-        backgroundSize: '8px 8px',
-        opacity: 0.35,
-        pointerEvents: 'none',
-        zIndex: 2
-      }} />
-      {/* CRT CURVE + VIGNETTE */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'radial-gradient(ellipse at center, transparent 0%, transparent 45%, rgba(0,0,0,0.35) 70%, rgba(0,0,0,0.85) 100%)',
+        background: 'radial-gradient(ellipse at center, transparent 0%, transparent 50%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.9) 100%)',
         pointerEvents: 'none',
         zIndex: 999
       }} />
-      {/* VHS NOISE */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 2px)',
-        mixBlendMode: 'screen',
-        opacity: 0.25,
-        pointerEvents: 'none',
-        zIndex: 998
-      }} />
-
+      
       {/* Particles */}
       {particles.map(p => (
         <div key={p.id} style={{
           position: 'absolute',
           left: p.x,
           top: p.y,
-          width: '10px',
-          height: '10px',
+          width: '8px',
+          height: '8px',
           background: p.color,
-          boxShadow: `0 0 15px ${p.color}`,
+          boxShadow: `0 0 12px ${p.color}`,
           pointerEvents: 'none',
           borderRadius: '50%'
         }} />
       ))}
-      
+
+      {/* MAIN ARCADE CABINET */}
       <div style={{
         position: 'relative',
         zIndex: 10,
-        minHeight: '100vh',
-        display: 'grid',
-        gridTemplateRows: 'auto 1fr auto'
+        width: 'min(1400px, 95vw)',
+        maxWidth: '1400px'
       }}>
-        {/* MARQUEE HEADER */}
+        
+        {/* CABINET TOP MARQUEE */}
         <div style={{
-          padding: '14px 28px 10px',
-          borderBottom: '8px solid #fff',
-          background: 'linear-gradient(180deg, #b10000, #ff3300, #ff9900)',
-          boxShadow: '0 10px 30px rgba(255,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
+          background: 'linear-gradient(180deg, #0066cc 0%, #004499 100%)',
+          borderTop: '8px solid #0088ff',
+          borderLeft: '8px solid #0088ff',
+          borderRight: '8px solid #0088ff',
+          borderBottom: '6px solid #00aaff',
+          padding: '20px 30px',
           position: 'relative',
-          overflow: 'hidden'
+          clipPath: 'polygon(5% 0%, 95% 0%, 100% 100%, 0% 100%)',
+          boxShadow: '0 0 40px rgba(0,136,255,0.6), inset 0 0 30px rgba(0,170,255,0.2)'
         }}>
-          {/* Bulb row */}
-          {Array.from({ length: 28 }).map((_, i) => (
-            <div key={`bulb-top-${i}`} style={{
-              position: 'absolute',
-              bottom: '6px',
-              left: `${i * 3.57}%`,
-              width: '14px',
-              height: '14px',
-              borderRadius: '50%',
-              background: ['#fff', '#ffff00', '#ff0000'][(i + 2) % 3],
-              boxShadow: `0 0 10px ${['#fff', '#ffff00', '#ff0000'][(i + 2) % 3]}`,
-              opacity: 0.9,
-              animation: 'bulb-blink 0.6s infinite',
-              animationDelay: `${i * 0.05}s`
-            }} />
-          ))}
-          {/* 90s chrome strips */}
+          {/* Neon tubes */}
           <div style={{
             position: 'absolute',
-            left: 0,
-            right: 0,
-            top: '6px',
+            top: '8px',
+            left: '10%',
+            right: '10%',
             height: '6px',
-            background: 'linear-gradient(90deg, transparent, #fff, transparent)',
-            opacity: 0.7
+            background: 'linear-gradient(90deg, transparent, #00ffff, #ffffff, #00ffff, transparent)',
+            boxShadow: '0 0 20px #00ffff',
+            borderRadius: '3px',
+            animation: 'neon-flicker 3s ease-in-out infinite'
           }} />
+          
           <div style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: '26px',
-            height: '4px',
-            background: 'linear-gradient(90deg, transparent, #ffff00, transparent)',
-            opacity: 0.7
-          }} />
-          <div style={{
-            fontSize: '46px',
-            color: '#ffff00',
-            textShadow: '0 0 30px #ffff00, 0 0 60px #ff9900, 6px 6px 0 #000',
-            letterSpacing: '10px',
-            animation: 'title-glitch 5s ease-in-out infinite',
-            whiteSpace: 'nowrap',
-            zIndex: 2
+            textAlign: 'center',
+            marginTop: '6px'
           }}>
-            ▓▓ GAME SELECT ▓▓
-          </div>
-          <div style={{
-            fontSize: '18px',
-            color: '#fff',
-            textShadow: '0 0 15px #fff, 3px 3px 0 #000',
-            letterSpacing: '4px',
-            zIndex: 2
-          }}>
-            CLICK A BANNER TO START
+            <div style={{
+              fontSize: '56px',
+              fontWeight: 'black',
+              color: '#ffffff',
+              textShadow: `
+                0 0 30px #00ffff,
+                0 0 60px #0088ff,
+                6px 6px 0 #002244,
+                -2px -2px 0 #004488
+              `,
+              letterSpacing: '14px',
+              lineHeight: '1',
+              fontFamily: '"Impact", "Arial Black", sans-serif'
+            }}>
+              GAME SELECT
+            </div>
+            <div style={{
+              fontSize: '16px',
+              color: '#00ffff',
+              letterSpacing: '6px',
+              marginTop: '8px',
+              textShadow: '0 0 15px #00ffff, 2px 2px 0 #002244'
+            }}>
+              ★ CHOOSE YOUR ADVENTURE ★
+            </div>
           </div>
         </div>
 
-        {/* CABINET FRAME */}
+        {/* MAIN SCREEN BEZEL */}
         <div style={{
-          padding: '18px',
-          background: 'linear-gradient(180deg, #2a003b, #0b0013)',
-          borderTop: '6px solid #111',
-          borderBottom: '6px solid #111',
-          position: 'relative',
-          overflow: 'hidden'
+          background: 'linear-gradient(180deg, #001a33, #000d1f)',
+          border: '12px solid #002244',
+          borderTop: 'none',
+          boxShadow: `
+            0 0 40px rgba(0,0,0,0.9),
+            inset 0 0 60px rgba(0,0,0,0.8),
+            inset 0 20px 40px rgba(0,136,255,0.1)
+          `,
+          padding: '30px',
+          position: 'relative'
         }}>
-          {/* Side panels */}
-          {['left', 'right'].map(side => (
-            <div key={side} style={{
+          {/* Screen corner bolts */}
+          {[
+            {top: '15px', left: '15px'},
+            {top: '15px', right: '15px'},
+            {bottom: '15px', left: '15px'},
+            {bottom: '15px', right: '15px'}
+          ].map((pos, i) => (
+            <div key={i} style={{
               position: 'absolute',
-              top: '16px',
-              bottom: '16px',
-              [side]: '12px',
-              width: '84px',
-              background: 'linear-gradient(180deg, #22002a, #120018)',
-              border: '4px solid #000',
-              boxShadow: 'inset 0 0 20px rgba(255,0,255,0.3)',
-              display: 'grid',
-              gap: '14px',
-              padding: '14px',
-              zIndex: 2
+              ...pos,
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle at 30% 30%, #0099ff, #004488)',
+              border: '3px solid #002244',
+              boxShadow: '0 0 12px rgba(0,136,255,0.6), inset 0 0 6px rgba(0,0,0,0.8)'
             }}>
               <div style={{
-                height: '52px',
-                background: 'linear-gradient(180deg, #ff0000, #990000)',
-                borderRadius: '6px',
-                border: '3px solid #000',
-                boxShadow: '0 0 12px #ff0000'
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '8px',
+                height: '2px',
+                background: '#001122'
               }} />
               <div style={{
-                height: '36px',
-                background: 'linear-gradient(180deg, #ffff00, #aa8800)',
-                borderRadius: '6px',
-                border: '3px solid #000',
-                boxShadow: '0 0 12px #ffff00'
-              }} />
-              <div style={{
-                height: '80px',
-                borderRadius: '6px',
-                border: '3px solid #000',
-                background: 'linear-gradient(180deg, #00ffff, #0088aa)',
-                boxShadow: '0 0 12px #00ffff'
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%) rotate(90deg)',
+                width: '8px',
+                height: '2px',
+                background: '#001122'
               }} />
             </div>
           ))}
 
+          {/* GAME GRID - Arcade style 2x3 */}
           <div style={{
-            border: '10px solid #111',
-            boxShadow: '0 0 30px rgba(0,0,0,0.8), inset 0 0 60px rgba(0,0,0,0.8)',
-            background: 'linear-gradient(180deg, #120018, #050008)',
-            padding: '18px',
-            margin: '0 108px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateRows: 'repeat(2, 1fr)',
+            gap: '24px',
+            background: 'linear-gradient(180deg, #000510, #000000)',
+            padding: '24px',
+            border: '4px solid #0088ff',
+            boxShadow: 'inset 0 0 40px rgba(0,136,255,0.15)',
             position: 'relative'
           }}>
-            {/* Bezel corners */}
-            {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map(corner => (
-              <div key={corner} style={{
-                position: 'absolute',
-                [corner.includes('top') ? 'top' : 'bottom']: '-6px',
-                [corner.includes('left') ? 'left' : 'right']: '-6px',
-                width: '18px',
-                height: '18px',
-                background: '#ffcc00',
-                border: '3px solid #000',
-                boxShadow: '0 0 12px #ffcc00'
-              }} />
-            ))}
-            <div
-              className="menu-grid"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, minmax(280px, 1fr))',
-                gap: '18px',
-                alignItems: 'stretch',
-                maxWidth: '1500px',
-                width: '100%',
-                margin: '0 auto'
-              }}
-            >
-          {games.map(game => (
-            <button
-              key={game.id}
-              type="button"
-              onClick={() => onSelectGame?.(game.id)}
-              className="arcade-card"
-              style={{
-                cursor: 'pointer',
-                border: `5px solid ${game.color}`,
-                background: 'linear-gradient(180deg, #0b0018, #050010)',
-                boxShadow: `0 0 25px ${game.color}, inset 0 0 25px rgba(0,0,0,0.7), 6px 6px 0 rgba(0,0,0,0.6)`,
-                padding: '0',
-                textAlign: 'left',
-                minHeight: '260px',
-                color: '#ffffff',
-                position: 'relative',
-                transition: 'transform 0.12s, box-shadow 0.12s',
-                display: 'grid',
-                gridTemplateRows: 'auto 1fr auto',
-                overflow: 'hidden'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)'
-                e.currentTarget.style.boxShadow = `0 0 45px ${game.color}, inset 0 0 25px rgba(0,0,0,0.6)`
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0) scale(1)'
-                e.currentTarget.style.boxShadow = `0 0 25px ${game.color}, inset 0 0 20px rgba(0,0,0,0.6)`
-              }}
-            >
-              <div style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                background: game.color,
-                color: '#000',
-                fontWeight: 'bold',
-                padding: '4px 8px',
-                border: '2px solid #000',
-                boxShadow: `0 0 15px ${game.color}`,
-                letterSpacing: '2px',
-                zIndex: 2
-              }}>
-                {game.badge}
-              </div>
+            {/* CRT Glass effect */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, rgba(0,136,255,0.08) 0%, transparent 20%, transparent 80%, rgba(0,136,255,0.05) 100%)',
+              pointerEvents: 'none',
+              zIndex: 5
+            }} />
 
-              {/* Banner art area */}
-              <div style={{
-                height: '120px',
-                background: `linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.2)), radial-gradient(circle at 20% 30%, ${game.glow}, transparent 60%)`,
-                borderBottom: `3px solid ${game.color}`,
-                boxShadow: `inset 0 -10px 20px rgba(0,0,0,0.6)`,
-                position: 'relative'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  left: '16px',
-                  bottom: '14px',
-                  fontSize: '26px',
-                  fontWeight: 'bold',
-                  letterSpacing: '4px',
-                  textShadow: `0 0 15px ${game.color}, 3px 3px 0 #000`
-                }}>
-                  {game.title}
-                </div>
-                <div style={{
-                  position: 'absolute',
-                  left: '0',
-                  right: '0',
-                  top: '0',
-                  height: '100%',
-                  backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.25) 0px, rgba(0,0,0,0.25) 2px, transparent 2px, transparent 4px)',
-                  opacity: 0.5,
-                  pointerEvents: 'none'
-                }} />
-              </div>
-
-              {/* Body */}
-              <div style={{
-                padding: '16px 18px',
-                display: 'grid',
-                gap: '8px'
-              }}>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#00ffff',
-                  letterSpacing: '3px'
-                }}>
-                  GENRE
-                </div>
-                <div style={{
-                  fontSize: '18px',
-                  color: game.color,
-                  letterSpacing: '3px'
-                }}>
-                  {game.genre}
-                </div>
-                <div style={{
-                  marginTop: '6px',
-                  height: '6px',
-                  background: 'rgba(0,0,0,0.7)',
-                  border: `1px solid ${game.color}`,
+            {games.map((game, idx) => (
+              <button
+                key={game.id}
+                type="button"
+                onClick={() => onSelectGame?.(game.id)}
+                className="game-slot"
+                style={{
+                  cursor: 'pointer',
+                  background: `
+                    linear-gradient(135deg, 
+                      rgba(0,10,20,0.95) 0%, 
+                      rgba(0,20,40,0.85) 50%, 
+                      rgba(0,10,20,0.95) 100%
+                    ),
+                    radial-gradient(circle at 30% 40%, ${game.glow}40, transparent 70%)
+                  `,
+                  border: `5px solid ${game.color}`,
+                  boxShadow: `
+                    0 0 35px ${game.color},
+                    inset 0 0 30px rgba(0,20,40,0.8),
+                    0 8px 16px rgba(0,0,0,0.6)
+                  `,
+                  padding: '0',
+                  minHeight: '220px',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'scale(1.05) translateY(-6px)'
+                  e.currentTarget.style.boxShadow = `
+                    0 0 50px ${game.color},
+                    0 0 80px ${game.glow},
+                    inset 0 0 30px rgba(0,20,40,0.7),
+                    0 12px 24px rgba(0,0,0,0.8)
+                  `
+                  e.currentTarget.style.zIndex = '10'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'scale(1) translateY(0)'
+                  e.currentTarget.style.boxShadow = `
+                    0 0 35px ${game.color},
+                    inset 0 0 30px rgba(0,20,40,0.8),
+                    0 8px 16px rgba(0,0,0,0.6)
+                  `
+                  e.currentTarget.style.zIndex = '1'
+                }}
+              >
+                {/* Slot number */}
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  left: '8px',
+                  width: '32px',
+                  height: '32px',
+                  background: 'rgba(0,0,0,0.8)',
+                  border: `2px solid ${game.color}`,
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  fontWeight: 'black',
+                  color: game.color,
+                  textShadow: `0 0 10px ${game.color}`,
+                  zIndex: 3
                 }}>
-                  <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    height: '100%',
-                    width: '45%',
-                    background: `linear-gradient(90deg, ${game.color}, ${game.glow})`,
-                    boxShadow: `0 0 10px ${game.color}`
-                  }} />
+                  {idx + 1}
                 </div>
-              </div>
 
-              {/* Footer */}
-              <div style={{
-                padding: '12px 18px',
-                borderTop: `3px solid ${game.color}`,
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.2), rgba(0,0,0,0.8))',
-                fontSize: '14px',
-                color: '#00ffff',
-                letterSpacing: '2px',
-                textAlign: 'right'
-              }}>
-                ▶ START
-              </div>
-              {/* Sweep glow */}
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.08) 45%, transparent 60%)',
-                animation: 'card-sweep 3.5s linear infinite',
-                pointerEvents: 'none'
-              }} />
-            </button>
-          ))}
-            </div>
+                {/* Badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  background: game.color,
+                  color: '#000814',
+                  fontSize: '11px',
+                  fontWeight: 'black',
+                  padding: '4px 10px',
+                  letterSpacing: '1px',
+                  border: '2px solid rgba(0,0,0,0.5)',
+                  boxShadow: `0 0 15px ${game.color}, inset 0 0 8px rgba(255,255,255,0.3)`,
+                  zIndex: 3
+                }}>
+                  {game.badge}
+                </div>
+
+                {/* Game Title Area */}
+                <div style={{
+                  padding: '50px 16px 20px',
+                  textAlign: 'center',
+                  flex: '1',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  zIndex: 2
+                }}>
+                  {/* Title */}
+                  <div style={{
+                    fontSize: '28px',
+                    fontWeight: 'black',
+                    color: '#ffffff',
+                    letterSpacing: '3px',
+                    textShadow: `
+                      0 0 25px ${game.color},
+                      0 0 50px ${game.glow},
+                      4px 4px 0 #000814,
+                      -1px -1px 0 ${game.color}40
+                    `,
+                    lineHeight: '1.2',
+                    marginBottom: '12px',
+                    fontFamily: '"Impact", "Arial Black", sans-serif'
+                  }}>
+                    {game.title}
+                  </div>
+
+                  {/* Genre tag */}
+                  <div style={{
+                    display: 'inline-block',
+                    margin: '0 auto',
+                    padding: '6px 16px',
+                    background: 'rgba(0,0,0,0.7)',
+                    border: `2px solid ${game.color}`,
+                    borderRadius: '3px',
+                    fontSize: '13px',
+                    color: game.color,
+                    letterSpacing: '2px',
+                    fontWeight: 'bold',
+                    textShadow: `0 0 8px ${game.color}`,
+                    boxShadow: `inset 0 0 12px rgba(0,0,0,0.6)`
+                  }}>
+                    {game.genre}
+                  </div>
+                </div>
+
+                {/* Insert Coin footer */}
+                <div style={{
+                  padding: '12px',
+                  background: `linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.8))`,
+                  borderTop: `3px solid ${game.color}`,
+                  textAlign: 'center',
+                  fontSize: '15px',
+                  fontWeight: 'bold',
+                  color: '#00ffff',
+                  letterSpacing: '3px',
+                  textShadow: '0 0 12px #00ffff, 2px 2px 0 #000814',
+                  animation: 'insert-blink 1.5s ease-in-out infinite',
+                  zIndex: 2
+                }}>
+                  ▶ PRESS START
+                </div>
+
+                {/* Animated scan line */}
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: '2px',
+                  background: `linear-gradient(90deg, transparent, ${game.color}, transparent)`,
+                  boxShadow: `0 0 8px ${game.color}`,
+                  animation: `scan-down-${idx} 3s linear infinite`,
+                  opacity: 0.6,
+                  pointerEvents: 'none',
+                  zIndex: 4
+                }} />
+
+                {/* Pixel grid overlay */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 3px)',
+                  pointerEvents: 'none',
+                  opacity: 0.5,
+                  zIndex: 4
+                }} />
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* CONTROL DECK */}
+        {/* CONTROL PANEL */}
         <div style={{
-          padding: '14px 28px 18px',
-          color: '#00ffff',
-          fontSize: '14px',
-          letterSpacing: '3px',
-          textShadow: '0 0 12px #00ffff, 2px 2px 0 #000',
-          borderTop: '6px solid #ff00ff',
-          background: 'linear-gradient(180deg, #3b001a, #120008)',
+          background: 'linear-gradient(180deg, #003366, #001a33)',
+          border: '8px solid #0088ff',
+          borderTop: 'none',
+          padding: '24px 40px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '20px'
+          gap: '30px',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.8), inset 0 4px 20px rgba(0,136,255,0.2)',
+          clipPath: 'polygon(0% 0%, 100% 0%, 95% 100%, 5% 100%)'
         }}>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          {/* Player 1 Controls */}
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+            {/* Joystick */}
             <div style={{
-              width: '44px',
-              height: '44px',
+              width: '70px',
+              height: '70px',
+              background: 'radial-gradient(circle at 40% 40%, #001a33, #000814)',
               borderRadius: '50%',
-              background: 'radial-gradient(circle at 30% 30%, #ff0000, #880000)',
-              border: '4px solid #000',
-              boxShadow: '0 0 15px #ff0000'
-            }} />
-            <div style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at 30% 30%, #00ffff, #0088aa)',
-              border: '4px solid #000',
-              boxShadow: '0 0 15px #00ffff'
-            }} />
-            <div style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at 30% 30%, #ffff00, #aa8800)',
-              border: '4px solid #000',
-              boxShadow: '0 0 15px #ffff00'
-            }} />
+              border: '5px solid #0088ff',
+              boxShadow: '0 0 25px rgba(0,136,255,0.6), inset 0 0 20px rgba(0,0,0,0.8)',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <div style={{
+                width: '30px',
+                height: '30px',
+                background: 'radial-gradient(circle at 30% 30%, #0099ff, #004488)',
+                borderRadius: '50%',
+                border: '3px solid #002244',
+                boxShadow: '0 0 15px rgba(0,153,255,0.8)'
+              }} />
+            </div>
+            
+            {/* Action Buttons */}
+            {['#0099ff', '#00ccff', '#00ddff'].map((color, i) => (
+              <div key={i} style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '50%',
+                background: `radial-gradient(circle at 35% 35%, ${color}, ${color}bb)`,
+                border: '4px solid #002244',
+                boxShadow: `0 0 20px ${color}aa, inset 0 -3px 8px rgba(0,0,0,0.5)`,
+                position: 'relative',
+                top: i === 1 ? '-8px' : '0'
+              }} />
+            ))}
           </div>
+
+          {/* Center Display */}
           <div style={{
-            fontSize: '14px',
-            letterSpacing: '3px'
+            flex: '1',
+            textAlign: 'center',
+            padding: '12px 24px',
+            background: 'rgba(0,0,0,0.6)',
+            border: '3px solid #0088ff',
+            borderRadius: '4px',
+            boxShadow: 'inset 0 0 20px rgba(0,136,255,0.2)'
           }}>
-            TIP: Use mouse or touch to select • Press ESC to return
+            <div style={{
+              fontSize: '14px',
+              color: '#00ffff',
+              letterSpacing: '3px',
+              textShadow: '0 0 12px #00ffff',
+              fontWeight: 'bold'
+            }}>
+              SELECT GAME • PRESS START • INSERT COIN
+            </div>
           </div>
+
+          {/* Coin Slot */}
           <div style={{
-            display: 'grid',
-            gap: '6px'
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px'
           }}>
             <div style={{
-              width: '86px',
-              height: '16px',
-              background: '#111',
-              border: '3px solid #000',
-              boxShadow: 'inset 0 0 10px #000'
-            }} />
+              width: '100px',
+              height: '50px',
+              background: 'linear-gradient(180deg, #000814, #001122)',
+              border: '4px solid #0088ff',
+              borderRadius: '6px',
+              boxShadow: '0 0 20px rgba(0,136,255,0.4), inset 0 0 15px rgba(0,0,0,0.9)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '60px',
+                height: '4px',
+                background: '#002244',
+                boxShadow: 'inset 0 0 4px #000'
+              }} />
+            </div>
             <div style={{
-              width: '86px',
-              height: '16px',
-              background: '#111',
-              border: '3px solid #000',
-              boxShadow: 'inset 0 0 10px #000'
-            }} />
+              fontSize: '11px',
+              color: '#00ffff',
+              letterSpacing: '2px',
+              textShadow: '0 0 8px #00ffff'
+            }}>
+              CREDITS: ∞
+            </div>
           </div>
         </div>
       </div>
 
       <style>{`
+        @keyframes starfield-slow {
+          from { backgroundPosition: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px; }
+          to { backgroundPosition: 0 300px, 40px 360px, 130px 570px, 70px 400px, 150px 350px, 200px 480px; }
+        }
+        
+        @keyframes grid-scroll {
+          from { backgroundPosition: 0 0; }
+          to { backgroundPosition: 0 41px; }
+        }
+        
+        @keyframes horizon-pulse {
+          0%, 100% { opacity: 0.7; boxShadow: 0 0 25px #0088ff; }
+          50% { opacity: 0.9; boxShadow: 0 0 40px #00aaff; }
+        }
+        
+        @keyframes neon-flicker {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.9; }
+          75% { opacity: 0.95; }
+        }
+        
+        @keyframes insert-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+        
+        @keyframes scan-down-0 { from { top: 0; } to { top: 100%; } }
+        @keyframes scan-down-1 { from { top: 0; } to { top: 100%; } }
+        @keyframes scan-down-2 { from { top: 0; } to { top: 100%; } }
+        @keyframes scan-down-3 { from { top: 0; } to { top: 100%; } }
+        @keyframes scan-down-4 { from { top: 0; } to { top: 100%; } }
+        @keyframes scan-down-5 { from { top: 0; } to { top: 100%; } }
+        
         @media (max-width: 1200px) {
-          .menu-grid { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+          .game-slot {
+            min-height: 180px !important;
+          }
         }
-        @media (max-width: 760px) {
-          .menu-grid { grid-template-columns: 1fr; }
-        }
-        .arcade-card { animation: card-glow 2.4s ease-in-out infinite; }
-        @keyframes bulb-blink {
-          0%, 90% { opacity: 1; }
-          95%, 100% { opacity: 0.4; }
-        }
-        @keyframes haze-drift {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(-10px, 8px); }
-        }
-        @keyframes card-sweep {
-          0% { transform: translateX(-120%); }
-          100% { transform: translateX(120%); }
-        }
-        @keyframes card-glow {
-          0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.08); }
+        
+        @media (max-width: 900px) {
+          .game-slot {
+            min-height: 160px !important;
+          }
         }
       `}</style>
     </div>

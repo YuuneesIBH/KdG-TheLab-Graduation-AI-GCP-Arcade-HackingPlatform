@@ -169,7 +169,6 @@ function App() {
               }
             }, i * 40)
           }
-          setTimeout(() => setIsBooting(false), 3000)
           return 10
         }
         return prev + 1
@@ -217,6 +216,7 @@ function App() {
         bootLineCount={bootLineCount}
         progress={progress}
         scrollingMarquee={scrollingMarquee}
+        onStart={() => setIsBooting(false)}
       />
     )
   }

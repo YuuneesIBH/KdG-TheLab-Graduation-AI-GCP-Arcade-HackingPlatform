@@ -18,6 +18,7 @@ type BootProps = {
   bootLineCount: number
   progress: number
   scrollingMarquee: string
+  onStart: () => void
 }
 
 export function BootScreen({
@@ -37,8 +38,11 @@ export function BootScreen({
   bootLines,
   bootLineCount,
   progress,
-  scrollingMarquee
+  scrollingMarquee,
+  onStart
 }: BootProps) {
+  const readyToStart = progress >= 100
+
   return (
     <div style={{
       background: 'linear-gradient(180deg, #001a40 0%, #000d1f 40%, #000510 70%, #000000 100%)',
@@ -242,18 +246,24 @@ export function BootScreen({
 
       {/* LOGO + BOOT PANEL WRAPPER */}
       <div style={{
-        position: 'relative',
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        bottom: 'auto',
+        transform: 'translate(-50%, -50%) scale(0.85)',
+        transformOrigin: 'center center',
         zIndex: 5,
         width: 'min(850px, 88vw)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '15px',
+        display: 'block'
       }}>
         {/* LOGO (nested divs om transform-conflict te vermijden) */}
         <div style={{
-          transform: `translate(${logoShake.x}px, ${logoShake.y}px)`,
-          textAlign: 'center'
+          position: 'absolute',
+          left: '50%',
+          top: '-980px',
+          transform: `translate(-50%, 0) translate(${logoShake.x}px, ${logoShake.y}px)`,
+          textAlign: 'center',
+          zIndex: 11
         }}>
           <div style={{
             display: 'flex',
@@ -264,8 +274,8 @@ export function BootScreen({
               src="./thearcaders_logo.png"
               alt="The Arcaders"
               style={{
-                width: '720px',
-                maxWidth: '92vw',
+                width: '1100px',
+                maxWidth: '98vw',
                 height: 'auto',
                 filter: 'drop-shadow(0 0 40px rgba(77,166,255,1)) drop-shadow(0 0 60px rgba(204,51,255,0.8))',
                 imageRendering: 'pixelated',
@@ -562,33 +572,59 @@ export function BootScreen({
                 textAlign: 'center',
                 position: 'relative',
                 overflow: 'hidden',
+                cursor: readyToStart ? 'pointer' : 'default',
                 boxShadow: progress < 100
                   ? '0 -3px 20px rgba(0,136,255,0.5)'
                   : '0 -3px 20px rgba(0,255,136,0.5)'
-              }}>
+              }}
+              onClick={readyToStart ? onStart : undefined}
+            >
                 <div style={{
                   position: 'absolute',
                   inset: 0,
                   backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(0,0,0,0.2) 20px, rgba(0,0,0,0.2) 40px)',
                   animation: 'stripe-move 2s linear infinite',
-                  opacity: 0.4
+                  opacity: 0.4,
+                  pointerEvents: 'none'
                 }} />
                 
-                <div style={{
-                  fontSize: '30px',
-                  fontWeight: 'black',
-                  color: '#ffffff',
-                  letterSpacing: '5px',
-                  textShadow: '0 0 25px rgba(255,255,255,0.8), 4px 4px 0 #002244',
-                  animation: progress < 100 ? 'urgent-blink 0.8s infinite' : 'ready-pulse 0.6s ease-in-out infinite',
-                  position: 'relative',
-                  zIndex: 1
-                }}>
-                  {progress < 100
-                    ? '▓▓ INSERT CARTRIDGE ▓▓'
-                    : '★ READY TO START ★'
-                  }
-                </div>
+                {progress < 100 ? (
+                  <div style={{
+                    fontSize: '30px',
+                    fontWeight: 'black',
+                    color: '#ffffff',
+                    letterSpacing: '5px',
+                    textShadow: '0 0 25px rgba(255,255,255,0.8), 4px 4px 0 #002244',
+                    animation: 'urgent-blink 0.8s infinite',
+                    position: 'relative',
+                    zIndex: 1
+                  }}>
+                    ▓▓ INSERT CARTRIDGE ▓▓
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onStart}
+                    style={{
+                      fontSize: '30px',
+                      fontWeight: 'black',
+                      color: '#ffffff',
+                      letterSpacing: '5px',
+                      textShadow: '0 0 25px rgba(255,255,255,0.8), 4px 4px 0 #002244',
+                      animation: 'ready-pulse 0.6s ease-in-out infinite',
+                      position: 'relative',
+                      zIndex: 1,
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit'
+                    }}
+                    aria-label="Start game menu"
+                  >
+                    ★ READY TO START - CLICK ★
+                  </button>
+                )}
               </div>
             </div>
           </div>

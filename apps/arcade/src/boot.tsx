@@ -263,12 +263,14 @@ export function BootScreen({
           top: '-980px',
           transform: `translate(-50%, 0) translate(${logoShake.x}px, ${logoShake.y}px)`,
           textAlign: 'center',
-          zIndex: 11
+          zIndex: 11,
+          pointerEvents: 'none'
         }}>
           <div style={{
             display: 'flex',
             justifyContent: 'center',
-            animation: 'title-float 3s ease-in-out infinite'
+            animation: 'title-float 3s ease-in-out infinite',
+            pointerEvents: 'none'
           }}>
             <img
               src="./thearcaders_logo.png"
@@ -279,7 +281,8 @@ export function BootScreen({
                 height: 'auto',
                 filter: 'drop-shadow(0 0 40px rgba(77,166,255,1)) drop-shadow(0 0 60px rgba(204,51,255,0.8))',
                 imageRendering: 'pixelated',
-                display: 'block'
+                display: 'block',
+                pointerEvents: 'none'
               }}
             />
           </div>
@@ -354,19 +357,27 @@ export function BootScreen({
                 }}>
                   ▓▒░ SYSTEM BOOT ░▒▓
                 </div>
-                <div style={{
-                  background: 'linear-gradient(180deg, #00ff88, #00cc66)',
-                  color: '#001122',
-                  padding: '6px 16px',
-                  border: '3px solid #00ff88',
-                  fontSize: '16px',
-                  fontWeight: 'black',
-                  letterSpacing: '2px',
-                  boxShadow: '0 0 15px rgba(0,255,136,0.5)',
-                  borderRadius: '2px'
-                }}>
+                <button
+                  type="button"
+                  onClick={readyToStart ? onStart : undefined}
+                  disabled={!readyToStart}
+                  style={{
+                    background: 'linear-gradient(180deg, #00ff88, #00cc66)',
+                    color: '#001122',
+                    padding: '6px 16px',
+                    border: '3px solid #00ff88',
+                    fontSize: '16px',
+                    fontWeight: 'black',
+                    letterSpacing: '2px',
+                    boxShadow: '0 0 15px rgba(0,255,136,0.5)',
+                    borderRadius: '2px',
+                    cursor: readyToStart ? 'pointer' : 'not-allowed',
+                    opacity: readyToStart ? 1 : 0.6
+                  }}
+                  aria-label="Start game menu"
+                >
                   START
-                </div>
+                </button>
               </div>
 
               {/* CONTENT */}

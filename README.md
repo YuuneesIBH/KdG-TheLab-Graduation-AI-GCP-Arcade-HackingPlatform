@@ -1,73 +1,78 @@
-# Arcade Platform - Project Beschrijving
+# Arcade Platform
 
-## Overzicht
-Een desktop arcade launcher gebouwd met Electron, TypeScript en React. Dit platform fungeert als centrale hub om verschillende arcade games (Pygame, Unity, standalone executables) te beheren en te starten vanuit één interface.
+> A desktop arcade launcher that starts all your games from one clean, fullscreen dashboard.
+
+## Why this project?
+This app bundles different game types (Pygame, Unity builds, standalone executables) into a single library with a consistent UI. Think: a real arcade experience, but manageable for school projects, demos, and events.
+
+## Highlights
+- 🧩 Centralize all games in one library
+- 🧭 Grid UI with thumbnails and fast navigation
+- 🎮 Launch multiple game types (Python, Unity, .exe)
+- 🥽 Fullscreen arcade mode focus
+- 🧪 Per-game metadata via JSON
 
 ## Tech Stack
-- **Electron** - Desktop applicatie framework
-- **TypeScript** - Type-safe development
-- **React** - UI framework voor de game grid interface
-- **Vite** - Build tool en dev server
-- **Node.js** - Backend voor game launching en file management
+**Icons**
+![TypeScript](https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg) ![JavaScript](https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg) ![React](https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg) ![Electron](https://cdn.jsdelivr.net/gh/devicons/devicon/icons/electron/electron-original.svg) ![Node.js](https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg) ![Vite](https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vitejs/vitejs-original.svg)
 
-## Project Structuur
+- **Electron** · desktop app shell
+- **TypeScript** · type-safe development
+- **React** · UI for the game grid
+- **Vite** · fast dev server and build tool
+- **Node.js** · game launching and file management
+
+## Project Structure
 ```
 arcade/
 ├── src/
-│   ├── main.ts          # Electron main process - app lifecycle & game launching
-│   ├── renderer.tsx     # React UI - game grid en navigatie
+│   ├── main.ts          # Electron main process: lifecycle & launching
+│   ├── renderer.tsx     # React UI: game grid and navigation
 │   ├── types.ts         # TypeScript interfaces (Game, metadata)
-│   └── index.html       # Electron renderer entry point
-├── games/               # Game executables en metadata
+│   └── index.html       # Electron renderer entry
+├── games/               # Game executables + metadata
 │   └── [game-folder]/
 │       ├── executable   # .exe, .py, Unity build, etc.
 │       ├── metadata.json
 │       └── thumbnail.png
+├── docs/                # Extra documentation
 ├── package.json
-├── tsconfig.json
-└── .gitignore
+└── tsconfig.json
 ```
 
-## Functionaliteit
-- **Game Library**: Grid view van beschikbare games met thumbnails
-- **Game Launcher**: Start verschillende game types (Python, Unity, executables)
-- **Metadata Management**: JSON-based game info (naam, beschrijving, type)
-- **Fullscreen Arcade Mode**: Dedicated fullscreen interface voor arcade gebruik
+## Features
+- **Game Library**: clean grid with cover art
+- **Game Launcher**: launch multiple game types through one flow
+- **Metadata Management**: simple JSON for name, description, type, category
+- **Arcade Mode**: fullscreen UI focused on quick input
 
-## Development
-
-### Setup
+## Quickstart
 ```bash
-# Installeer dependencies
+# 1) Install dependencies
 npm install
 
-# Installeer Electron en development tools
-npm install electron electron-vite vite react react-dom
-npm install -D @types/react @types/react-dom @types/node typescript @vitejs/plugin-react
+# 2) Start development mode
+npm run dev
 ```
 
-### Development Commands
+## Commands
 ```bash
-npm run dev          # Start development mode met hot reload
-npm run build        # Build voor productie
-npm run preview      # Preview production build
+npm run dev          # Development with hot reload
+npm run build        # Production build
+npm run preview      # Preview build
 ```
 
-## Team Context
-**The Lab Project - Arcade & Hacking Platform**
+## Add a Game
+1. Create a folder in `games/`.
+2. Add your executable and `thumbnail.png`.
+3. Add a `metadata.json` with the fields below.
 
-- **Rayan**: Hardware - arcade cabinet, buttons, computer setup
-- **Matthias**: Raspberry Pi Pico hacking tool
-- **Younes**: Arcade platform - game launcher en interface
-
-## Game Metadata Format
-Elke game in de `games/` folder heeft een `metadata.json`:
-
+### Metadata Example
 ```json
 {
   "id": "game-1",
   "name": "Super Arcade Game",
-  "description": "Een awesome arcade game",
+  "description": "A fast-paced arcade game with a retro vibe.",
   "executable": "game.exe",
   "thumbnail": "thumbnail.png",
   "category": "action",
@@ -75,14 +80,26 @@ Elke game in de `games/` folder heeft een `metadata.json`:
 }
 ```
 
+## Team Context
+**The Lab Project · Arcade & Hacking Platform**
+- **Rayan** · hardware (arcade cabinet, buttons, computer setup)
+- **Matthias** · Raspberry Pi Pico hacking tool
+- **Younes** · arcade platform (launcher and interface)
+
 ## Roadmap
-- [ ] Basis Electron + React setup
-- [ ] Game grid UI met thumbnails
-- [ ] Game launching functionaliteit
-- [ ] Metadata management systeem
-- [ ] Fullscreen arcade mode
+- [x] Base Electron + React setup
+- [x] Game grid UI with thumbnails
+- [x] Game launching functionality
+- [ ] Fullscreen arcade mode polish
 - [ ] Controller input support
-- [ ] High score tracking (optioneel)
+- [ ] High score tracking (optional)
 
 ## License
 ISC
+
+---
+
+### Extra Ideas (optional)
+- Auto-detect new games in `games/`
+- Category filters (action, puzzle, racing)
+- Favorites and recently played

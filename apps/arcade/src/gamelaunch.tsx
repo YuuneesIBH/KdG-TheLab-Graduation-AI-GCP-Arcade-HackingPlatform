@@ -1,4 +1,5 @@
 import React from 'react'
+import { games } from './menu'
 
 type GameLaunchProps = {
   gameId: string
@@ -17,9 +18,19 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
   const [pixelShift, setPixelShift] = React.useState(0)
   const [glitchLine, setGlitchLine] = React.useState(-1)
   const [coinBlink, setCoinBlink] = React.useState(false)
+  const [gameStarted, setGameStarted] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState('')
 
-  const title = formatTitle(gameId)
+  // Find the game info
+  const game = games.find(g => g.id === gameId)
+  const title = game ? game.title : formatTitle(gameId)
   const ready = progress >= 100
+
+  React.useEffect(() => {
+    console.log('🎮 GameLaunch mounted with gameId:', gameId)
+    console.log('🎮 Found game:', game)
+    console.log('🎮 Window.electron available?', !!window.electron)
+  }, [gameId, game])
 
   React.useEffect(() => {
     const progressInterval = setInterval(() => {
@@ -83,6 +94,49 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onBack])
+
+  // Launch the game when ready
+  const launchGame = React.useCallback(async () => {
+    console.log('🚀 LAUNCH GAME CLICKED!')
+    
+    if (!game) {
+      console.error('❌ No game found!')
+      setErrorMessage('Game not found!')
+      return
+    }
+    
+    console.log('🎮 Game to launch:', game)
+    console.log('📁 Executable path:', game.executable)
+    
+    setGameStarted(true)
+    
+    // Check if we're in Electron
+    if (window.electron?.launchGame) {
+      console.log('✅ Electron API available, launching...')
+      
+      try {
+        const result = await window.electron.launchGame(game.executable)
+        console.log('🎮 Launch result:', result)
+        
+        if (!result.success) {
+          setErrorMessage(result.message)
+          setGameStarted(false)
+        }
+      } catch (error) {
+        console.error('❌ Error launching game:', error)
+        setErrorMessage(`Error: ${error}`)
+        setGameStarted(false)
+      }
+    } else {
+      console.warn('⚠️ Electron API NOT available (running in browser?)')
+      console.log('Would launch:', game.executable)
+      setErrorMessage('Electron not available - are you running with npm run dev?')
+      
+      // Show alert as fallback
+      alert(`🎮 GAME LAUNCH\n\nGame: ${game.title}\nFile: ${game.executable}\n\n⚠️ This only works in Electron!\n\nRun: npm run dev`)
+      setGameStarted(false)
+    }
+  }, [game])
 
   return (
     <div style={{
@@ -310,6 +364,18 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
                 {title}
               </div>
 
+              {game && (
+                <div style={{
+                  fontSize: '14px',
+                  color: '#00ff88',
+                  textShadow: '0 0 8px #00ff88',
+                  letterSpacing: '1px',
+                  fontFamily: '"Courier New", monospace'
+                }}>
+                  FILE: {game.executable}
+                </div>
+              )}
+
               <div style={{
                 border: '3px solid #0088ff',
                 padding: '18px',
@@ -353,6 +419,36 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
                 </div>
               </div>
 
+              {/* ERROR MESSAGE */}
+              {errorMessage && (
+                <div style={{
+                  border: '3px solid #ff0000',
+                  padding: '12px',
+                  background: 'rgba(40,0,0,0.6)',
+                  boxShadow: '0 0 15px rgba(255,0,0,0.3)',
+                  fontSize: '12px',
+                  color: '#ff0000',
+                  textShadow: '0 0 8px #ff0000',
+                  letterSpacing: '1px'
+                }}>
+                  ⚠️ ERROR: {errorMessage}
+                </div>
+              )}
+
+              {/* DEBUG INFO */}
+              <div style={{
+                fontSize: '11px',
+                color: '#666',
+                fontFamily: '"Courier New", monospace',
+                borderTop: '1px solid #222',
+                paddingTop: '12px'
+              }}>
+                <div>🔍 Debug:</div>
+                <div>Ready: {ready ? 'YES' : 'NO'}</div>
+                <div>Game Started: {gameStarted ? 'YES' : 'NO'}</div>
+                <div>Electron API: {window.electron ? 'AVAILABLE ✅' : 'NOT AVAILABLE ❌'}</div>
+              </div>
+
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -366,25 +462,28 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
                   letterSpacing: '3px',
                   animation: ready ? 'ready-pulse 0.6s ease-in-out infinite' : 'urgent-blink 0.8s infinite'
                 }}>
-                  {ready ? 'READY TO PLAY' : 'PREPARING SYSTEM'}
+                  {gameStarted ? 'GAME RUNNING' : ready ? 'READY TO PLAY' : 'PREPARING SYSTEM'}
                 </div>
-                <button
-                  type="button"
-                  onClick={onBack}
-                  style={{
-                    background: 'transparent',
-                    color: '#ffffff',
-                    border: '3px solid #00ccff',
-                    padding: '10px 18px',
-                    fontWeight: 'bold',
-                    letterSpacing: '2px',
-                    cursor: 'pointer',
-                    textShadow: '0 0 10px #00ccff',
-                    boxShadow: '0 0 15px rgba(0,204,255,0.4), inset 0 0 10px rgba(0,204,255,0.2)'
-                  }}
-                >
-                  BACK TO MENU
-                </button>
+                {ready && !gameStarted && (
+                  <button
+                    type="button"
+                    onClick={launchGame}
+                    style={{
+                      background: 'linear-gradient(180deg, #00ff88, #00cc66)',
+                      color: '#001122',
+                      border: '4px solid #000000',
+                      padding: '12px 20px',
+                      fontWeight: 'bold',
+                      letterSpacing: '2px',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      boxShadow: '0 0 25px rgba(0,255,136,0.7), 4px 4px 0 #000000',
+                      animation: 'ready-pulse 0.6s ease-in-out infinite'
+                    }}
+                  >
+                    🚀 LAUNCH GAME
+                  </button>
+                )}
               </div>
             </div>
 
@@ -418,7 +517,7 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
                 letterSpacing: '4px',
                 textShadow: '0 0 20px rgba(255,255,255,0.8), 3px 3px 0 #002244'
               }}>
-                {ready ? 'SYSTEM ONLINE' : 'LOADING SYSTEM'}
+                {gameStarted ? 'GAME IN PROGRESS' : ready ? 'SYSTEM ONLINE' : 'LOADING SYSTEM'}
               </div>
             </div>
           </div>
@@ -459,10 +558,10 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
         }
         @keyframes starfield-drift {
           from {
-            backgroundPosition: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px;
+            background-position: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px;
           }
           to {
-            backgroundPosition: 0 200px, 40px 260px, 130px 470px, 70px 300px, 150px 250px;
+            background-position: 0 200px, 40px 260px, 130px 470px, 70px 300px, 150px 250px;
           }
         }
       `}</style>

@@ -14,9 +14,21 @@ type GameCard = {
   image: string
   accent: string
   glow: string
+  executable: string  // Path to the game file
 }
 
 const games: GameCard[] = [
+  {
+    id: 'space-invader',
+    title: 'SPACE INVADER',
+    genre: 'SHOOTER',
+    badge: 'CLASSIC',
+    tagline: 'Defend Earth from the alien invasion!',
+    image: 'https://images.pexels.com/photos/956999/milky-way-starry-sky-night-sky-star-956999.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    accent: '#00ff00',
+    glow: '#00ff00',
+    executable: 'games/SpaceInvader.py'
+  },
   {
     id: 'neon-runner',
     title: 'NEON RUNNER',
@@ -25,7 +37,8 @@ const games: GameCard[] = [
     tagline: 'Street sprint through the midnight skyline.',
     image: 'https://images.pexels.com/photos/7026427/pexels-photo-7026427.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
     accent: '#00ccff',
-    glow: '#00ccff'
+    glow: '#00ccff',
+    executable: 'games/neon-runner.py'
   },
   {
     id: 'pixel-blaster',
@@ -35,7 +48,8 @@ const games: GameCard[] = [
     tagline: 'Clear waves of enemies in pure arcade chaos.',
     image: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
     accent: '#00ff88',
-    glow: '#00ff88'
+    glow: '#00ff88',
+    executable: 'games/pixel-blaster.py'
   },
   {
     id: 'grid-fighter',
@@ -45,7 +59,8 @@ const games: GameCard[] = [
     tagline: 'Combo battles on an electric retro grid.',
     image: 'https://images.pexels.com/photos/29096083/pexels-photo-29096083.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
     accent: '#ffff00',
-    glow: '#ffff00'
+    glow: '#ffff00',
+    executable: 'games/grid-fighter.py'
   },
   {
     id: 'retro-quest',
@@ -55,7 +70,8 @@ const games: GameCard[] = [
     tagline: 'Explore dungeons and hunt legendary loot.',
     image: 'https://images.pexels.com/photos/4835419/pexels-photo-4835419.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
     accent: '#ff00ff',
-    glow: '#ff00ff'
+    glow: '#ff00ff',
+    executable: 'games/retro-quest.py'
   },
   {
     id: 'sky-raid',
@@ -65,19 +81,13 @@ const games: GameCard[] = [
     tagline: 'Fly low, dodge fire, and own the horizon.',
     image: 'https://images.pexels.com/photos/22845394/pexels-photo-22845394.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
     accent: '#00ffff',
-    glow: '#00ffff'
-  },
-  {
-    id: 'tank-rush',
-    title: 'TANK RUSH',
-    genre: 'STRATEGY',
-    badge: 'BOSS',
-    tagline: 'Armor up and push through heavy resistance.',
-    image: 'https://images.pexels.com/photos/25626507/pexels-photo-25626507.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
-    accent: '#00ff00',
-    glow: '#00ff00'
+    glow: '#00ffff',
+    executable: 'games/sky-raid.py'
   }
 ]
+
+// Export games array so other components can access it
+export { games }
 
 function wrapIndex(index: number, length: number) {
   return (index + length) % length
@@ -204,21 +214,20 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   // Random warship spawning and movement
   React.useEffect(() => {
     const spawnWarship = () => {
-      // Random entry point (left, right, top)
       const side = Math.floor(Math.random() * 3)
       let startX = 0, startY = 0, speedX = 0, speedY = 0
       
-      if (side === 0) { // From left
+      if (side === 0) {
         startX = -400
         startY = Math.random() * window.innerHeight * 0.6
         speedX = Math.random() * 8 + 6
         speedY = (Math.random() - 0.5) * 3
-      } else if (side === 1) { // From right
+      } else if (side === 1) {
         startX = window.innerWidth + 400
         startY = Math.random() * window.innerHeight * 0.6
         speedX = -(Math.random() * 8 + 6)
         speedY = (Math.random() - 0.5) * 3
-      } else { // From top
+      } else {
         startX = Math.random() * window.innerWidth
         startY = -200
         speedX = (Math.random() - 0.5) * 6
@@ -238,10 +247,8 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     }
 
     const spawnInterval = setInterval(() => {
-      if (Math.random() < 0.4) { // 40% chance every interval
-        spawnWarship()
-      }
-    }, 8000) // Check every 8 seconds
+      if (Math.random() < 0.4) spawnWarship()
+    }, 8000)
 
     const moveInterval = setInterval(() => {
       setWarships(prev => 
@@ -280,9 +287,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     }
 
     const spawnInterval = setInterval(() => {
-      if (Math.random() < 0.5) {
-        spawnStar()
-      }
+      if (Math.random() < 0.5) spawnStar()
     }, 2000)
 
     const moveInterval = setInterval(() => {
@@ -309,7 +314,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
   // Satellites orbiting
   React.useEffect(() => {
-    // Spawn 3 satellites
     setSatellites([
       { id: 1, x: 0, y: 0, angle: 0 },
       { id: 2, x: 0, y: 0, angle: 120 },
@@ -328,7 +332,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     return () => clearInterval(orbitInterval)
   }, [])
 
-  // UFOs flying horizontally with wobble
+  // UFOs
   React.useEffect(() => {
     const spawnUfo = () => {
       const newUfo = {
@@ -393,7 +397,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     }
   }, [])
 
-  // Floating power-ups
+  // Power-ups
   React.useEffect(() => {
     const types = [
       { type: 'SPEED', color: '#ffff00' },
@@ -431,7 +435,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     }
   }, [])
 
-  // Random explosions
+  // Explosions
   React.useEffect(() => {
     const triggerExplosion = () => {
       const newExplosion = {
@@ -453,7 +457,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     return () => clearInterval(explosionInterval)
   }, [])
 
-  // Confetti bursts
+  // Confetti
   React.useEffect(() => {
     const burstConfetti = () => {
       const centerX = Math.random() * window.innerWidth
@@ -497,7 +501,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     }
   }, [])
 
-  // Asteroids/debris floating
+  // Asteroids
   React.useEffect(() => {
     const spawnAsteroid = () => {
       const newAsteroid = {
@@ -526,7 +530,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     }
   }, [])
 
-  // Random laser beams
+  // Laser beams
   React.useEffect(() => {
     const shootLaser = () => {
       const newLaser = {
@@ -542,9 +546,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     }
 
     const laserInterval = setInterval(() => {
-      if (Math.random() < 0.3) {
-        shootLaser()
-      }
+      if (Math.random() < 0.3) shootLaser()
     }, 4000)
 
     return () => clearInterval(laserInterval)
@@ -561,7 +563,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
       transition: 'filter 0.06s',
       transform: `translateX(${pixelShift}px)`
     }}>
-      {/* STARFIELD - 90s arcade style */}
+      {/* STARFIELD */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -581,7 +583,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         pointerEvents: 'none'
       }} />
 
-      {/* PIXELATED EARTH IN BACKGROUND */}
+      {/* EARTH */}
       <div style={{
         position: 'absolute',
         right: '-15%',
@@ -613,7 +615,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         zIndex: 100,
         imageRendering: 'pixelated'
       }}>
-        {/* Pixelated continents */}
         <div style={{
           position: 'absolute',
           top: '30%',
@@ -668,7 +669,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         }} />
       ))}
 
-      {/* SATELLITES ORBITING EARTH */}
+      {/* SATELLITES */}
       {satellites.map(sat => {
         const radius = 550
         const centerX = window.innerWidth * 0.85 + radius * Math.cos(sat.angle * Math.PI / 180)
@@ -684,7 +685,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             zIndex: 700,
             pointerEvents: 'none'
           }}>
-            {/* Satellite body */}
             <div style={{
               position: 'absolute',
               left: '14px',
@@ -695,7 +695,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               border: '2px solid #00ffff',
               boxShadow: '0 0 15px #00ffff'
             }} />
-            {/* Solar panels */}
             <div style={{
               position: 'absolute',
               left: '0',
@@ -714,7 +713,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               background: '#0088ff',
               border: '1px solid #00aaff'
             }} />
-            {/* Antenna */}
             <div style={{
               position: 'absolute',
               left: '18px',
@@ -740,7 +738,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           pointerEvents: 'none',
           filter: 'drop-shadow(0 0 20px #00ff00)'
         }}>
-          {/* UFO dome */}
           <div style={{
             position: 'absolute',
             left: '15px',
@@ -752,7 +749,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             border: '3px solid #00ff00',
             boxShadow: '0 0 20px #00ff00, inset 0 0 15px rgba(0,255,0,0.3)'
           }} />
-          {/* UFO base */}
           <div style={{
             position: 'absolute',
             left: '0',
@@ -764,7 +760,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             border: '3px solid #00ff00',
             boxShadow: '0 0 25px #00ff00'
           }} />
-          {/* Lights */}
           <div style={{
             position: 'absolute',
             left: '20px',
@@ -812,7 +807,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           zIndex: 650,
           pointerEvents: 'none'
         }}>
-          {/* Comet head */}
           <div style={{
             width: '20px',
             height: '20px',
@@ -820,7 +814,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             borderRadius: '50%',
             boxShadow: '0 0 30px #ffaa00, 0 0 50px #ff6600'
           }} />
-          {/* Comet tail */}
           <div style={{
             position: 'absolute',
             left: '-80px',
@@ -834,7 +827,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         </div>
       ))}
 
-      {/* POWER-UPS FLOATING */}
+      {/* POWER-UPS */}
       {powerUps.map(pu => (
         <div key={pu.id} style={{
           position: 'absolute',
@@ -909,7 +902,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         }} />
       ))}
 
-      {/* PIXEL GRID BACKGROUND */}
+      {/* GRID BACKGROUND */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -921,7 +914,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         transition: 'all 0.4s ease'
       }} />
 
-      {/* CRT VIGNETTE */}
+      {/* VIGNETTE */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -930,7 +923,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         zIndex: 999
       }} />
 
-      {/* GLOWING EDGE EFFECT */}
+      {/* GLOW */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -940,7 +933,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         transition: 'all 0.4s ease'
       }} />
 
-      {/* RETRO GRID FLOOR */}
+      {/* GRID FLOOR */}
       <div style={{
         position: 'absolute',
         bottom: '-20%',
@@ -961,7 +954,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         transition: 'all 0.4s ease'
       }} />
 
-      {/* HORIZON LINE */}
+      {/* HORIZON */}
       <div style={{
         position: 'absolute',
         top: '46%',
@@ -990,7 +983,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         }} />
       ))}
 
-      {/* RANDOM WARSHIPS */}
+      {/* WARSHIPS */}
       {warships.map(ship => (
         <div key={ship.id} style={{
           position: 'absolute',
@@ -1001,9 +994,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           filter: 'drop-shadow(0 0 20px #00ffff)',
           transform: `rotate(${ship.rotation}deg)`
         }}>
-          {/* Warship body */}
           <div style={{ position: 'relative', width: '300px', height: '80px' }}>
-            {/* Main hull */}
             <div style={{
               position: 'absolute',
               left: '50px',
@@ -1014,7 +1005,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               border: '3px solid #00ccff',
               boxShadow: '0 0 30px #00ccff, inset 0 0 20px rgba(0,200,255,0.3)'
             }} />
-            {/* Cockpit */}
             <div style={{
               position: 'absolute',
               left: '220px',
@@ -1026,7 +1016,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               clipPath: 'polygon(0 50%, 100% 0, 100% 100%)',
               boxShadow: '0 0 25px #00ffff'
             }} />
-            {/* Wings */}
             <div style={{
               position: 'absolute',
               left: '80px',
@@ -1045,7 +1034,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               background: '#0066cc',
               border: '2px solid #00aaff'
             }} />
-            {/* Engine glow */}
             <div style={{
               position: 'absolute',
               left: '35px',
@@ -1065,7 +1053,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               background: 'linear-gradient(90deg, #ff8800, transparent)',
               opacity: 0.8
             }} />
-            {/* Details */}
             <div style={{
               position: 'absolute',
               left: '100px',
@@ -1090,7 +1077,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         </div>
       ))}
 
-      {/* ASTEROIDS/DEBRIS */}
+      {/* ASTEROIDS */}
       {asteroids.map(ast => (
         <div key={ast.id} style={{
           position: 'absolute',
@@ -1107,7 +1094,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         }} />
       ))}
 
-      {/* LASER BEAMS */}
+      {/* LASERS */}
       {laserBeams.map(laser => (
         <div key={laser.id} style={{
           position: 'absolute',
@@ -1134,7 +1121,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         opacity: 0.6
       }} />
 
-      {/* GLITCH LINE */}
+      {/* GLITCH */}
       {glitchLine >= 0 && (
         <div style={{
           position: 'absolute',
@@ -1148,7 +1135,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         }} />
       )}
 
-      {/* RETRO STATUS BAR */}
+      {/* STATUS BAR */}
       <div style={{
         position: 'absolute',
         top: '20px',
@@ -1224,7 +1211,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               boxShadow: `0 3px 20px ${activeGame.accent}66`,
               transition: 'all 0.4s ease'
             }}>
-              {/* Corner pixels */}
               <div style={{
                 position: 'absolute',
                 top: '10px',
@@ -1278,7 +1264,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               </button>
             </div>
 
-            {/* MAIN CAROUSEL AREA */}
+            {/* MAIN AREA */}
             <div style={{
               position: 'relative',
               flex: 1,
@@ -1340,7 +1326,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                     key={game.id}
                     onClick={() => {
                       if (!isVisible) return
-                      if (isCenter) return
+                      if (isCenter) {
+                        startSelected()
+                        return
+                      }
                       goTo(index)
                     }}
                     style={{
@@ -1360,7 +1349,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       zIndex,
                       transition: 'transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.35s ease',
                       pointerEvents,
-                      cursor: isCenter ? 'default' : 'pointer',
+                      cursor: 'pointer',
                       filter
                     }}
                   >
@@ -1385,13 +1374,11 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       pointerEvents: 'none'
                     }} />
 
-                    {/* Corner brackets */}
                     <div style={{ position: 'absolute', left: 0, top: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
                     <div style={{ position: 'absolute', right: 0, top: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
                     <div style={{ position: 'absolute', left: 0, bottom: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
                     <div style={{ position: 'absolute', right: 0, bottom: 0, width: '14px', height: '14px', background: frameColor, pointerEvents: 'none' }} />
 
-                    {/* Badges */}
                     <div style={{
                       position: 'absolute',
                       top: '16px',
@@ -1425,7 +1412,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       </div>
                     </div>
 
-                    {/* Bottom content */}
                     <div style={{
                       position: 'absolute',
                       left: '32px',
@@ -1461,7 +1447,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       {isCenter ? (
                         <button
                           type="button"
-                          onClick={startSelected}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startSelected()
+                          }}
                           style={{
                             background: game.accent,
                             color: '#000000',
@@ -1491,7 +1480,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       )}
                     </div>
 
-                    {/* Scanline overlay */}
                     <div style={{
                       position: 'absolute',
                       inset: 0,
@@ -1503,7 +1491,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                 )
               })}
 
-              {/* Navigation arrows */}
               <button
                 type="button"
                 onClick={goPrev}
@@ -1524,7 +1511,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                   boxShadow: `0 0 25px ${activeGame.accent}, 5px 5px 0 #000000`,
                   fontWeight: 'bold'
                 }}
-                aria-label="Previous game"
+                aria-label="Previous"
               >
                 ‹
               </button>
@@ -1549,12 +1536,11 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                   boxShadow: `0 0 25px ${activeGame.accent}, 5px 5px 0 #000000`,
                   fontWeight: 'bold'
                 }}
-                aria-label="Next game"
+                aria-label="Next"
               >
                 ›
               </button>
 
-              {/* Dot indicators */}
               <div style={{
                 position: 'absolute',
                 left: '50%',
@@ -1594,7 +1580,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
               </div>
             </div>
 
-            {/* BOTTOM STATUS BAR */}
             <div style={{
               background: `linear-gradient(180deg, ${activeGame.accent}, ${activeGame.accent}cc)`,
               borderTop: `4px solid ${activeGame.accent}`,

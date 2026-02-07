@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BootScreen } from './boot'
 import { MenuScreen } from './menu'
+import { GameLaunch } from './gamelaunch'
 
 function App() {
   const [isBooting, setIsBooting] = useState(true)
@@ -223,38 +224,11 @@ function App() {
 
   return (
     selectedGame ? (
-      <div style={{
-        background: 'radial-gradient(circle at 50% 50%, #1a0033, #000000)',
-        minHeight: '100vh',
-        margin: 0,
-        padding: '40px',
-        fontFamily: '"Courier New", monospace',
-        color: '#00ffff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        gap: '20px'
-      }}>
-        <div style={{ fontSize: '40px', textShadow: '0 0 20px #00ffff, 4px 4px 0 #000' }}>
-          LOADING {selectedGame.toUpperCase()}
-        </div>
-        <button
-          type="button"
-          onClick={() => setSelectedGame(null)}
-          style={{
-            background: '#00ffff',
-            color: '#000',
-            border: '4px solid #000',
-            padding: '10px 20px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            letterSpacing: '2px'
-          }}
-        >
-          BACK TO MENU
-        </button>
-      </div>
+      <GameLaunch
+        gameId={selectedGame}
+        particles={particles}
+        onBack={() => setSelectedGame(null)}
+      />
     ) : (
       <MenuScreen particles={particles} onSelectGame={setSelectedGame} />
     )

@@ -13,7 +13,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
-    fullscreen: false,
+    fullscreen: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -27,6 +27,11 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
+
+  // Ensure fullscreen after load (in case fullscreen: true is ignored on some systems)
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.setFullScreen(true)
+  })
 
   mainWindow.on('closed', () => {
     mainWindow = null

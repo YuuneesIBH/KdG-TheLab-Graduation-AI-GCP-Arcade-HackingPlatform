@@ -6,18 +6,14 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: {
-        input: {
-          main: resolve(__dirname, 'src/main.ts')
-        }
+        input: resolve(__dirname, 'src/main.ts')
       }
     }
   },
   preload: {
     build: {
       rollupOptions: {
-        input: {
-          preload: resolve(__dirname, 'src/preload.ts')
-        }
+        input: resolve(__dirname, 'src/preload.ts')
       }
     }
   },

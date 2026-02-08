@@ -92,7 +92,22 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    
+    // Listen for game exit event
+    const cleanup = window.electron?.onGameExit?.(() => {
+      console.log('🎮 Game exited, showing UI again')
+      const root = document.getElementById('root')
+      if (root) {
+        root.style.display = 'block'
+      }
+      setGameStarted(false)
+      onBack() // Go back to menu
+    })
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      cleanup?.()
+    }
   }, [onBack])
 
   // Launch the game when ready
@@ -118,7 +133,16 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
         const result = await window.electron.launchGame(game.executable)
         console.log('🎮 Launch result:', result)
         
-        if (!result.success) {
+        if (result.success) {
+          // Hide the UI after a short delay to let game window appear
+          setTimeout(() => {
+            // Hide the entire app UI by making it invisible
+            const root = document.getElementById('root')
+            if (root) {
+              root.style.display = 'none'
+            }
+          }, 800)
+        } else {
           setErrorMessage(result.message)
           setGameStarted(false)
         }

@@ -25,9 +25,44 @@ DARK_BLUE = (10, 10, 50)
 
 # Inicializa Pygame
 pygame.init()
+
+# Fix for pygame.font issue with Python 3.14
+# Try to initialize font module explicitly
+try:
+    pygame.font.init()
+except:
+    pass
+
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Space Battle - Alien Invasion")
 clock = pygame.time.Clock()
+
+# Helper function to get font with fallback
+def get_font(size):
+    """Get font with fallback for Python 3.14 compatibility"""
+    # Try system fonts first (these usually work even when Font doesn't)
+    system_fonts = ['arial', 'helvetica', 'courier', 'times', 'verdana', 'dejavusans']
+    
+    for font_name in system_fonts:
+        try:
+            return pygame.font.SysFont(font_name, size)
+        except:
+            continue
+    
+    # Try default system font
+    try:
+        default_font = pygame.font.get_default_font()
+        if default_font:
+            return pygame.font.SysFont(default_font, size)
+    except:
+        pass
+    
+    # Last resort: try Font with None (might fail but worth trying)
+    try:
+        return pygame.font.Font(None, size)
+    except:
+        # If all else fails, return None and handle in code
+        return None
 
 # Clase de estrellas animadas
 class Star:
@@ -394,9 +429,13 @@ class PowerUp:
             # Símbolo de triple disparo
             pygame.draw.circle(self.image, ORANGE, (12, 12), 12)
             pygame.draw.circle(self.image, YELLOW, (12, 12), 10)
-            font = pygame.font.Font(None, 20)
-            text = font.render("3X", True, BLACK)
-            self.image.blit(text, (4, 6))
+            font = get_font(20)
+            if font:
+                text = font.render("3X", True, BLACK)
+            else:
+                text = None
+            if text:
+                self.image.blit(text, (4, 6))
             
         elif self.type == "shield":
             # Símbolo de escudo
@@ -558,8 +597,12 @@ class SpaceBattle:
             screen.blit(powerup.image, powerup.rect)
         
         # HUD con diseño mejorado
-        font = pygame.font.Font(None, 32)
-        font_small = pygame.font.Font(None, 24)
+        font = get_font(32)
+        font_small = get_font(24)
+        
+        # Skip rendering if fonts are not available
+        if font is None or font_small is None:
+            return
         
         # Panel superior semi-transparente
         panel = pygame.Surface((SCREEN_WIDTH, 60), pygame.SRCALPHA)
@@ -595,9 +638,12 @@ class SpaceBattle:
         overlay.fill((0, 0, 0, 200))
         screen.blit(overlay, (0, 0))
         
-        font_huge = pygame.font.Font(None, 90)
-        font_large = pygame.font.Font(None, 48)
-        font_medium = pygame.font.Font(None, 36)
+        font_huge = get_font(90)
+        font_large = get_font(48)
+        font_medium = get_font(36)
+        
+        if not (font_huge and font_large and font_medium):
+            return
         
         game_over_text = font_huge.render("GAME OVER", True, RED)
         score_text = font_large.render(f"Final Score: {self.score}", True, YELLOW)

@@ -1,6 +1,24 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
 import { spawn } from 'child_process'
+import fs from 'fs'
+
+type LaunchViewport = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+type LaunchRequest = {
+  gamePath: string
+  mode?: 'external' | 'embedded'
+  viewport?: LaunchViewport
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -39,7 +57,7 @@ function createWindow() {
 }
 
 // IPC handler for making window fullscreen
-ipcMain.handle('set-fullscreen', async (event, fullscreen: boolean) => {
+ipcMain.handle('set-fullscreen', async (_event, fullscreen: boolean) => {
   if (mainWindow) {
     mainWindow.setFullScreen(fullscreen)
     return { success: true }
@@ -47,39 +65,36 @@ ipcMain.handle('set-fullscreen', async (event, fullscreen: boolean) => {
   return { success: false }
 })
 
-// IPC handler for hiding/showing window
-ipcMain.handle('hide-window', async () => {
-  if (mainWindow) {
-    mainWindow.hide()
-    return { success: true }
-  }
-  return { success: false }
-})
-
-ipcMain.handle('show-window', async () => {
-  if (mainWindow) {
-    mainWindow.show()
-    return { success: true }
-  }
-  return { success: false }
-})
-
 // IPC handler for launching games
-ipcMain.handle('launch-game', async (event, gamePath: string) => {
+ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) => {
   try {
+    const request: LaunchRequest = typeof payload === 'string'
+      ? { gamePath: payload, mode: 'external' }
+      : { ...payload, mode: payload.mode ?? 'external' }
+
+    const { gamePath } = request
+    const launchMode = request.mode ?? 'external'
+
+    if (!gamePath) {
+      return {
+        success: false,
+        message: 'Missing game path'
+      }
+    }
+
     console.log('🎮 Launching game:', gamePath)
+    console.log('🎮 Launch mode:', launchMode)
+
+    const activeDisplay = mainWindow
+      ? screen.getDisplayMatching(mainWindow.getBounds())
+      : screen.getPrimaryDisplay()
+    const displayBounds = activeDisplay.bounds
     
     // Make window fullscreen before launching game
     if (mainWindow) {
-      // Get screen size for fullscreen
-      const primaryDisplay = screen.getPrimaryDisplay()
-      const { width, height } = primaryDisplay.workAreaSize
-      
-      // Set window to fullscreen size
+      // Use physical display bounds so the launcher matches the monitor resolution.
+      mainWindow.setBounds(displayBounds)
       mainWindow.setFullScreen(true)
-      mainWindow.setBounds({ x: 0, y: 0, width, height })
-      
-      // Keep window visible but let game window appear on top
     }
     
     // Resolve the game path relative to the app directory
@@ -96,32 +111,56 @@ ipcMain.handle('launch-game', async (event, gamePath: string) => {
     console.log('📁 Full game path:', fullGamePath)
     
     // Check if file exists
-    const fs = require('fs')
     if (!fs.existsSync(fullGamePath)) {
       return {
         success: false,
         message: `Game file not found: ${gamePath}`
       }
     }
-    
-    // Get window bounds to position game window
-    const bounds = mainWindow?.getBounds()
+
+    const hostBounds = mainWindow?.getBounds() || displayBounds
+    const defaultBounds = {
+      x: displayBounds.x,
+      y: displayBounds.y,
+      width: displayBounds.width,
+      height: displayBounds.height
+    }
+
+    const viewport = request.viewport
+    const targetBounds = launchMode === 'embedded' && viewport
+      ? (() => {
+          const minWidth = Math.min(320, displayBounds.width)
+          const minHeight = Math.min(240, displayBounds.height)
+          const width = clamp(Math.round(viewport.width), minWidth, displayBounds.width)
+          const height = clamp(Math.round(viewport.height), minHeight, displayBounds.height)
+          const maxX = displayBounds.x + displayBounds.width - width
+          const maxY = displayBounds.y + displayBounds.height - height
+
+          return {
+            x: clamp(Math.round(hostBounds.x + viewport.x), displayBounds.x, maxX),
+            y: clamp(Math.round(hostBounds.y + viewport.y), displayBounds.y, maxY),
+            width,
+            height
+          }
+        })()
+      : defaultBounds
     
     // Determine how to launch based on file extension
     if (gamePath.endsWith('.py')) {
       // Launch Python script
       // Try python3 first, fallback to python
       const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
-      
-      // Get fullscreen bounds
-      const display = mainWindow?.getBounds()
-      const screenBounds = mainWindow?.getBounds() || { x: 0, y: 0, width: 1920, height: 1080 }
-      
+
       const pythonProcess = spawn(pythonCmd, [fullGamePath], {
         detached: true,
         stdio: ['ignore', 'pipe', 'pipe'], // Capture stdout and stderr for debugging
         cwd: path.dirname(fullGamePath), // Set working directory to game folder
-        env: { ...process.env }
+        env: {
+          ...process.env,
+          ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
+          ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
+          ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
+        }
       })
       
       // Log Python output for debugging
@@ -138,7 +177,6 @@ ipcMain.handle('launch-game', async (event, gamePath: string) => {
         // Show window again if game fails to launch
         if (mainWindow) {
           mainWindow.show()
-          mainWindow.setFullScreen(false)
         }
       })
       
@@ -148,7 +186,6 @@ ipcMain.handle('launch-game', async (event, gamePath: string) => {
         // Show Electron window again when game closes
         if (mainWindow) {
           mainWindow.show()
-          mainWindow.setFullScreen(false)
           // Notify renderer that game exited
           mainWindow.webContents.send('game-exited')
         }
@@ -162,6 +199,10 @@ ipcMain.handle('launch-game', async (event, gamePath: string) => {
         
         const positionWindow = setInterval(() => {
           attempts++
+
+          const fullscreenScript = launchMode === 'embedded'
+            ? 'set value of attribute "AXFullScreen" of win to false'
+            : 'set value of attribute "AXFullScreen" of win to true'
           
           const script = `
             tell application "System Events"
@@ -172,10 +213,9 @@ ipcMain.handle('launch-game', async (event, gamePath: string) => {
                     set procWindows to windows of proc
                     repeat with win in procWindows
                       try
-                        set position of win to {0, 0}
-                        set size of win to {${screenBounds.width}, ${screenBounds.height}}
-                        -- Make it fullscreen-like
-                        set value of attribute "AXFullScreen" of win to true
+                        set position of win to {${targetBounds.x}, ${targetBounds.y}}
+                        set size of win to {${targetBounds.width}, ${targetBounds.height}}
+                        ${fullscreenScript}
                       end try
                     end repeat
                   end try
@@ -212,7 +252,7 @@ ipcMain.handle('launch-game', async (event, gamePath: string) => {
       exeProcess.on('exit', () => {
         if (mainWindow) {
           mainWindow.show()
-          mainWindow.setFullScreen(false)
+          mainWindow.webContents.send('game-exited')
         }
       })
       
@@ -234,7 +274,6 @@ ipcMain.handle('launch-game', async (event, gamePath: string) => {
     // Show window again on error
     if (mainWindow) {
       mainWindow.show()
-      mainWindow.setFullScreen(false)
     }
     return {
       success: false,

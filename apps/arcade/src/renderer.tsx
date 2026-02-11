@@ -3,10 +3,12 @@ import ReactDOM from 'react-dom/client'
 import { BootScreen } from './boot'
 import { MenuScreen } from './menu'
 import { GameLaunch } from './gamelaunch'
+import { GameDisplay } from './gamedisplay'
 
 function App() {
   const [isBooting, setIsBooting] = useState(true)
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
+  const [displayGame, setDisplayGame] = useState<string | null>(null)
   const [coins, setCoins] = useState(0)
   const [time, setTime] = useState(0)
   const [highScore, setHighScore] = useState(999999)
@@ -222,12 +224,24 @@ function App() {
     )
   }
 
+  if (displayGame) {
+    return (
+      <GameDisplay
+        gameId={displayGame}
+        onExit={() => {
+          setDisplayGame(null)
+          setSelectedGame(null)
+        }}
+      />
+    )
+  }
+
   return (
     selectedGame ? (
       <GameLaunch
         gameId={selectedGame}
-        particles={particles}
         onBack={() => setSelectedGame(null)}
+        onOpenDisplay={setDisplayGame}
       />
     ) : (
       <MenuScreen particles={particles} onSelectGame={setSelectedGame} />

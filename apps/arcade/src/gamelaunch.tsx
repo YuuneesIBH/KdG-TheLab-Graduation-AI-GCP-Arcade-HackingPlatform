@@ -3,85 +3,31 @@ import { games } from './menu'
 
 type GameLaunchProps = {
   gameId: string
-  particles: Array<{x: number, y: number, vx: number, vy: number, color: string, id: number}>
   onBack: () => void
+  onOpenDisplay: (gameId: string) => void
 }
 
 function formatTitle(gameId: string) {
   return gameId.replace(/-/g, ' ').toUpperCase()
 }
 
-export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
-  const [progress, setProgress] = React.useState(0)
-  const [crtFlicker, setCrtFlicker] = React.useState(false)
-  const [scanlineOffset, setScanlineOffset] = React.useState(0)
-  const [pixelShift, setPixelShift] = React.useState(0)
-  const [glitchLine, setGlitchLine] = React.useState(-1)
-  const [coinBlink, setCoinBlink] = React.useState(false)
-  const [gameStarted, setGameStarted] = React.useState(false)
+export function GameLaunch({ gameId, onBack, onOpenDisplay }: GameLaunchProps) {
+  const [isOpening, setIsOpening] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState('')
 
-  // Find the game info
-  const game = games.find(g => g.id === gameId)
+  const game = games.find((entry) => entry.id === gameId)
   const title = game ? game.title : formatTitle(gameId)
-  const ready = progress >= 100
 
-  React.useEffect(() => {
-    console.log('🎮 GameLaunch mounted with gameId:', gameId)
-    console.log('🎮 Found game:', game)
-    console.log('🎮 Window.electron available?', !!window.electron)
-  }, [gameId, game])
+  const openDisplay = React.useCallback(() => {
+    if (!game) {
+      setErrorMessage('Game not found.')
+      return
+    }
 
-  React.useEffect(() => {
-    const progressInterval = setInterval(() => {
-      setProgress(prev => (prev >= 100 ? 100 : prev + 2))
-    }, 60)
-    return () => clearInterval(progressInterval)
-  }, [])
-
-  React.useEffect(() => {
-    const flickerInterval = setInterval(() => {
-      if (Math.random() < 0.06) {
-        setCrtFlicker(true)
-        setTimeout(() => setCrtFlicker(false), 60)
-      }
-    }, 120)
-    return () => clearInterval(flickerInterval)
-  }, [])
-
-  React.useEffect(() => {
-    const scanlineInterval = setInterval(() => {
-      setScanlineOffset(prev => (prev + 1) % 4)
-    }, 50)
-    return () => clearInterval(scanlineInterval)
-  }, [])
-
-  React.useEffect(() => {
-    const shiftInterval = setInterval(() => {
-      if (Math.random() < 0.05) {
-        setPixelShift(Math.random() < 0.5 ? 2 : -2)
-        setTimeout(() => setPixelShift(0), 50)
-      }
-    }, 200)
-    return () => clearInterval(shiftInterval)
-  }, [])
-
-  React.useEffect(() => {
-    const glitchInterval = setInterval(() => {
-      if (Math.random() < 0.12) {
-        setGlitchLine(Math.floor(Math.random() * 20))
-        setTimeout(() => setGlitchLine(-1), 100)
-      }
-    }, 300)
-    return () => clearInterval(glitchInterval)
-  }, [])
-
-  React.useEffect(() => {
-    const coinBlinkInterval = setInterval(() => {
-      setCoinBlink(prev => !prev)
-    }, 250)
-    return () => clearInterval(coinBlinkInterval)
-  }, [])
+    setIsOpening(true)
+    setErrorMessage('')
+    setTimeout(() => onOpenDisplay(game.id), 120)
+  }, [game, onOpenDisplay])
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -89,506 +35,112 @@ export function GameLaunch({ gameId, particles, onBack }: GameLaunchProps) {
         event.preventDefault()
         onBack()
       }
+      if (event.key === 'Enter' && !isOpening) {
+        event.preventDefault()
+        openDisplay()
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    
-    // Listen for game exit event
-    const cleanup = window.electron?.onGameExit?.(() => {
-      console.log('🎮 Game exited, showing UI again')
-      const root = document.getElementById('root')
-      if (root) {
-        root.style.display = 'block'
-      }
-      setGameStarted(false)
-      onBack() // Go back to menu
-    })
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      cleanup?.()
-    }
-  }, [onBack])
-
-  // Launch the game when ready
-  const launchGame = React.useCallback(async () => {
-    console.log('🚀 LAUNCH GAME CLICKED!')
-    
-    if (!game) {
-      console.error('❌ No game found!')
-      setErrorMessage('Game not found!')
-      return
-    }
-    
-    console.log('🎮 Game to launch:', game)
-    console.log('📁 Executable path:', game.executable)
-    
-    setGameStarted(true)
-    
-    // Check if we're in Electron
-    if (window.electron?.launchGame) {
-      console.log('✅ Electron API available, launching...')
-      
-      try {
-        const result = await window.electron.launchGame(game.executable)
-        console.log('🎮 Launch result:', result)
-        
-        if (result.success) {
-          // Hide the UI after a short delay to let game window appear
-          setTimeout(() => {
-            // Hide the entire app UI by making it invisible
-            const root = document.getElementById('root')
-            if (root) {
-              root.style.display = 'none'
-            }
-          }, 800)
-        } else {
-          setErrorMessage(result.message)
-          setGameStarted(false)
-        }
-      } catch (error) {
-        console.error('❌ Error launching game:', error)
-        setErrorMessage(`Error: ${error}`)
-        setGameStarted(false)
-      }
-    } else {
-      console.warn('⚠️ Electron API NOT available (running in browser?)')
-      console.log('Would launch:', game.executable)
-      setErrorMessage('Electron not available - are you running with npm run dev?')
-      
-      // Show alert as fallback
-      alert(`🎮 GAME LAUNCH\n\nGame: ${game.title}\nFile: ${game.executable}\n\n⚠️ This only works in Electron!\n\nRun: npm run dev`)
-      setGameStarted(false)
-    }
-  }, [game])
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpening, onBack, openDisplay])
 
   return (
-    <div style={{
-      background: 'linear-gradient(180deg, #001a40 0%, #000d1f 40%, #000510 70%, #000000 100%)',
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '90px 40px 60px',
-      fontFamily: '"Courier New", "Press Start 2P", monospace',
-      position: 'relative',
-      overflow: 'hidden',
-      filter: crtFlicker
-        ? 'brightness(0.75) contrast(1.25)'
-        : 'brightness(1) contrast(1.1)',
-      transition: 'filter 0.06s',
-      transform: `translateX(${pixelShift}px)`
-    }}>
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: `
-          radial-gradient(1px 1px at 20% 30%, #0088ff, transparent),
-          radial-gradient(1px 1px at 60% 70%, #00ccff, transparent),
-          radial-gradient(2px 2px at 50% 50%, #ffffff, transparent),
-          radial-gradient(1px 1px at 80% 10%, #0088ff, transparent),
-          radial-gradient(1px 1px at 90% 60%, #00aaff, transparent)
-        `,
-        backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px',
-        backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px',
-        animation: 'starfield-drift 120s linear infinite',
-        opacity: 0.4,
-        pointerEvents: 'none'
-      }} />
-
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: `
-          repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,136,255,0.04) 3px, rgba(0,136,255,0.04) 4px),
-          repeating-linear-gradient(90deg, transparent 0px, transparent 3px, rgba(0,136,255,0.04) 3px, rgba(0,136,255,0.04) 4px)
-        `,
-        pointerEvents: 'none'
-      }} />
-
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'radial-gradient(ellipse at center, transparent 0%, transparent 55%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.9) 100%)',
-        pointerEvents: 'none',
-        zIndex: 999
-      }} />
-
-      {particles.map(p => (
-        <div key={p.id} style={{
-          position: 'absolute',
-          left: p.x,
-          top: p.y,
-          width: '8px',
-          height: '8px',
-          background: p.color,
-          boxShadow: `0 0 12px ${p.color}`,
-          pointerEvents: 'none'
-        }} />
-      ))}
-
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 2px, transparent 2px, transparent 4px)',
-        pointerEvents: 'none',
-        zIndex: 1000,
-        transform: `translateY(${scanlineOffset}px)`,
-        opacity: 0.6
-      }} />
-
-      {glitchLine >= 0 && (
-        <div style={{
-          position: 'absolute',
-          top: `${glitchLine * 5}%`,
-          left: 0,
-          right: 0,
-          height: '3px',
-          background: 'rgba(0,200,255,0.8)',
-          mixBlendMode: 'screen',
-          zIndex: 1001
-        }} />
-      )}
-
-      <div style={{
-        position: 'absolute',
-        top: '20px',
-        left: 0,
-        right: 0,
-        background: 'linear-gradient(180deg, #0066cc, #004499)',
-        borderTop: '2px solid #00aaff',
-        borderBottom: '4px solid #002266',
-        padding: '12px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        fontSize: '18px',
-        fontWeight: 'bold',
-        letterSpacing: '3px',
-        zIndex: 5,
-        boxShadow: '0 0 20px rgba(0,136,255,0.4), 0 6px 0 #001133'
-      }}>
-        <div style={{
-          color: '#ffff00',
-          textShadow: '0 0 10px #ffff00, 2px 2px 0 #002244',
-          animation: 'pixel-pulse 1s ease-in-out infinite'
-        }}>
-          1UP 00000000
+    <div
+      style={{
+        width: '100vw',
+        height: '100vh',
+        background: 'radial-gradient(circle at 50% 20%, #052544 0%, #03111f 55%, #000000 100%)',
+        display: 'grid',
+        placeItems: 'center',
+        color: '#e6f8ff',
+        fontFamily: '"Courier New", "Press Start 2P", monospace',
+        padding: '24px'
+      }}
+    >
+      <div
+        style={{
+          width: 'min(840px, 96vw)',
+          border: '3px solid #00b7ff',
+          background: 'rgba(0, 8, 16, 0.88)',
+          boxShadow: '0 0 35px rgba(0,183,255,0.28)',
+          padding: '28px',
+          display: 'grid',
+          gap: '18px'
+        }}
+      >
+        <div style={{ fontSize: '13px', color: '#87dfff', letterSpacing: '2px' }}>
+          PREPARE GAME DISPLAY
         </div>
-        <div style={{
-          color: '#00ff88',
-          textShadow: '0 0 10px #00ff88, 2px 2px 0 #002244',
-          animation: 'pixel-pulse 1s ease-in-out infinite 0.5s'
-        }}>
-          HI 999999
+        <div
+          style={{
+            fontSize: '34px',
+            lineHeight: 1.1,
+            letterSpacing: '3px',
+            textShadow: '0 0 18px rgba(0,187,255,0.72)'
+          }}
+        >
+          {title}
         </div>
-      </div>
+        <div style={{ fontSize: '12px', color: '#9fd8f3', letterSpacing: '1px' }}>
+          {game ? game.executable : 'Executable not configured'}
+        </div>
 
-      <div style={{
-        position: 'relative',
-        zIndex: 10,
-        width: 'min(900px, 92vw)'
-      }}>
-        <div style={{
-          border: '6px solid #0088ff',
-          background: '#000814',
-          boxShadow: `
-            0 0 30px rgba(0,136,255,0.5),
-            inset 0 0 20px rgba(0,136,255,0.2),
-            6px 6px 0 rgba(0,0,0,0.6)
-          `,
-          padding: '6px'
-        }}>
-          <div style={{
-            border: '4px solid #004488',
-            background: 'linear-gradient(180deg, #001122, #000a14)',
-            boxShadow: 'inset 0 0 30px rgba(0,68,136,0.3)'
-          }}>
-            <div style={{
-              background: 'linear-gradient(180deg, #0088ff, #0066cc)',
-              borderBottom: '3px solid #00aaff',
-              padding: '14px 20px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              position: 'relative',
-              boxShadow: '0 3px 15px rgba(0,136,255,0.4)'
-            }}>
-              <div style={{
-                position: 'absolute',
-                top: '10px',
-                left: '10px',
-                width: '12px',
-                height: '12px',
-                background: coinBlink ? '#ffff00' : '#666600',
-                border: '2px solid #ffff00',
-                boxShadow: coinBlink ? '0 0 15px #ffff00' : 'none'
-              }} />
-              <div style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                width: '12px',
-                height: '12px',
-                background: coinBlink ? '#ffff00' : '#666600',
-                border: '2px solid #ffff00',
-                boxShadow: coinBlink ? '0 0 15px #ffff00' : 'none'
-              }} />
-              <div style={{
-                color: '#ffffff',
-                fontSize: '24px',
-                fontWeight: 'bold',
-                letterSpacing: '4px',
-                textShadow: '0 0 15px #00ccff, 3px 3px 0 #002244'
-              }}>
-                ▓▒░ LAUNCH SEQUENCE ░▒▓
-              </div>
-              <button
-                type="button"
-                onClick={onBack}
-                style={{
-                  background: 'linear-gradient(180deg, #00ff88, #00cc66)',
-                  color: '#001122',
-                  padding: '6px 16px',
-                  border: '3px solid #00ff88',
-                  fontSize: '16px',
-                  fontWeight: 'black',
-                  letterSpacing: '2px',
-                  boxShadow: '0 0 15px rgba(0,255,136,0.5)',
-                  borderRadius: '2px',
-                  cursor: 'pointer'
-                }}
-              >
-                BACK
-              </button>
-            </div>
-
-            <div style={{
-              background: '#000000',
-              padding: '28px',
-              display: 'grid',
-              gap: '22px'
-            }}>
-              <div style={{
-                fontSize: '18px',
-                color: '#00ccff',
-                textShadow: '0 0 10px #00ccff',
-                letterSpacing: '2px'
-              }}>
-                BOOTING CARTRIDGE
-              </div>
-
-              <div style={{
-                fontSize: '36px',
-                fontWeight: 'bold',
-                color: '#ffffff',
-                textShadow: '0 0 20px #00ccff, 4px 4px 0 #002244',
-                letterSpacing: '4px'
-              }}>
-                {title}
-              </div>
-
-              {game && (
-                <div style={{
-                  fontSize: '14px',
-                  color: '#00ff88',
-                  textShadow: '0 0 8px #00ff88',
-                  letterSpacing: '1px',
-                  fontFamily: '"Courier New", monospace'
-                }}>
-                  FILE: {game.executable}
-                </div>
-              )}
-
-              <div style={{
-                border: '3px solid #0088ff',
-                padding: '18px',
-                background: 'rgba(0,20,40,0.6)',
-                boxShadow: '0 0 15px rgba(0,136,255,0.3), inset 0 0 10px rgba(0,136,255,0.1)'
-              }}>
-                <div style={{
-                  height: '26px',
-                  background: '#001122',
-                  border: '2px solid #002244',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    height: '100%',
-                    width: `${progress}%`,
-                    background: 'linear-gradient(90deg, #00ff88, #00ccff)',
-                    boxShadow: '0 0 12px rgba(0,255,136,0.6)',
-                    transition: 'width 0.08s'
-                  }} />
-                </div>
-                <div style={{
-                  marginTop: '10px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '14px',
-                  letterSpacing: '2px',
-                  color: '#00ccff',
-                  textShadow: '0 0 8px #00ccff'
-                }}>
-                  <span>LOADING...</span>
-                  <span style={{
-                    color: ready ? '#00ff88' : '#00ccff',
-                    textShadow: ready ? '0 0 15px #00ff88' : '0 0 8px #00ccff'
-                  }}>
-                    {progress}%
-                  </span>
-                </div>
-              </div>
-
-              {/* ERROR MESSAGE */}
-              {errorMessage && (
-                <div style={{
-                  border: '3px solid #ff0000',
-                  padding: '12px',
-                  background: 'rgba(40,0,0,0.6)',
-                  boxShadow: '0 0 15px rgba(255,0,0,0.3)',
-                  fontSize: '12px',
-                  color: '#ff0000',
-                  textShadow: '0 0 8px #ff0000',
-                  letterSpacing: '1px'
-                }}>
-                  ⚠️ ERROR: {errorMessage}
-                </div>
-              )}
-
-              {/* DEBUG INFO */}
-              <div style={{
-                fontSize: '11px',
-                color: '#666',
-                fontFamily: '"Courier New", monospace',
-                borderTop: '1px solid #222',
-                paddingTop: '12px'
-              }}>
-                <div>🔍 Debug:</div>
-                <div>Ready: {ready ? 'YES' : 'NO'}</div>
-                <div>Game Started: {gameStarted ? 'YES' : 'NO'}</div>
-                <div>Electron API: {window.electron ? 'AVAILABLE ✅' : 'NOT AVAILABLE ❌'}</div>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '16px'
-              }}>
-                <div style={{
-                  fontSize: '16px',
-                  color: ready ? '#00ff88' : '#ffff00',
-                  textShadow: ready ? '0 0 12px #00ff88' : '0 0 12px #ffff00',
-                  letterSpacing: '3px',
-                  animation: ready ? 'ready-pulse 0.6s ease-in-out infinite' : 'urgent-blink 0.8s infinite'
-                }}>
-                  {gameStarted ? 'GAME RUNNING' : ready ? 'READY TO PLAY' : 'PREPARING SYSTEM'}
-                </div>
-                {ready && !gameStarted && (
-                  <button
-                    type="button"
-                    onClick={launchGame}
-                    style={{
-                      background: 'linear-gradient(180deg, #00ff88, #00cc66)',
-                      color: '#001122',
-                      border: '4px solid #000000',
-                      padding: '12px 20px',
-                      fontWeight: 'bold',
-                      letterSpacing: '2px',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      boxShadow: '0 0 25px rgba(0,255,136,0.7), 4px 4px 0 #000000',
-                      animation: 'ready-pulse 0.6s ease-in-out infinite'
-                    }}
-                  >
-                    🚀 LAUNCH GAME
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div style={{
-              background: ready
-                ? 'linear-gradient(180deg, #00ff88, #00cc66)'
-                : 'linear-gradient(180deg, #0088ff, #0066cc)',
-              borderTop: '4px solid #00aaff',
-              padding: '16px',
-              textAlign: 'center',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: ready
-                ? '0 -3px 20px rgba(0,255,136,0.5)'
-                : '0 -3px 20px rgba(0,136,255,0.5)'
-            }}>
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(0,0,0,0.2) 20px, rgba(0,0,0,0.2) 40px)',
-                animation: 'stripe-move 2s linear infinite',
-                opacity: 0.4,
-                pointerEvents: 'none'
-              }} />
-              <div style={{
-                position: 'relative',
-                zIndex: 1,
-                fontSize: '22px',
-                fontWeight: 'black',
-                color: '#ffffff',
-                letterSpacing: '4px',
-                textShadow: '0 0 20px rgba(255,255,255,0.8), 3px 3px 0 #002244'
-              }}>
-                {gameStarted ? 'GAME IN PROGRESS' : ready ? 'SYSTEM ONLINE' : 'LOADING SYSTEM'}
-              </div>
-            </div>
+        {errorMessage && (
+          <div
+            style={{
+              border: '2px solid #ff5a5a',
+              background: 'rgba(60, 0, 0, 0.45)',
+              color: '#ffd0d0',
+              padding: '10px 12px',
+              fontSize: '12px'
+            }}
+          >
+            {errorMessage}
           </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={isOpening}
+            style={{
+              background: '#1b1b1b',
+              color: '#ffffff',
+              border: '1px solid #7a7a7a',
+              padding: '11px 16px',
+              cursor: isOpening ? 'default' : 'pointer',
+              fontSize: '12px',
+              letterSpacing: '1px',
+              opacity: isOpening ? 0.65 : 1
+            }}
+          >
+            BACK
+          </button>
+          <button
+            type="button"
+            onClick={openDisplay}
+            disabled={isOpening}
+            style={{
+              background: isOpening ? '#086b4f' : '#00b56d',
+              color: '#00161e',
+              border: '1px solid #00ff99',
+              padding: '11px 16px',
+              cursor: isOpening ? 'default' : 'pointer',
+              fontSize: '12px',
+              letterSpacing: '1px',
+              fontWeight: 'bold'
+            }}
+          >
+            {isOpening ? 'OPENING DISPLAY...' : 'OPEN FULLSCREEN DISPLAY'}
+          </button>
+        </div>
+
+        <div style={{ fontSize: '11px', color: '#8bb8cc' }}>
+          Enter = launch, Esc = back
         </div>
       </div>
-
-      <div style={{
-        position: 'absolute',
-        bottom: '20px',
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        fontSize: '13px',
-        color: '#0088ff',
-        letterSpacing: '2px',
-        textShadow: '0 0 10px #0088ff',
-        zIndex: 100
-      }}>
-        © 1992 THE ARCADERS • LICENSED NINTENDO • STEREO
-      </div>
-
-      <style>{`
-        @keyframes pixel-pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-        @keyframes urgent-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        @keyframes ready-pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-        @keyframes stripe-move {
-          from { transform: translateX(0); }
-          to { transform: translateX(40px); }
-        }
-        @keyframes starfield-drift {
-          from {
-            background-position: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px;
-          }
-          to {
-            background-position: 0 200px, 40px 260px, 130px 470px, 70px 300px, 150px 250px;
-          }
-        }
-      `}</style>
     </div>
   )
 }

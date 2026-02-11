@@ -2,10 +2,13 @@ import pygame
 import random
 import sys
 import math
+import os
 
 # Configuración inicial
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+DEFAULT_SCREEN_WIDTH = 800
+DEFAULT_SCREEN_HEIGHT = 600
+SCREEN_WIDTH = DEFAULT_SCREEN_WIDTH
+SCREEN_HEIGHT = DEFAULT_SCREEN_HEIGHT
 PLAYER_SPEED = 6
 BULLET_SPEED = 10
 ALIEN_SPAWN_RATE = 60  # frames tussen spawns
@@ -23,6 +26,34 @@ PURPLE = (200, 0, 255)
 CYAN = (0, 255, 255)
 DARK_BLUE = (10, 10, 50)
 
+# Configure embedded/windowed mode from launcher environment variables
+def parse_window_size(raw_value):
+    if not raw_value:
+        return None
+
+    cleaned_value = raw_value.strip().lower().replace(' ', '')
+    separator = 'x' if 'x' in cleaned_value else ','
+    parts = cleaned_value.split(separator)
+    if len(parts) != 2:
+        return None
+
+    try:
+        width = max(320, int(parts[0]))
+        height = max(240, int(parts[1]))
+        return (width, height)
+    except ValueError:
+        return None
+
+embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
+window_size = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE'))
+window_pos = os.environ.get('ARCADE_WINDOW_POS')
+
+if window_size:
+    SCREEN_WIDTH, SCREEN_HEIGHT = window_size
+
+if window_pos:
+    os.environ['SDL_VIDEO_WINDOW_POS'] = window_pos
+
 # Inicializa Pygame
 pygame.init()
 
@@ -33,7 +64,8 @@ try:
 except:
     pass
 
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+display_flags = pygame.NOFRAME if embedded_mode else 0
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), display_flags)
 pygame.display.set_caption("Space Battle - Alien Invasion")
 clock = pygame.time.Clock()
 

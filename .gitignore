@@ -43,6 +43,7 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+*.venv/
 
 # Cache
 .cache/

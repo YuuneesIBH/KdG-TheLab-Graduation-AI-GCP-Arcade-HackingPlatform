@@ -60,7 +60,7 @@ const games: GameCard[] = [
     image: '../assets/blockstorm.png',
     accent: '#ffff00',
     glow: '#ffff00',
-    executable: 'games/Tetris/main.py'
+    executable: 'games/BlockStorm/main.py'
   },
   {
     id: 'AngryWalls',

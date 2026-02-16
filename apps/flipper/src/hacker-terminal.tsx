@@ -54,14 +54,18 @@ function BootScreen({ onDone }: { onDone: () => void }) {
   const [glitch, setGlitch] = useState(false)
   const [fading, setFading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  // Voorkom dubbel triggeren
   const triggered = useRef(false)
+  const bootStarted = useRef(false)  // ← nieuw
 
   useEffect(() => {
+    if (bootStarted.current) return  // ← voorkom dubbel
+    bootStarted.current = true
+
     let i = 0
     const boot = () => {
       if (i < BOOT_SEQUENCE.length) {
-        setLines(prev => [...prev, BOOT_SEQUENCE[i]])
+        const line = BOOT_SEQUENCE[i]  // ← capture voor i++
+        setLines(prev => [...prev, line])
         i++
         setTimeout(boot, 180)
       } else {
@@ -135,8 +139,14 @@ function BootScreen({ onDone }: { onDone: () => void }) {
 
 function App() {
   const [screen, setScreen] = useState<'boot' | 'menu'>('boot')
+
+  console.log('Current screen:', screen)  // ← voeg dit toe
+
   return screen === 'boot'
-    ? <BootScreen onDone={() => setScreen('menu')} />
+    ? <BootScreen onDone={() => {
+        console.log('onDone called!')  // ← en dit
+        setScreen('menu')
+      }} />
     : <Menu />
 }
 

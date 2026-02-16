@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react'
 
 const MENU_ITEMS = [
-  { key: 'scan',     label: '[ RF SCANNER ]',    icon: '📡' },
-  { key: 'nfc',      label: '[ NFC / RFID ]',     icon: '🔷' },
-  { key: 'subghz',   label: '[ SUB-GHZ ]',        icon: '📻' },
-  { key: 'badusb',   label: '[ BAD USB ]',         icon: '💀' },
-  { key: 'ir',       label: '[ INFRARED ]',        icon: '🔴' },
-  { key: 'bt',       label: '[ BLUETOOTH ]',       icon: '🦷' },
-  { key: 'gpio',     label: '[ GPIO CONTROL ]',    icon: '⚡' },
-  { key: 'terminal', label: '[ OPEN TERMINAL ]',   icon: '🖥️' },
+{ key: 'scan',     label: '[ RF SCANNER ]',    icon: '' },
+  { key: 'nfc',      label: '[ NFC / RFID ]',     icon: '' },
+  { key: 'subghz',   label: '[ SUB-GHZ ]',        icon: '' },
+  { key: 'badusb',   label: '[ BAD USB ]',         icon: '' },
+  { key: 'ir',       label: '[ INFRARED ]',        icon: '' },
+  { key: 'bt',       label: '[ BLUETOOTH ]',       icon: '' },
+  { key: 'gpio',     label: '[ GPIO CONTROL ]',    icon: '' },
+  { key: 'terminal', label: '[ OPEN TERMINAL ]',   icon: '' },
 ]
 
 export default function Menu() {

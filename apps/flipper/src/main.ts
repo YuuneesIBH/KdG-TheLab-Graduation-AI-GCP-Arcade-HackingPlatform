@@ -7,12 +7,14 @@ function createWindow() {
     height: 800,
     backgroundColor: '#000000',
     title: 'FLIPPER // HACK TERMINAL',
-    fullscreen: true,        // ← fullscreen
+    fullscreen: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
     },
   })
+
+  win.webContents.openDevTools()  // ← voeg dit toe
 
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/hacker-terminal.html')

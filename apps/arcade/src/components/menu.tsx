@@ -27,62 +27,62 @@ const games: GameCard[] = [
     image: '../assets/spaceinvaders.png',
     accent: '#00ff00',
     glow: '#00ff00',
-    executable: 'games/SpaceInvader.py'
+    executable: 'games/spaceinvaders.py'
   },
   {
-    id: 'neon-runner',
-    title: 'NEON RUNNER',
+    id: 'flappy-bird',
+    title: 'FLAPPY BIRD',
+    genre: 'ARCADE',
+    badge: 'RETRO',
+    tagline: 'Tap to flap and dodge the pipes!',
+    image: '../assets/retrobird.png',
+    accent: '#ffaa00',
+    glow: '#ffaa00',
+    executable: 'games/RetroBird/main.py'
+  },
+  {
+    id: 'car-racing-extreme',
+    title: 'CAR RACING EXTREME',
     genre: 'RACING',
     badge: 'NEW',
-    tagline: 'Street sprint through the midnight skyline.',
-    image: 'https://images.pexels.com/photos/7026427/pexels-photo-7026427.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
-    accent: '#00ccff',
-    glow: '#00ccff',
-    executable: 'games/neon-runner.py'
+    tagline: 'Feel the adrenaline in this high-speed racing game!',
+    image: '../assets/extremeracing.png',
+    accent: '#ff0000',
+    glow: '#ff0000',
+    executable: 'games/CarRacingUltraMaxExtremeLevel1000/main.py'
   },
   {
-    id: 'pixel-blaster',
-    title: 'PIXEL BLASTER',
-    genre: 'SHOOTER',
-    badge: 'HOT',
-    tagline: 'Clear waves of enemies in pure arcade chaos.',
-    image: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
-    accent: '#00ff88',
-    glow: '#00ff88',
-    executable: 'games/pixel-blaster.py'
-  },
-  {
-    id: 'grid-fighter',
-    title: 'GRID FIGHTER',
-    genre: 'FIGHT',
-    badge: 'VS',
-    tagline: 'Combo battles on an electric retro grid.',
-    image: 'https://images.pexels.com/photos/29096083/pexels-photo-29096083.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    id: 'BlockStorm',
+    title: 'BLOCK STORM',
+    genre: 'PUZZLE',
+    badge: 'CLASSIC',
+    tagline: 'Arrange falling blocks to clear lines.',
+    image: '../assets/blockstorm.png',
     accent: '#ffff00',
     glow: '#ffff00',
-    executable: 'games/grid-fighter.py'
+    executable: 'games/Tetris/main.py'
   },
   {
-    id: 'retro-quest',
-    title: 'RETRO QUEST',
+    id: 'AngryWalls',
+    title: 'ANGRY WALLS',
     genre: 'RPG',
     badge: 'EPIC',
     tagline: 'Explore dungeons and hunt legendary loot.',
-    image: 'https://images.pexels.com/photos/4835419/pexels-photo-4835419.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    image: '../assets/angrywalls.png',  
     accent: '#ff00ff',
     glow: '#ff00ff',
-    executable: 'games/retro-quest.py'
+    executable: 'games/AngryWalls/main.py'
   },
   {
-    id: 'sky-raid',
-    title: 'SKY RAID',
+    id: 'PONG',
+    title: 'PONG',
     genre: 'ARCADE',
-    badge: 'CO-OP',
-    tagline: 'Fly low, dodge fire, and own the horizon.',
-    image: 'https://images.pexels.com/photos/22845394/pexels-photo-22845394.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
-    accent: '#00ffff',
-    glow: '#00ffff',
-    executable: 'games/sky-raid.py'
+    badge: 'CLASSIC',
+    tagline: 'Classic pong game.',
+    image: '../assets/pong.png',
+    accent: '#ffff00',
+    glow: '#ffff00',
+    executable: 'games/pong.py'
   }
 ]
 

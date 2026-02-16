@@ -273,7 +273,7 @@ export function BootScreen({
             pointerEvents: 'none'
           }}>
             <img
-              src="./thearcaders_logo.png"
+              src="../assets/thearcaders_logo.png"
               alt="The Arcaders"
               style={{
                 width: '1100px',

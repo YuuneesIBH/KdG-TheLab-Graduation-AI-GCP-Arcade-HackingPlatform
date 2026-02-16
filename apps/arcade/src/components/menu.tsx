@@ -24,7 +24,7 @@ const games: GameCard[] = [
     genre: 'SHOOTER',
     badge: 'CLASSIC',
     tagline: 'Defend Earth from the alien invasion!',
-    image: 'https://images.pexels.com/photos/956999/milky-way-starry-sky-night-sky-star-956999.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop',
+    image: '../assets/spaceinvaders.png',
     accent: '#00ff00',
     glow: '#00ff00',
     executable: 'games/SpaceInvader.py'

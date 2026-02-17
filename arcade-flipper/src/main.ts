@@ -97,25 +97,31 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       mainWindow.setFullScreen(true)
     }
     
-    // Resolve the game path relative to the app directory
-    // In development, __dirname points to out/main, so we go up to the project root
-    // In production, app.getAppPath() gives us the app directory
     const isDev = process.env.NODE_ENV === 'development'
-    const basePath = isDev 
-      ? path.join(__dirname, '../../')  // From out/main to project root
+    const basePath = isDev
+      ? path.resolve(__dirname, '../../arcade-flipper/src')
       : app.getAppPath()
-    
-    const fullGamePath = path.resolve(basePath, gamePath)
-    
+
+    function resolveSafe(base: string, rel: string) {
+      const cleaned = rel.replace(/^(\.\/)+/, '') // "./games/x" -> "games/x"
+      const full = path.resolve(base, cleaned)
+
+      const baseNorm = path.resolve(base) + path.sep
+      const fullNorm = path.resolve(full)
+
+      if (!fullNorm.startsWith(baseNorm)) {
+        throw new Error(`Blocked path traversal: ${rel}`)
+      }
+      return fullNorm
+    }
+
+    const fullGamePath = resolveSafe(basePath, gamePath)
+
     console.log('📁 Base path:', basePath)
     console.log('📁 Full game path:', fullGamePath)
-    
-    // Check if file exists
+
     if (!fs.existsSync(fullGamePath)) {
-      return {
-        success: false,
-        message: `Game file not found: ${gamePath}`
-      }
+      return { success: false, message: `Game file not found: ${gamePath}` }
     }
 
     const hostBounds = mainWindow?.getBounds() || displayBounds

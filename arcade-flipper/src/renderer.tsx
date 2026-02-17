@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BootScreen } from "./components/boot";
-import { MenuScreen } from "./components/menu";
-import { GameLaunch } from "./components/gamelaunch";
-import { GameDisplay } from "./components/gamedisplay";
+import { BootScreen } from "./components/arcade/boot";
+import { MenuScreen } from "./components/arcade/menu";
+import { GameLaunch } from "./components/arcade/gamelaunch";
+import { GameDisplay } from "./components/arcade/gamedisplay";
 
 function App() {
   const [isBooting, setIsBooting] = useState(true)

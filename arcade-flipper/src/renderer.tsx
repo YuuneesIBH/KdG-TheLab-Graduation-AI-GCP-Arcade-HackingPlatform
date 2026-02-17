@@ -118,7 +118,7 @@ function App() {
 
   // ── render ────────────────────────────────────────────────────
   if (screen === 'hacker-menu')
-    return <HackerMenu onSelect={handleModuleSelect} />
+    return <HackerMenu onSelect={handleModuleSelect} onBack={() => setScreen('boot')} />
 
   if (screen === 'game-display' && displayGame)
     return <GameDisplay gameId={displayGame} onExit={() => { setDisplayGame(null); setSelectedGame(null); setScreen('arcade-menu') }} />

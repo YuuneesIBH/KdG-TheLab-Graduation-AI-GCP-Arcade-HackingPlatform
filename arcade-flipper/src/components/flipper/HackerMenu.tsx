@@ -1,41 +1,36 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 
 const MENU_ITEMS = [
-  { key: 'scan',     label: 'RF SCANNER',    prefix: '[ 01 ]', color: '#00ff88' },
-  { key: 'nfc',      label: 'NFC / RFID',    prefix: '[ 02 ]', color: '#00ccff' },
-  { key: 'subghz',   label: 'SUB-GHZ',       prefix: '[ 03 ]', color: '#00ccff' },
-  { key: 'badusb',   label: 'BAD USB',        prefix: '[ 04 ]', color: '#ff4444' },
-  { key: 'ir',       label: 'INFRARED',       prefix: '[ 05 ]', color: '#00ccff' },
-  { key: 'bt',       label: 'BLUETOOTH',      prefix: '[ 06 ]', color: '#00ccff' },
-  { key: 'gpio',     label: 'GPIO CONTROL',   prefix: '[ 07 ]', color: '#ffff00' },
-  { key: 'terminal', label: 'OPEN TERMINAL',  prefix: '[ 08 ]', color: '#00ff88' },
+  { key: 'scan',     cmd: 'flipper run rf_scanner',     desc: 'Scan & capture RF signals',        color: '#00ff88', tag: '[RF]'   },
+  { key: 'nfc',      cmd: 'flipper run nfc_clone',       desc: 'Read/emulate NFC & RFID cards',    color: '#00ccff', tag: '[NFC]'  },
+  { key: 'subghz',   cmd: 'flipper run subghz_scan',     desc: 'Sub-GHz frequency analyzer',       color: '#00ccff', tag: '[SUB]'  },
+  { key: 'badusb',   cmd: 'flipper run badusb_inject',   desc: 'HID keystroke injection',           color: '#ff4444', tag: '[USB]'  },
+  { key: 'ir',       cmd: 'flipper run ir_blast',        desc: 'Infrared signal transmitter',       color: '#ff8800', tag: '[IR]'   },
+  { key: 'bt',       cmd: 'flipper run bt_scan',         desc: 'Bluetooth device scanner',          color: '#4488ff', tag: '[BT]'   },
+  { key: 'gpio',     cmd: 'flipper run gpio_ctrl',       desc: 'GPIO pin control & logic analyzer', color: '#ffff00', tag: '[GPIO]' },
+  { key: 'terminal', cmd: 'flipper shell --root',        desc: 'Open interactive root shell',       color: '#00ff88', tag: '[SH]'   },
 ]
 
-// ── Matrix rain background ────────────────────────────────────────
 function MatrixBg() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-
   useEffect(() => {
     const canvas = canvasRef.current!
-    const ctx    = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d')!
     const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
     resize()
-
-    const CHARS = 'アイウエオカキクケコサシスセソ0123456789ABCDEF></?!@#$%^&*'
+    const CHARS = 'アイウエオカキクケコ0123456789ABCDEF></?!@#$%^&*'
     const COL_W = 16
-    const cols  = Math.ceil(canvas.width / COL_W)
+    const cols = Math.ceil(canvas.width / COL_W)
     const drops = Array.from({ length: cols }, () => Math.random() * -80)
-    const spds  = Array.from({ length: cols }, () => 0.3 + Math.random() * 0.6)
-
+    const spds = Array.from({ length: cols }, () => 0.3 + Math.random() * 0.5)
     let raf: number
     const draw = () => {
-      ctx.fillStyle = 'rgba(0,0,0,0.06)'
+      ctx.fillStyle = 'rgba(0,0,0,0.055)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       for (let i = 0; i < cols; i++) {
         const char = CHARS[Math.floor(Math.random() * CHARS.length)]
-        ctx.fillStyle  = Math.random() > 0.97 ? '#ffffff' : i % 11 === 0 ? '#00ffaa' : '#00ff41'
-        ctx.shadowColor = '#00ff41'
-        ctx.shadowBlur  = 4
+        ctx.fillStyle = Math.random() > 0.97 ? '#ffffff' : i % 11 === 0 ? '#00ffaa' : '#00ff41'
+        ctx.shadowColor = '#00ff41'; ctx.shadowBlur = 3
         ctx.font = `${COL_W}px "Courier New", monospace`
         ctx.fillText(char, i * COL_W, drops[i] * COL_W)
         ctx.shadowBlur = 0
@@ -48,372 +43,340 @@ function MatrixBg() {
     window.addEventListener('resize', resize)
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }, [])
-
-  return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, opacity: 0.18, pointerEvents: 'none' }} />
+  return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, opacity: 0.15, pointerEvents: 'none' }} />
 }
 
-// ── Typewriter hook ───────────────────────────────────────────────
-function useTypewriter(text: string, speed = 40) {
-  const [displayed, setDisplayed] = useState('')
+export default function Menu({ onSelect, onBack }: { onSelect?: (key: string) => void; onBack?: () => void }) {
+  const [selected, setSelected]   = useState(0)
+  const [entered, setEntered]     = useState(false)
+  const [glitch, setGlitch]       = useState(false)
+  const [scanY, setScanY]         = useState(0)
+  const [blink, setBlink]         = useState(true)
+  const [booted, setBooted]       = useState(false)
+  const [bootLines, setBootLines] = useState<string[]>([])
+  const selectedRef               = useRef(selected)
+  selectedRef.current = selected
+
+  const BOOT = [
+    '> Flipper Zero OS v0.91.1  —  ARM Cortex-M4 @ 64MHz',
+    '> Checking hardware...  Flash: OK  RAM: OK  SD: MOUNTED',
+    '> CC1101: OK  |  ST25R3916: OK  |  IR: OK  |  BT: OK',
+    '> Root access granted. Loading module selector...',
+    '',
+  ]
+
   useEffect(() => {
-    setDisplayed('')
     let i = 0
-    const iv = setInterval(() => {
-      setDisplayed(text.slice(0, i + 1))
-      i++
-      if (i >= text.length) clearInterval(iv)
-    }, speed)
-    return () => clearInterval(iv)
-  }, [text, speed])
-  return displayed
-}
-
-export default function Menu({ onSelect }: { onSelect?: (key: string) => void }) {
-  const [selected, setSelected]     = useState(0)
-  const [entered, setEntered]       = useState(false)
-  const [glitch, setGlitch]         = useState(false)
-  const [scanlineY, setScanlineY]   = useState(0)
-  const [showCursor, setShowCursor] = useState(true)
-  const [booting, setBooting]       = useState(true)   // brief "ACCESS GRANTED → menu" flash
-
-  const titleText  = useTypewriter(booting ? '' : 'FLIPPER ZERO // SELECT MODULE', 35)
-
-  // Boot-in delay
-  useEffect(() => {
-    const t = setTimeout(() => setBooting(false), 400)
-    return () => clearTimeout(t)
-  }, [])
-
-  // Scanline crawl
-  useEffect(() => {
-    const iv = setInterval(() => setScanlineY(y => (y + 1) % 6), 80)
-    return () => clearInterval(iv)
-  }, [])
-
-  // Cursor blink
-  useEffect(() => {
-    const iv = setInterval(() => setShowCursor(v => !v), 530)
-    return () => clearInterval(iv)
-  }, [])
-
-  // Random glitch
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setGlitch(true)
-      setTimeout(() => setGlitch(false), 100)
-    }, 5000 + Math.random() * 3000)
-    return () => clearInterval(iv)
-  }, [])
-
-  // Keyboard nav
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp')   setSelected(prev => (prev - 1 + MENU_ITEMS.length) % MENU_ITEMS.length)
-      if (e.key === 'ArrowDown') setSelected(prev => (prev + 1) % MENU_ITEMS.length)
-      if (e.key === 'Enter') {
-        setEntered(true)
-        setTimeout(() => setEntered(false), 200)
-        onSelect?.(MENU_ITEMS[selected].key)
-      }
+    const next = () => {
+      if (i >= BOOT.length) { setBooted(true); return }
+      setBootLines(p => [...p, BOOT[i++]])
+      setTimeout(next, 110)
     }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [selected])
+    setTimeout(next, 300)
+  }, [])
+
+  useEffect(() => {
+    const iv = setInterval(() => setScanY(y => (y + 1) % 6), 80)
+    return () => clearInterval(iv)
+  }, [])
+
+  useEffect(() => {
+    const iv = setInterval(() => setBlink(v => !v), 500)
+    return () => clearInterval(iv)
+  }, [])
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setGlitch(true); setTimeout(() => setGlitch(false), 80)
+    }, 5000 + Math.random() * 4000)
+    return () => clearInterval(iv)
+  }, [])
+
+  const moveUp   = useCallback(() => setSelected(p => (p - 1 + MENU_ITEMS.length) % MENU_ITEMS.length), [])
+  const moveDown = useCallback(() => setSelected(p => (p + 1) % MENU_ITEMS.length), [])
+  const confirm  = useCallback(() => {
+    setEntered(true)
+    setTimeout(() => setEntered(false), 150)
+    onSelect?.(MENU_ITEMS[selectedRef.current].key)
+  }, [onSelect])
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp')   { e.preventDefault(); moveUp() }
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveDown() }
+      if (e.key === 'Enter')     confirm()
+      if (e.key === 'Escape')    onBack?.()
+    }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [moveUp, moveDown, confirm])
+
+  useEffect(() => {
+    let raf: number; let cd = 0
+    const poll = () => {
+      const gp = Array.from(navigator.getGamepads?.() ?? []).find(g => g?.connected)
+      if (gp) {
+        const now = Date.now(); const ay = gp.axes[1] ?? 0
+        if (now > cd) {
+          if (ay < -0.5 || gp.buttons[12]?.pressed) { moveUp();   cd = now + 170 }
+          if (ay >  0.5 || gp.buttons[13]?.pressed) { moveDown(); cd = now + 170 }
+          if (gp.buttons[0]?.pressed)               { confirm();  cd = now + 400 }
+        }
+      }
+      raf = requestAnimationFrame(poll)
+    }
+    poll()
+    return () => cancelAnimationFrame(raf)
+  }, [moveUp, moveDown, confirm])
+
+  const item = MENU_ITEMS[selected]
 
   return (
     <div style={{
       width: '100vw', height: '100vh',
-      background: '#000000',
-      position: 'relative',
-      overflow: 'hidden',
-      fontFamily: '"Courier New", monospace',
-      filter: glitch ? 'hue-rotate(90deg) brightness(1.3)' : 'none',
-      transition: 'filter 0.05s',
+      background: '#000',
+      position: 'relative', overflow: 'hidden',
+      fontFamily: '"Courier New", Courier, monospace',
+      filter: glitch ? 'hue-rotate(80deg) brightness(1.3)' : 'none',
+      transition: 'filter 0.04s',
     }}>
-      {/* Matrix bg */}
       <MatrixBg />
 
       {/* Scanlines */}
       <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.4) 0px, rgba(0,0,0,0.4) 2px, transparent 2px, transparent 4px)',
-        transform: `translateY(${scanlineY}px)`,
-        pointerEvents: 'none', zIndex: 10, opacity: 0.7,
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5,
+        backgroundImage: 'repeating-linear-gradient(0deg,rgba(0,0,0,0.42) 0px,rgba(0,0,0,0.42) 2px,transparent 2px,transparent 4px)',
+        transform: `translateY(${scanY}px)`, opacity: 0.7,
       }} />
 
-      {/* CRT vignette */}
+      {/* Vignette */}
       <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 80%, rgba(0,0,0,0.95) 100%)',
-        pointerEvents: 'none', zIndex: 11,
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 6,
+        background: 'radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.97) 100%)',
       }} />
 
-      {/* Glitch bar */}
-      {glitch && (
-        <div style={{
-          position: 'absolute', top: `${20 + Math.random() * 60}%`,
-          left: 0, right: 0, height: '2px',
-          background: 'rgba(0,255,136,0.6)', mixBlendMode: 'screen', zIndex: 12,
-        }} />
-      )}
+      {glitch && <div style={{
+        position: 'absolute', left: 0, right: 0, height: '2px', zIndex: 7,
+        top: `${25 + Math.random() * 50}%`,
+        background: 'rgba(0,255,136,0.55)', mixBlendMode: 'screen',
+      }} />}
 
-      {/* ── HEADER BAR ── */}
+      {/* HEADER */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0,
-        background: 'linear-gradient(180deg, #001a00, #000d00)',
-        borderBottom: '2px solid #00ff41',
-        padding: '10px 24px',
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
+        borderBottom: '1px solid #00ff41',
+        background: 'rgba(0,6,0,0.97)',
+        padding: '6px 20px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        zIndex: 20,
-        boxShadow: '0 0 20px rgba(0,255,65,0.3)',
+        boxShadow: '0 0 16px rgba(0,255,65,0.15)',
       }}>
-        {/* Dots */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f57', boxShadow: '0 0 8px #ff5f57' }} />
-          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e', boxShadow: '0 0 8px #ffbd2e' }} />
-          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#28ca41', boxShadow: '0 0 8px #28ca41' }} />
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {['#ff5f57','#ffbd2e','#28ca41'].map((c,i) => (
+            <div key={i} style={{ width:10, height:10, borderRadius:'50%', background:c, boxShadow:`0 0 5px ${c}` }} />
+          ))}
         </div>
-
-        {/* Title */}
-        <div style={{
-          color: '#00ff41',
-          fontSize: '14px',
-          letterSpacing: '4px',
-          textShadow: '0 0 12px #00ff41',
-          fontWeight: 'bold',
-        }}>
-          {titleText}{showCursor ? '█' : ' '}
-        </div>
-
-        {/* Status */}
-        <div style={{
-          color: '#00ff88',
-          fontSize: '12px',
-          letterSpacing: '3px',
-          textShadow: '0 0 8px #00ff88',
-          animation: 'menu-pulse 2s ease-in-out infinite',
-        }}>
-          ◉ ROOT ACCESS
+        <span style={{ color:'#00ff41', fontSize:'11px', letterSpacing:'4px', textShadow:'0 0 10px #00ff41', fontWeight:'bold' }}>
+          FLIPPER ZERO // TERMINAL
+        </span>
+        <div style={{ display:'flex', gap:'12px', alignItems:'center' }}>
+          <span style={{ color:'#00ff88', fontSize:'10px', letterSpacing:'2px', textShadow:'0 0 6px #00ff88' }}>◉ ROOT</span>
+          <button onClick={() => onBack?.()} style={{
+            background:'transparent', border:'1px solid #ff4444',
+            color:'#ff4444', fontFamily:'inherit', fontSize:'10px',
+            letterSpacing:'2px', padding:'2px 8px', cursor:'pointer',
+          }}>✕ EXIT</button>
         </div>
       </div>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* TERMINAL BODY */}
       <div style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        paddingTop: '40px', paddingBottom: '32px',
         zIndex: 15,
-        paddingTop: '60px',
-        paddingBottom: '40px',
       }}>
+        <div style={{ width: 'min(820px, 90vw)', display: 'flex', flexDirection: 'column' }}>
 
-        {/* ASCII logo */}
-        <pre style={{
-          color: '#00ff41',
-          textShadow: '0 0 10px #00ff41',
-          fontSize: 'clamp(5px, 0.85vw, 11px)',
-          lineHeight: 1.2,
-          letterSpacing: '1px',
-          marginBottom: '28px',
-          textAlign: 'center',
-          userSelect: 'none',
-          animation: 'menu-logo-glow 3s ease-in-out infinite',
-        }}>{`
-███████╗██╗     ██╗██████╗ ██████╗ ███████╗██████╗
-██╔════╝██║     ██║██╔══██╗██╔══██╗██╔════╝██╔══██╗
-█████╗  ██║     ██║██████╔╝██████╔╝█████╗  ██████╔╝
-██╔══╝  ██║     ██║██╔═══╝ ██╔═══╝ ██╔══╝  ██╔══██╗
-██║     ███████╗██║██║     ██║     ███████╗██║  ██║
-╚═╝     ╚══════╝╚═╝╚═╝     ╚═╝     ╚══════╝╚═╝  ╚═╝`}
-        </pre>
-
-        {/* Subtitle */}
-        <div style={{
-          color: '#00ccff',
-          fontSize: '11px',
-          letterSpacing: '5px',
-          textShadow: '0 0 10px #00ccff',
-          marginBottom: '32px',
-          opacity: 0.8,
-        }}>
-          ↑ ↓ NAVIGATE &nbsp;│&nbsp; ENTER SELECT &nbsp;│&nbsp; ESC BACK
-        </div>
-
-        {/* Menu panel */}
-        <div style={{
-          border: '1px solid #00ff41',
-          background: 'rgba(0,10,0,0.85)',
-          boxShadow: '0 0 30px rgba(0,255,65,0.2), inset 0 0 20px rgba(0,255,65,0.05)',
-          padding: '6px',
-          width: 'min(480px, 88vw)',
-          backdropFilter: 'blur(4px)',
-        }}>
-          {/* Panel header */}
-          <div style={{
-            background: 'linear-gradient(90deg, #003300, #001a00)',
-            borderBottom: '1px solid #004400',
-            padding: '8px 16px',
-            marginBottom: '4px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <span style={{ color: '#00ff41', fontSize: '11px', letterSpacing: '3px' }}>MODULE SELECT</span>
-            <span style={{ color: '#004400', fontSize: '10px', letterSpacing: '2px' }}>v2.4.1</span>
+          {/* Boot lines */}
+          <div style={{ marginBottom: '14px' }}>
+            {bootLines.map((line, i) => (
+              <div key={i} style={{
+                fontSize: '11px', lineHeight: '1.85',
+                color: '#3a5a3a', letterSpacing: '0.5px',
+              }}>{line || '\u00A0'}</div>
+            ))}
           </div>
 
-          {/* Items */}
-          {MENU_ITEMS.map((item, i) => {
-            const isSelected = i === selected
-            const isEntering = isSelected && entered
-            return (
-              <div
-                key={item.key}
-                onClick={() => setSelected(i)}
-                onDoubleClick={() => onSelect?.(item.key)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '9px 16px',
-                  cursor: 'pointer',
-                  background: isSelected
-                    ? 'linear-gradient(90deg, rgba(0,255,65,0.12), rgba(0,255,65,0.04))'
-                    : 'transparent',
-                  borderLeft: isSelected ? `3px solid ${item.color}` : '3px solid transparent',
-                  transition: 'all 0.08s ease',
-                  transform: isEntering ? 'translateX(4px)' : 'none',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Scan line on hover */}
-                {isSelected && (
-                  <div style={{
-                    position: 'absolute', inset: 0,
-                    background: `linear-gradient(90deg, ${item.color}08, transparent)`,
-                    animation: 'menu-scan 1.5s linear infinite',
-                    pointerEvents: 'none',
-                  }} />
-                )}
-
-                {/* Arrow */}
-                <span style={{
-                  color: item.color,
-                  fontSize: '12px',
-                  width: '16px',
-                  textShadow: isSelected ? `0 0 10px ${item.color}` : 'none',
-                  flexShrink: 0,
-                }}>
-                  {isSelected ? '▶' : ' '}
-                </span>
-
-                {/* Prefix */}
-                <span style={{
-                  color: isSelected ? item.color : '#003300',
-                  fontSize: '12px',
-                  letterSpacing: '1px',
-                  marginRight: '12px',
-                  textShadow: isSelected ? `0 0 8px ${item.color}` : 'none',
-                  flexShrink: 0,
-                  transition: 'all 0.08s',
-                }}>
-                  {item.prefix}
-                </span>
-
-                {/* Label */}
-                <span style={{
-                  color: isSelected ? '#ffffff' : '#00aa33',
-                  fontSize: '13px',
-                  letterSpacing: '3px',
-                  fontWeight: isSelected ? 'bold' : 'normal',
-                  textShadow: isSelected ? `0 0 12px ${item.color}, 0 0 25px ${item.color}` : 'none',
-                  flex: 1,
-                  transition: 'all 0.08s',
-                }}>
-                  {item.label}
-                </span>
-
-                {/* Cursor */}
-                {isSelected && (
-                  <span style={{
-                    color: item.color,
-                    fontSize: '13px',
-                    opacity: showCursor ? 1 : 0,
-                    textShadow: `0 0 8px ${item.color}`,
-                    marginLeft: '8px',
-                  }}>
-                    ▌
-                  </span>
-                )}
-              </div>
-            )
-          })}
-
-          {/* Panel footer */}
-          <div style={{
-            borderTop: '1px solid #002200',
-            marginTop: '4px',
-            padding: '8px 16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <span style={{ color: '#003300', fontSize: '10px', letterSpacing: '2px' }}>
-              {String(selected + 1).padStart(2, '0')}/{String(MENU_ITEMS.length).padStart(2, '0')}
-            </span>
-            <span style={{
-              color: '#00ff41',
-              fontSize: '10px',
-              letterSpacing: '2px',
-              animation: 'menu-pulse 1.2s steps(2) infinite',
+          {booted && (
+            <div style={{
+              border: '1px solid #00ff41',
+              background: 'rgba(0,4,0,0.95)',
+              boxShadow: '0 0 28px rgba(0,255,65,0.1), inset 0 0 40px rgba(0,0,0,0.6)',
+              overflow: 'hidden',
             }}>
-              PRESS ENTER TO EXECUTE
-            </span>
-          </div>
-        </div>
+              {/* Titlebar */}
+              <div style={{
+                background: '#00ff41', color: '#000',
+                padding: '3px 12px', fontSize: '10px',
+                letterSpacing: '3px', fontWeight: 'bold',
+                display: 'flex', justifyContent: 'space-between',
+              }}>
+                <span>root@flipper:~  —  module-selector</span>
+                <span>↑↓ NAV  |  ENTER RUN  |  ESC BACK</span>
+              </div>
 
-        {/* Bottom hint */}
-        <div style={{
-          marginTop: '20px',
-          color: '#002200',
-          fontSize: '10px',
-          letterSpacing: '3px',
-          textAlign: 'center',
-        }}>
-          FLIPPER ZERO TERMINAL &nbsp;//&nbsp; UNAUTHORIZED ACCESS PROHIBITED
+              {/* ls-style prompt */}
+              <div style={{ padding: '10px 18px 4px', display:'flex', gap:'4px', alignItems:'center' }}>
+                <span style={{ color:'#00cc44', fontSize:'12px' }}>root@flipper</span>
+                <span style={{ color:'#555', fontSize:'12px' }}>:</span>
+                <span style={{ color:'#4466cc', fontSize:'12px' }}>~</span>
+                <span style={{ color:'#888', fontSize:'12px' }}>$</span>
+                <span style={{ color:'#ddd', fontSize:'12px', letterSpacing:'1px' }}>flipper --list-modules</span>
+              </div>
+              <div style={{ padding:'0 18px 10px', fontSize:'10px', color:'#334433', letterSpacing:'0.5px', borderBottom:'1px solid #0a1a0a' }}>
+                {MENU_ITEMS.length} modules available. Navigate with ↑↓ or joystick, press ENTER to execute.
+              </div>
+
+              {/* Items */}
+              <div style={{ padding: '4px 0' }}>
+                {MENU_ITEMS.map((it, i) => {
+                  const isSel = i === selected
+                  const isEntering = isSel && entered
+                  return (
+                    <div
+                      key={it.key}
+                      onClick={() => { setSelected(i); setTimeout(() => onSelect?.(it.key), 80) }}
+                      style={{
+                        display: 'flex', alignItems: 'center',
+                        padding: '8px 18px',
+                        cursor: 'pointer',
+                        background: isSel ? 'rgba(0,255,65,0.06)' : 'transparent',
+                        borderLeft: `3px solid ${isSel ? it.color : 'transparent'}`,
+                        transform: isEntering ? 'translateX(5px)' : 'none',
+                        transition: 'background 0.06s, transform 0.06s',
+                        position: 'relative', overflow: 'hidden',
+                      }}
+                    >
+                      {isSel && (
+                        <div style={{
+                          position:'absolute', inset:0, pointerEvents:'none',
+                          background:`linear-gradient(90deg, ${it.color}10 0%, transparent 50%)`,
+                          animation:'scanrow 2s linear infinite',
+                        }} />
+                      )}
+
+                      {/* Line nr */}
+                      <span style={{ fontSize:'10px', color:'#1a2a1a', width:'28px', flexShrink:0, userSelect:'none' }}>
+                        {String(i + 1).padStart(2,' ')}
+                      </span>
+
+                      {/* Cursor */}
+                      <span style={{
+                        fontSize:'12px', color:it.color,
+                        width:'16px', flexShrink:0,
+                        textShadow: isSel ? `0 0 8px ${it.color}` : 'none',
+                        opacity: isSel ? 1 : 0,
+                        transition:'opacity 0.06s',
+                      }}>▶</span>
+
+                      {/* Tag */}
+                      <span style={{
+                        fontSize:'10px', letterSpacing:'1px', fontWeight:'bold',
+                        color: isSel ? it.color : '#1d3a1d',
+                        width:'54px', flexShrink:0,
+                        textShadow: isSel ? `0 0 8px ${it.color}` : 'none',
+                        transition:'all 0.06s',
+                      }}>{it.tag}</span>
+
+                      {/* THE COMMAND — main element */}
+                      <span style={{
+                        fontSize:'14px', letterSpacing:'2px',
+                        color: isSel ? '#ffffff' : '#009922',
+                        fontWeight: isSel ? 'bold' : 'normal',
+                        textShadow: isSel ? `0 0 14px ${it.color}, 0 0 28px ${it.color}66` : 'none',
+                        flex: 1,
+                        transition:'all 0.06s',
+                      }}>{it.cmd}</span>
+
+                      {/* Comment */}
+                      <span style={{
+                        fontSize:'10px',
+                        color: isSel ? '#3a5a3a' : '#162216',
+                        letterSpacing:'0.5px',
+                        textAlign:'right',
+                        transition:'all 0.06s',
+                        flexShrink:0,
+                      }}># {it.desc}</span>
+
+                      {/* Blink cursor */}
+                      {isSel && (
+                        <span style={{
+                          fontSize:'14px', color:it.color,
+                          marginLeft:'8px', flexShrink:0,
+                          opacity: blink ? 1 : 0,
+                          textShadow:`0 0 8px ${it.color}`,
+                        }}>▌</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Active prompt at bottom */}
+              <div style={{
+                borderTop:'1px solid #081408',
+                padding:'10px 18px',
+                display:'flex', alignItems:'center', gap:'6px',
+              }}>
+                <span style={{ color:'#00cc44', fontSize:'12px' }}>root@flipper</span>
+                <span style={{ color:'#555', fontSize:'12px' }}>:</span>
+                <span style={{ color:'#4466cc', fontSize:'12px' }}>~</span>
+                <span style={{ color:'#888', fontSize:'12px' }}>$</span>
+                <span style={{
+                  color: item.color, fontSize:'14px', letterSpacing:'2px',
+                  fontWeight:'bold',
+                  textShadow:`0 0 12px ${item.color}`,
+                  transition:'all 0.12s',
+                }}>{item.cmd}</span>
+                <span style={{
+                  fontSize:'14px', color: item.color,
+                  opacity: blink ? 1 : 0,
+                  textShadow:`0 0 8px ${item.color}`,
+                }}>▌</span>
+              </div>
+            </div>
+          )}
+
+          {booted && (
+            <div style={{ marginTop:'8px', display:'flex', gap:'20px', color:'#1a2a1a', fontSize:'10px', letterSpacing:'2px' }}>
+              <span>↑↓  navigate</span>
+              <span>ENTER  execute</span>
+              <span>JOYSTICK  supported</span>
+              <span>ESC  back</span>
+              <span style={{ marginLeft:'auto' }}>{String(selected+1).padStart(2,'0')}/{String(MENU_ITEMS.length).padStart(2,'0')}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── FOOTER ── */}
+      {/* Footer */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        background: 'linear-gradient(180deg, transparent, rgba(0,255,65,0.04))',
-        borderTop: '1px solid #001a00',
-        padding: '6px 24px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        zIndex: 20,
+        position:'absolute', bottom:0, left:0, right:0, zIndex:20,
+        borderTop:'1px solid #0a140a',
+        background:'rgba(0,0,0,0.85)',
+        padding:'4px 20px',
+        display:'flex', justifyContent:'space-between',
       }}>
-        <span style={{ color: '#002200', fontSize: '10px', letterSpacing: '2px' }}>SYS::ACTIVE</span>
-        <span style={{ color: '#002200', fontSize: '10px', letterSpacing: '2px' }}>MEM::OK</span>
-        <span style={{ color: '#002200', fontSize: '10px', letterSpacing: '2px' }}>RF::STANDBY</span>
+        {['SYS::ACTIVE','MEM::OK','RF::STANDBY','NFC::IDLE','BT::OFF'].map(s => (
+          <span key={s} style={{ color:'#0d1a0d', fontSize:'9px', letterSpacing:'2px' }}>{s}</span>
+        ))}
       </div>
 
       <style>{`
-        @keyframes menu-pulse {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.3; }
-        }
-        @keyframes menu-logo-glow {
-          0%, 100% { text-shadow: 0 0 10px #00ff41; }
-          50%      { text-shadow: 0 0 20px #00ff41, 0 0 40px #00ff41; }
-        }
-        @keyframes menu-scan {
+        @keyframes scanrow {
           0%   { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
+          100% { transform: translateX(300%); }
         }
       `}</style>
     </div>

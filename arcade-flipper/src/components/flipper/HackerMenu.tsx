@@ -1,15 +1,28 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 
 const MENU_ITEMS = [
-  { key: 'scan',     cmd: 'flipper run rf_scanner',     desc: 'Scan & capture RF signals',        color: '#00ff88', tag: '[RF]'   },
   { key: 'nfc',      cmd: 'flipper run nfc_clone',       desc: 'Read/emulate NFC & RFID cards',    color: '#00ccff', tag: '[NFC]'  },
-  { key: 'subghz',   cmd: 'flipper run subghz_scan',     desc: 'Sub-GHz frequency analyzer',       color: '#00ccff', tag: '[SUB]'  },
   { key: 'badusb',   cmd: 'flipper run badusb_inject',   desc: 'HID keystroke injection',           color: '#ff4444', tag: '[USB]'  },
   { key: 'ir',       cmd: 'flipper run ir_blast',        desc: 'Infrared signal transmitter',       color: '#ff8800', tag: '[IR]'   },
-  { key: 'bt',       cmd: 'flipper run bt_scan',         desc: 'Bluetooth device scanner',          color: '#4488ff', tag: '[BT]'   },
   { key: 'gpio',     cmd: 'flipper run gpio_ctrl',       desc: 'GPIO pin control & logic analyzer', color: '#ffff00', tag: '[GPIO]' },
   { key: 'terminal', cmd: 'flipper shell --root',        desc: 'Open interactive root shell',       color: '#00ff88', tag: '[SH]'   },
 ]
+
+type DeviceStatus = {
+  connected: boolean
+  connecting: boolean
+  autoConnect: boolean
+  portPath?: string
+  error?: string
+  lastSeenAt?: number
+}
+
+type HackerMenuProps = {
+  onSelect?: (key: string) => void
+  onBack?: () => void
+  deviceStatus?: DeviceStatus
+  lastDeviceLine?: string
+}
 
 function MatrixBg() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -46,7 +59,7 @@ function MatrixBg() {
   return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, opacity: 0.15, pointerEvents: 'none' }} />
 }
 
-export default function Menu({ onSelect, onBack }: { onSelect?: (key: string) => void; onBack?: () => void }) {
+export default function Menu({ onSelect, onBack, deviceStatus, lastDeviceLine }: HackerMenuProps) {
   const [selected, setSelected]   = useState(0)
   const [entered, setEntered]     = useState(false)
   const [glitch, setGlitch]       = useState(false)
@@ -60,7 +73,7 @@ export default function Menu({ onSelect, onBack }: { onSelect?: (key: string) =>
   const BOOT = [
     '> Flipper Zero OS v0.91.1  —  ARM Cortex-M4 @ 64MHz',
     '> Checking hardware...  Flash: OK  RAM: OK  SD: MOUNTED',
-    '> CC1101: OK  |  ST25R3916: OK  |  IR: OK  |  BT: OK',
+    '> ST25R3916: OK  |  IR: OK  |  GPIO: OK',
     '> Root access granted. Loading module selector...',
     '',
   ]
@@ -130,6 +143,16 @@ export default function Menu({ onSelect, onBack }: { onSelect?: (key: string) =>
   }, [moveUp, moveDown, confirm])
 
   const item = MENU_ITEMS[selected]
+  const hardwareLabel = deviceStatus?.connected
+    ? `HW::ONLINE ${deviceStatus.portPath ?? ''}`.trim()
+    : deviceStatus?.connecting
+      ? 'HW::CONNECTING'
+      : 'HW::OFFLINE'
+  const hardwareColor = deviceStatus?.connected
+    ? '#00ff88'
+    : deviceStatus?.connecting
+      ? '#ffff00'
+      : '#ff4444'
 
   return (
     <div style={{
@@ -179,6 +202,9 @@ export default function Menu({ onSelect, onBack }: { onSelect?: (key: string) =>
           FLIPPER ZERO // TERMINAL
         </span>
         <div style={{ display:'flex', gap:'12px', alignItems:'center' }}>
+          <span style={{ color: hardwareColor, fontSize:'10px', letterSpacing:'2px', textShadow:`0 0 6px ${hardwareColor}` }}>
+            {hardwareLabel}
+          </span>
           <span style={{ color:'#00ff88', fontSize:'10px', letterSpacing:'2px', textShadow:'0 0 6px #00ff88' }}>◉ ROOT</span>
           <button onClick={() => onBack?.()} style={{
             background:'transparent', border:'1px solid #ff4444',
@@ -354,6 +380,11 @@ export default function Menu({ onSelect, onBack }: { onSelect?: (key: string) =>
               <span>ENTER  execute</span>
               <span>JOYSTICK  supported</span>
               <span>ESC  back</span>
+              {lastDeviceLine && (
+                <span style={{ maxWidth:'260px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  RX::{lastDeviceLine}
+                </span>
+              )}
               <span style={{ marginLeft:'auto' }}>{String(selected+1).padStart(2,'0')}/{String(MENU_ITEMS.length).padStart(2,'0')}</span>
             </div>
           )}
@@ -368,7 +399,7 @@ export default function Menu({ onSelect, onBack }: { onSelect?: (key: string) =>
         padding:'4px 20px',
         display:'flex', justifyContent:'space-between',
       }}>
-        {['SYS::ACTIVE','MEM::OK','RF::STANDBY','NFC::IDLE','BT::OFF'].map(s => (
+        {['SYS::ACTIVE','MEM::OK','NFC::IDLE','IR::IDLE',hardwareLabel].map(s => (
           <span key={s} style={{ color:'#0d1a0d', fontSize:'9px', letterSpacing:'2px' }}>{s}</span>
         ))}
       </div>

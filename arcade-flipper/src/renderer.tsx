@@ -7,11 +7,25 @@ import { GameDisplay } from "./components/arcade/gamedisplay";
 import HackerMenu from "./components/flipper/HackerMenu";
 
 type Screen = 'boot' | 'arcade-menu' | 'game-launch' | 'game-display' | 'hacker-menu'
+type DiyFlipperStatus = {
+  connected: boolean
+  connecting: boolean
+  autoConnect: boolean
+  portPath?: string
+  error?: string
+  lastSeenAt?: number
+}
 
 function App() {
   const [screen, setScreen]             = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const [displayGame, setDisplayGame]   = useState<string | null>(null)
+  const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>({
+    connected: false,
+    connecting: false,
+    autoConnect: true
+  })
+  const [diyFlipperLastLine, setDiyFlipperLastLine] = useState<string>('')
 
   // ── arcade boot state ─────────────────────────────────────────
   const [coins, setCoins]                   = useState(0)
@@ -107,18 +121,57 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!window.electron) return
+
+    const readInitialStatus = async () => {
+      const status = await window.electron!.diyFlipperGetStatus()
+      setDiyFlipperStatus(status)
+      await window.electron!.diyFlipperConnect()
+    }
+
+    const unsubscribeStatus = window.electron.onDiyFlipperStatus((status) => {
+      setDiyFlipperStatus(status)
+    })
+
+    const unsubscribeLine = window.electron.onDiyFlipperLine((line) => {
+      setDiyFlipperLastLine(line)
+    })
+
+    void readInitialStatus()
+
+    return () => {
+      unsubscribeStatus()
+      unsubscribeLine()
+    }
+  }, [])
+
   // ── navigatie ─────────────────────────────────────────────────
   // useCallback → stabiele ref, HackTransition reset listener NIET
   const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
 
-  const handleModuleSelect = useCallback((key: string) => {
-    // Hier kun je later per key naar een subscherm navigeren
-    console.log('Module selected:', key)
+  const handleModuleSelect = useCallback(async (key: string) => {
+    if (!window.electron) return
+
+    const result = await window.electron.diyFlipperRunModule(key)
+    if (!result.success) {
+      console.warn('[DIYFLIPPER] Module launch failed:', result.message)
+      return
+    }
+
+    console.log('[DIYFLIPPER] Module command sent:', key)
   }, [])
 
   // ── render ────────────────────────────────────────────────────
   if (screen === 'hacker-menu')
-    return <HackerMenu onSelect={handleModuleSelect} onBack={() => setScreen('boot')} />
+    return (
+      <HackerMenu
+        onSelect={handleModuleSelect}
+        onBack={() => setScreen('boot')}
+        deviceStatus={diyFlipperStatus}
+        lastDeviceLine={diyFlipperLastLine}
+      />
+    )
 
   if (screen === 'game-display' && displayGame)
     return <GameDisplay gameId={displayGame} onExit={() => { setDisplayGame(null); setSelectedGame(null); setScreen('arcade-menu') }} />

@@ -68,6 +68,10 @@ npm run build        # Production build
 npm run preview      # Preview build
 ```
 
+## DIY Flipper Setup
+- Quick wiring + firmware setup: `docs/DIYFLIPPER_QUICKSTART.md`
+- ESP32 baseline firmware: `firmware/esp32_diyflipper/esp32_diyflipper.ino`
+
 ## Add a Game
 1. Create a folder in `games/`.
 2. Add your executable and `thumbnail.png`.

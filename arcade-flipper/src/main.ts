@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
 import { spawn } from 'child_process'
 import fs from 'fs'
+import { SerialPort } from 'serialport'
 
 type LaunchViewport = {
   x: number
@@ -16,16 +17,289 @@ type LaunchRequest = {
   viewport?: LaunchViewport
 }
 
+type PortInfo = Awaited<ReturnType<typeof SerialPort.list>>[number]
+
+type DiyFlipperStatus = {
+  connected: boolean
+  connecting: boolean
+  autoConnect: boolean
+  portPath?: string
+  error?: string
+  lastSeenAt?: number
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+const DIY_FLIPPER_BAUD_RATE = 115200
+const DIY_FLIPPER_SCAN_INTERVAL_MS = 3000
+
+const DIY_MODULE_COMMANDS: Record<string, string> = {
+  nfc: 'NFC_CLONE',
+  badusb: 'BADUSB_INJECT',
+  ir: 'IR_BLAST',
+  gpio: 'GPIO_CTRL',
+  terminal: 'SHELL'
+}
+
 let mainWindow: BrowserWindow | null = null
 
+let diyFlipperPort: SerialPort | null = null
+let diyFlipperLineBuffer = ''
+let diyFlipperScanTimer: NodeJS.Timeout | null = null
+let diyFlipperStatus: DiyFlipperStatus = {
+  connected: false,
+  connecting: false,
+  autoConnect: true
+}
+
+function publishDiyFlipperStatus() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('diyflipper-status', diyFlipperStatus)
+}
+
+function setDiyFlipperStatus(patch: Partial<DiyFlipperStatus>) {
+  diyFlipperStatus = { ...diyFlipperStatus, ...patch }
+  publishDiyFlipperStatus()
+}
+
+function portInfoText(port: PortInfo) {
+  const maybeFriendlyName = (port as unknown as { friendlyName?: string }).friendlyName ?? ''
+  return `${port.path} ${port.manufacturer ?? ''} ${port.pnpId ?? ''} ${maybeFriendlyName} ${port.vendorId ?? ''} ${port.productId ?? ''}`.toLowerCase()
+}
+
+function scoreSerialPort(port: PortInfo) {
+  const text = portInfoText(port)
+  let score = 0
+
+  if (text.includes('pico') || text.includes('rp2040') || text.includes('raspberry')) score += 120
+  if (text.includes('esp32') || text.includes('espressif')) score += 110
+  if (text.includes('usb serial') || text.includes('uart')) score += 60
+  if (text.includes('ch340') || text.includes('cp210') || text.includes('silicon labs')) score += 60
+  if (text.includes('ttyacm') || text.includes('ttyusb') || text.includes('com')) score += 40
+
+  return score
+}
+
+async function listSerialPortsSafe() {
+  try {
+    return await SerialPort.list()
+  } catch (error: any) {
+    console.error('[DIYFLIPPER] Failed to list serial ports:', error)
+    return []
+  }
+}
+
+function attachDiyFlipperPortListeners(port: SerialPort) {
+  port.on('data', (chunk: Buffer) => {
+    diyFlipperLineBuffer += chunk.toString('utf8')
+
+    let newlineIndex = diyFlipperLineBuffer.indexOf('\n')
+    while (newlineIndex >= 0) {
+      const line = diyFlipperLineBuffer.slice(0, newlineIndex).replace(/\r/g, '').trim()
+      diyFlipperLineBuffer = diyFlipperLineBuffer.slice(newlineIndex + 1)
+      newlineIndex = diyFlipperLineBuffer.indexOf('\n')
+
+      if (!line) continue
+      setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('diyflipper-line', line)
+      }
+    }
+  })
+
+  port.on('error', (error) => {
+    console.error('[DIYFLIPPER] Serial error:', error)
+    if (diyFlipperPort === port) {
+      diyFlipperPort = null
+      diyFlipperLineBuffer = ''
+      setDiyFlipperStatus({
+        connected: false,
+        connecting: false,
+        portPath: undefined,
+        error: `Serial error: ${error.message || error}`
+      })
+    }
+  })
+
+  port.on('close', () => {
+    if (diyFlipperPort === port) {
+      console.warn('[DIYFLIPPER] Device disconnected')
+      diyFlipperPort = null
+      diyFlipperLineBuffer = ''
+      setDiyFlipperStatus({
+        connected: false,
+        connecting: false,
+        portPath: undefined,
+        error: 'Device disconnected'
+      })
+    }
+  })
+}
+
+async function openDiyFlipperPort(portPath: string) {
+  const port = new SerialPort({
+    path: portPath,
+    baudRate: DIY_FLIPPER_BAUD_RATE,
+    autoOpen: false
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    port.open((error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
+
+  diyFlipperPort = port
+  diyFlipperLineBuffer = ''
+  attachDiyFlipperPortListeners(port)
+  setDiyFlipperStatus({
+    connected: true,
+    connecting: false,
+    portPath,
+    error: undefined,
+    lastSeenAt: Date.now()
+  })
+
+  port.write('HELLO\n')
+  port.write('PING\n')
+}
+
+async function connectDiyFlipper(preferredPath?: string) {
+  if (diyFlipperPort?.isOpen) {
+    return { success: true, message: `Already connected on ${diyFlipperStatus.portPath ?? 'serial'}` }
+  }
+
+  if (diyFlipperStatus.connecting) {
+    return { success: false, message: 'Connection already in progress' }
+  }
+
+  setDiyFlipperStatus({ connecting: true, error: undefined })
+
+  const ports = await listSerialPortsSafe()
+  if (!ports.length) {
+    setDiyFlipperStatus({ connecting: false, connected: false, error: 'No serial ports found' })
+    return { success: false, message: 'No serial ports found' }
+  }
+
+  let candidates: PortInfo[] = []
+
+  if (preferredPath) {
+    candidates = ports.filter((port) => port.path === preferredPath)
+    if (!candidates.length) {
+      setDiyFlipperStatus({
+        connecting: false,
+        connected: false,
+        error: `Requested port not found: ${preferredPath}`
+      })
+      return { success: false, message: `Requested port not found: ${preferredPath}` }
+    }
+  } else {
+    candidates = [...ports].sort((a, b) => scoreSerialPort(b) - scoreSerialPort(a))
+  }
+
+  const errors: string[] = []
+  for (const candidate of candidates) {
+    try {
+      await openDiyFlipperPort(candidate.path)
+      console.log(`[DIYFLIPPER] Connected on ${candidate.path}`)
+      return { success: true, message: `Connected on ${candidate.path}` }
+    } catch (error: any) {
+      const message = `${candidate.path}: ${error.message || error}`
+      errors.push(message)
+      console.warn(`[DIYFLIPPER] Failed to open ${message}`)
+    }
+  }
+
+  const errorMessage = errors.length
+    ? `Could not connect. Tried: ${errors.join(' | ')}`
+    : 'Could not connect to any serial device'
+
+  setDiyFlipperStatus({ connecting: false, connected: false, error: errorMessage })
+  return { success: false, message: errorMessage }
+}
+
+async function disconnectDiyFlipper() {
+  diyFlipperStatus.autoConnect = false
+
+  if (!diyFlipperPort) {
+    setDiyFlipperStatus({
+      connected: false,
+      connecting: false,
+      portPath: undefined,
+      error: undefined
+    })
+    return { success: true, message: 'Already disconnected' }
+  }
+
+  const port = diyFlipperPort
+  diyFlipperPort = null
+  diyFlipperLineBuffer = ''
+
+  await new Promise<void>((resolve) => {
+    if (!port.isOpen) {
+      resolve()
+      return
+    }
+    port.close(() => resolve())
+  })
+
+  setDiyFlipperStatus({
+    connected: false,
+    connecting: false,
+    portPath: undefined,
+    error: undefined
+  })
+  return { success: true, message: 'Disconnected' }
+}
+
+async function writeDiyFlipperCommand(command: string) {
+  if (!diyFlipperPort?.isOpen) {
+    const reconnect = await connectDiyFlipper()
+    if (!reconnect.success || !diyFlipperPort?.isOpen) {
+      return { success: false, message: reconnect.message || 'Device not connected' }
+    }
+  }
+
+  return new Promise<{ success: boolean; message: string }>((resolve) => {
+    diyFlipperPort!.write(`${command.trim()}\n`, (error) => {
+      if (error) {
+        setDiyFlipperStatus({ error: `Write failed: ${error.message || error}` })
+        resolve({ success: false, message: `Write failed: ${error.message || error}` })
+        return
+      }
+      setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
+      resolve({ success: true, message: `Command sent: ${command}` })
+    })
+  })
+}
+
+function startDiyFlipperAutoConnect() {
+  if (diyFlipperScanTimer) return
+
+  const tick = async () => {
+    if (!diyFlipperStatus.autoConnect) return
+    if (diyFlipperPort?.isOpen) return
+    if (diyFlipperStatus.connecting) return
+    await connectDiyFlipper()
+  }
+
+  void tick()
+  diyFlipperScanTimer = setInterval(() => {
+    void tick()
+  }, DIY_FLIPPER_SCAN_INTERVAL_MS)
+}
+
+function stopDiyFlipperAutoConnect() {
+  if (diyFlipperScanTimer) {
+    clearInterval(diyFlipperScanTimer)
+    diyFlipperScanTimer = null
+  }
+}
+
 function createWindow() {
-  // Get preload script path
-  // In development, electron-vite compiles it to out/preload/preload.js
-  // In production, it's in the same location
   const preloadPath = path.join(__dirname, '../preload/preload.js')
 
   mainWindow = new BrowserWindow({
@@ -39,16 +313,18 @@ function createWindow() {
     }
   })
 
-  // In development: load from vite dev server
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
-  // Ensure fullscreen after load (in case fullscreen: true is ignored on some systems)
   mainWindow.once('ready-to-show', () => {
     mainWindow?.setFullScreen(true)
+  })
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    publishDiyFlipperStatus()
   })
 
   mainWindow.on('closed', () => {
@@ -56,7 +332,6 @@ function createWindow() {
   })
 }
 
-// IPC handler for making window fullscreen
 ipcMain.handle('set-fullscreen', async (_event, fullscreen: boolean) => {
   if (mainWindow) {
     mainWindow.setFullScreen(fullscreen)
@@ -65,7 +340,34 @@ ipcMain.handle('set-fullscreen', async (_event, fullscreen: boolean) => {
   return { success: false }
 })
 
-// IPC handler for launching games
+ipcMain.handle('diyflipper-get-status', async () => {
+  return diyFlipperStatus
+})
+
+ipcMain.handle('diyflipper-connect', async (_event, preferredPath?: string) => {
+  diyFlipperStatus.autoConnect = true
+  return connectDiyFlipper(preferredPath)
+})
+
+ipcMain.handle('diyflipper-disconnect', async () => {
+  return disconnectDiyFlipper()
+})
+
+ipcMain.handle('diyflipper-send-command', async (_event, command: string) => {
+  if (!command || typeof command !== 'string') {
+    return { success: false, message: 'Invalid command' }
+  }
+  return writeDiyFlipperCommand(command)
+})
+
+ipcMain.handle('diyflipper-run-module', async (_event, moduleKey: string) => {
+  const command = DIY_MODULE_COMMANDS[moduleKey]
+  if (!command) {
+    return { success: false, message: `Unknown module key: ${moduleKey}` }
+  }
+  return writeDiyFlipperCommand(`RUN ${command}`)
+})
+
 ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) => {
   try {
     const request: LaunchRequest = typeof payload === 'string'
@@ -82,28 +384,26 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       }
     }
 
-    console.log('🎮 Launching game:', gamePath)
-    console.log('🎮 Launch mode:', launchMode)
+    console.log('[LAUNCH] Game:', gamePath)
+    console.log('[LAUNCH] Mode:', launchMode)
 
     const activeDisplay = mainWindow
       ? screen.getDisplayMatching(mainWindow.getBounds())
       : screen.getPrimaryDisplay()
     const displayBounds = activeDisplay.bounds
-    
-    // Make window fullscreen before launching game
+
     if (mainWindow) {
-      // Use physical display bounds so the launcher matches the monitor resolution.
       mainWindow.setBounds(displayBounds)
       mainWindow.setFullScreen(true)
     }
-    
+
     const isDev = process.env.NODE_ENV === 'development'
     const basePath = isDev
       ? path.resolve(__dirname, '../../arcade-flipper/src')
       : app.getAppPath()
 
     function resolveSafe(base: string, rel: string) {
-      const cleaned = rel.replace(/^(\.\/)+/, '') // "./games/x" -> "games/x"
+      const cleaned = rel.replace(/^(\.\/)+/, '')
       const full = path.resolve(base, cleaned)
 
       const baseNorm = path.resolve(base) + path.sep
@@ -116,9 +416,6 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
     }
 
     const fullGamePath = resolveSafe(basePath, gamePath)
-
-    console.log('📁 Base path:', basePath)
-    console.log('📁 Full game path:', fullGamePath)
 
     if (!fs.existsSync(fullGamePath)) {
       return { success: false, message: `Game file not found: ${gamePath}` }
@@ -150,17 +447,14 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
           }
         })()
       : defaultBounds
-    
-    // Determine how to launch based on file extension
+
     if (gamePath.endsWith('.py')) {
-      // Launch Python script
-      // Try python3 first, fallback to python
       const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
 
       const pythonProcess = spawn(pythonCmd, [fullGamePath], {
         detached: true,
-        stdio: ['ignore', 'pipe', 'pipe'], // Capture stdout and stderr for debugging
-        cwd: path.dirname(fullGamePath), // Set working directory to game folder
+        stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: path.dirname(fullGamePath),
         env: {
           ...process.env,
           ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
@@ -168,48 +462,39 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
           ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
         }
       })
-      
-      // Log Python output for debugging
+
       pythonProcess.stdout?.on('data', (data) => {
-        console.log('🐍 Python stdout:', data.toString())
+        console.log('[PYTHON STDOUT]', data.toString())
       })
-      
+
       pythonProcess.stderr?.on('data', (data) => {
-        console.error('🐍 Python stderr:', data.toString())
+        console.error('[PYTHON STDERR]', data.toString())
       })
-      
+
       pythonProcess.on('error', (error) => {
-        console.error('❌ Failed to launch Python:', error)
-        // Show window again if game fails to launch
-        if (mainWindow) {
-          mainWindow.show()
-        }
+        console.error('[LAUNCH] Python start failed:', error)
+        if (mainWindow) mainWindow.show()
       })
-      
-      // Monitor when game process exits
+
       pythonProcess.on('exit', (code) => {
-        console.log('🎮 Game process exited with code:', code)
-        // Show Electron window again when game closes
+        console.log('[LAUNCH] Python game exited with code:', code)
         if (mainWindow) {
           mainWindow.show()
-          // Notify renderer that game exited
           mainWindow.webContents.send('game-exited')
         }
       })
-      
-      // On macOS, use AppleScript to position and resize the Pygame window
+
       if (process.platform === 'darwin' && mainWindow) {
-        // Try multiple times to catch the window when it appears
         let attempts = 0
         const maxAttempts = 10
-        
+
         const positionWindow = setInterval(() => {
           attempts++
 
           const fullscreenScript = launchMode === 'embedded'
             ? 'set value of attribute "AXFullScreen" of win to false'
             : 'set value of attribute "AXFullScreen" of win to true'
-          
+
           const script = `
             tell application "System Events"
               try
@@ -229,55 +514,53 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
               end try
             end tell
           `
-          
+
           spawn('osascript', ['-e', script], {
             detached: true,
             stdio: 'ignore'
           }).unref()
-          
+
           if (attempts >= maxAttempts) {
             clearInterval(positionWindow)
           }
-        }, 500) // Try every 500ms for 5 seconds
+        }, 500)
       }
-      
+
       pythonProcess.unref()
-      
-      console.log('✅ Python game launched with:', pythonCmd)
+
       return {
         success: true,
         message: 'Game launched successfully'
       }
-    } else if (gamePath.endsWith('.exe')) {
-      // Launch Windows executable
+    }
+
+    if (gamePath.endsWith('.exe')) {
       const exeProcess = spawn(fullGamePath, [], {
         detached: true,
         stdio: 'ignore'
       })
-      
+
       exeProcess.on('exit', () => {
         if (mainWindow) {
           mainWindow.show()
           mainWindow.webContents.send('game-exited')
         }
       })
-      
+
       exeProcess.unref()
-      
-      console.log('✅ Executable game launched')
+
       return {
         success: true,
         message: 'Game launched successfully'
       }
-    } else {
-      return {
-        success: false,
-        message: `Unsupported file type: ${path.extname(gamePath)}`
-      }
+    }
+
+    return {
+      success: false,
+      message: `Unsupported file type: ${path.extname(gamePath)}`
     }
   } catch (error: any) {
-    console.error('❌ Error launching game:', error)
-    // Show window again on error
+    console.error('[LAUNCH] Error launching game:', error)
     if (mainWindow) {
       mainWindow.show()
     }
@@ -288,7 +571,17 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  createWindow()
+  startDiyFlipperAutoConnect()
+})
+
+app.on('before-quit', async () => {
+  stopDiyFlipperAutoConnect()
+  if (diyFlipperPort?.isOpen) {
+    await disconnectDiyFlipper()
+  }
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

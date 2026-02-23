@@ -171,7 +171,3 @@ The Lab Graduation Project:
 - Younes: arcade platform (launcher and interface)
 - Rayan: hardware (arcade cabinet, buttons, computer setup)
 - Matthias: Raspberry Pi Pico hacking tool
-
-## License
-
-ISC

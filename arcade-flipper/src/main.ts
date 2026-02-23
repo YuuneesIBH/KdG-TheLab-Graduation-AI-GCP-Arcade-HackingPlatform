@@ -324,6 +324,11 @@ function createWindow() {
   })
 
   mainWindow.webContents.on('did-finish-load', () => {
+    // On Windows is de OS-schaal vaak > 100%, waardoor alles te ingezoomd oogt.
+    // We compenseren dit door de Electron zoomfactor iets te verlagen.
+    if (process.platform === 'win32') {
+      mainWindow?.webContents.setZoomFactor(0.85)
+    }
     publishDiyFlipperStatus()
   })
 

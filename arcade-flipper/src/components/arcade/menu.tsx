@@ -94,8 +94,20 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     return () => clearInterval(t)
   }, [])
 
-  React.useEffect(() => { const t = setInterval(() => setScanlineOffset(p => (p + 1) % 6), 60); return () => clearInterval(t) }, [])
-  React.useEffect(() => { const t = setInterval(() => { if (Math.random() < 0.06) { setGlitchLine(Math.floor(Math.random() * 16)); setTimeout(() => setGlitchLine(-1), 80) } }, 520); return () => clearInterval(t) }, [])
+  React.useEffect(() => {
+    const t = setInterval(() => setScanlineOffset(p => (p + 1) % 6), 60)
+    return () => clearInterval(t)
+  }, [])
+
+  React.useEffect(() => {
+    const t = setInterval(() => {
+      if (Math.random() < 0.06) {
+        setGlitchLine(Math.floor(Math.random() * 18))
+        setTimeout(() => setGlitchLine(-1), 80)
+      }
+    }, 520)
+    return () => clearInterval(t)
+  }, [])
 
   const visibleRange = 4
   const itemSpacing = 140
@@ -130,212 +142,423 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   }, [moveSelection])
 
   return (
-    <div
-      style={{
-        width: '100vw',
-        height: '100vh',
-        background: '#050814',
-        position: 'relative',
-        overflow: 'hidden',
-        fontFamily: '"Segoe UI", system-ui, -apple-system, Arial, sans-serif',
-        filter: crtFlicker ? 'brightness(0.9) contrast(1.15)' : 'brightness(1)',
-        transition: 'filter 0.06s',
-      }}
-    >
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(1200px 600px at 60% 0%, rgba(100,0,180,0.28), transparent 60%), radial-gradient(900px 500px at 10% 30%, rgba(0,120,255,0.18), transparent 60%), radial-gradient(800px 500px at 90% 80%, rgba(0,255,180,0.10), transparent 60%)' }} />
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(transparent 0, transparent 33px, rgba(0,160,255,0.06) 34px), linear-gradient(90deg, transparent 0, transparent 39px, rgba(0,160,255,0.05) 40px)', backgroundSize: '100% 34px, 40px 100%', opacity: 0.35 }} />
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.35, backgroundImage: 'radial-gradient(1px 1px at 8% 12%, rgba(255,255,255,0.8), transparent), radial-gradient(1px 1px at 23% 35%, rgba(200,220,255,0.8), transparent), radial-gradient(1px 1px at 74% 18%, rgba(255,255,255,0.7), transparent), radial-gradient(1px 1px at 61% 67%, rgba(200,220,255,0.7), transparent), radial-gradient(1px 1px at 90% 42%, rgba(255,255,255,0.7), transparent)' }} />
-
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 100% 100% at 50% 50%, transparent 55%, rgba(0,0,0,0.55) 100%)', pointerEvents: 'none', zIndex: 30 }} />
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 4px)', transform: `translateY(${scanlineOffset}px)`, opacity: 0.35, pointerEvents: 'none', zIndex: 31 }} />
-      {glitchLine >= 0 && <div style={{ position: 'absolute', top: `${glitchLine * 6}%`, left: 0, right: 0, height: '2px', background: 'rgba(120,120,255,0.55)', zIndex: 32, pointerEvents: 'none' }} />}
-
-      {particles.map(p => (
-        <div key={p.id} style={{ position: 'absolute', left: p.x, top: p.y, width: '5px', height: '5px', background: p.color, boxShadow: `0 0 10px ${p.color}`, pointerEvents: 'none', zIndex: 10 }} />
-      ))}
-
+    <>
       <div
         style={{
-          position: 'absolute',
-          top: 10,
-          left: 10,
-          right: 10,
-          bottom: 10,
-          zIndex: 40,
-          display: 'grid',
-          gridTemplateColumns: '0.44fr 1.56fr',
-          gap: 10,
+          background: 'linear-gradient(180deg, #001a40 0%, #000d1f 40%, #000510 70%, #000000 100%)',
+          width: '100vw',
+          height: '100vh',
+          position: 'relative',
+          overflow: 'hidden',
+          fontFamily: '"Courier New", "Press Start 2P", monospace',
+          filter: crtFlicker ? 'brightness(0.8) contrast(1.25)' : 'brightness(1) contrast(1.15)',
+          transition: 'filter 0.06s',
         }}
       >
         <div
-          onWheel={onWheel}
           style={{
-            borderRadius: 18,
-            border: '1px solid rgba(120,160,220,0.16)',
-            background: 'linear-gradient(180deg, rgba(10,16,40,0.40), rgba(6,10,26,0.20))',
-            boxShadow: 'inset 0 0 60px rgba(0,140,255,0.05)',
-            position: 'relative',
-            overflow: 'hidden',
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `
+              radial-gradient(1px 1px at 20% 30%, #0088ff, transparent),
+              radial-gradient(1px 1px at 60% 70%, #00ccff, transparent),
+              radial-gradient(2px 2px at 50% 50%, #ffffff, transparent),
+              radial-gradient(1px 1px at 80% 10%, #0088ff, transparent),
+              radial-gradient(1px 1px at 90% 60%, #00aaff, transparent),
+              radial-gradient(1px 1px at 15% 80%, #00ddff, transparent),
+              radial-gradient(2px 2px at 35% 25%, #ffffff, transparent)
+            `,
+            backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px, 280px 280px',
+            backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px',
+            animation: 'starfield-drift 120s linear infinite',
+            opacity: 0.45,
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `
+              repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,136,255,0.04) 3px, rgba(0,136,255,0.04) 4px),
+              repeating-linear-gradient(90deg, transparent 0px, transparent 3px, rgba(0,136,255,0.04) 3px, rgba(0,136,255,0.04) 4px)
+            `,
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(ellipse at center, transparent 0%, transparent 55%, rgba(0,0,0,0.5) 82%, rgba(0,0,0,0.92) 100%)',
+            pointerEvents: 'none',
+            zIndex: 50,
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 2px, transparent 2px, transparent 4px)',
+            pointerEvents: 'none',
+            zIndex: 60,
+            transform: `translateY(${scanlineOffset}px)`,
+            opacity: 0.55,
+          }}
+        />
+
+        {glitchLine >= 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: `${glitchLine * 5}%`,
+              left: 0,
+              right: 0,
+              height: '3px',
+              background: 'rgba(0,200,255,0.85)',
+              mixBlendMode: 'screen',
+              zIndex: 61,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {particles.map(p => (
+          <div
+            key={p.id}
+            style={{
+              position: 'absolute',
+              left: p.x,
+              top: p.y,
+              width: 8,
+              height: 8,
+              background: p.color,
+              boxShadow: `0 0 12px ${p.color}`,
+              pointerEvents: 'none',
+              zIndex: 5,
+            }}
+          />
+        ))}
+
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10,
+            display: 'grid',
+            gridTemplateColumns: '0.44fr 1.56fr',
+            gap: 12,
           }}
         >
-          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(620px 360px at 35% 0%, rgba(0,160,255,0.09), transparent 70%)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.70) 0%, transparent 28%, transparent 72%, rgba(0,0,0,0.70) 100%)' }} />
-
-          <div style={{ position: 'absolute', top: 6, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 6, pointerEvents: 'none' }}>
-            <img
-              src="../assets/thearcaders_logo.png"
-              alt="The Arcaders"
+          <div onWheel={onWheel} style={{ position: 'relative', overflow: 'hidden' }}>
+            <div
               style={{
-                width: '300px',
-                maxWidth: '88%',
-                height: 'auto',
-                imageRendering: 'pixelated',
-                opacity: 0.96,
-                filter: 'drop-shadow(0 0 26px rgba(77,166,255,0.9)) drop-shadow(0 0 42px rgba(204,51,255,0.55))',
+                border: '6px solid #0088ff',
+                background: '#000814',
+                boxShadow: '0 0 30px rgba(0,136,255,0.45), inset 0 0 20px rgba(0,136,255,0.18), 6px 6px 0 rgba(0,0,0,0.6)',
+                padding: 6,
+                borderRadius: 18,
+                height: '100%',
               }}
-            />
-          </div>
-
-          <div style={{ position: 'absolute', left: 16, right: 16, top: '56%', transform: 'translateY(-50%)', height: 760 }}>
-            <div style={{ position: 'absolute', left: 34, top: '50%', width: 8, height: iconSize, transform: 'translateY(-50%)', borderRadius: 999, background: `linear-gradient(180deg, transparent, ${accent}88, transparent)`, boxShadow: `0 0 22px ${accent}22` }} />
-
-            {wheelItems.map(({ g, offset }) => {
-              const abs = Math.abs(offset)
-              const y = offset * itemSpacing
-              const curve = -28 * (abs * abs)
-              const x = 118 + curve
-              const scale = clamp(1 - abs * 0.08, 0.56, 1)
-              const opacity = clamp(1 - abs * 0.20, 0.22, 1)
-              const rot = clamp(offset * 3.1, -12, 12)
-              const isFocus = g.id === (hoveredId ?? selectedId)
-              const isSelected = g.id === selectedId
-
-              return (
+            >
+              <div
+                style={{
+                  border: '4px solid #004488',
+                  background: 'linear-gradient(180deg, #001122, #000a14)',
+                  boxShadow: 'inset 0 0 30px rgba(0,68,136,0.28)',
+                  borderRadius: 14,
+                  height: '100%',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
                 <div
-                  key={g.id}
-                  onMouseEnter={() => setHoveredId(g.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => setSelectedId(g.id)}
-                  onDoubleClick={startSelected}
                   style={{
                     position: 'absolute',
+                    top: 14,
                     left: 0,
-                    top: '50%',
-                    transform: `translate(${x}px, ${y}px) translateY(-50%) rotate(${rot}deg) scale(${scale})`,
-                    transformOrigin: 'center',
-                    transition: 'transform 0.14s ease, opacity 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease, border 0.14s ease',
-                    opacity,
-                    cursor: 'pointer',
-                    width: iconSize,
-                    height: iconSize,
-                    borderRadius: 28,
-                    overflow: 'hidden',
-                    border: isFocus ? `3px solid ${g.accent}` : '1px solid rgba(120,160,220,0.14)',
-                    background: 'rgba(0,0,0,0.35)',
-                    boxShadow: isFocus
-                      ? `0 0 0 1px rgba(0,0,0,0.7), 0 0 40px ${g.accent}30`
-                      : isSelected
-                        ? `0 0 22px ${g.accent}18`
-                        : 'none',
-                    filter: isFocus ? 'brightness(1.02) saturate(1.08)' : 'brightness(0.78) saturate(0.92)',
-                    willChange: 'transform',
+                    right: 0,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    zIndex: 4,
+                    pointerEvents: 'none',
                   }}
                 >
                   <img
-                    src={g.image}
-                    alt={g.title}
+                    src="../assets/thearcaders_logo.png"
+                    alt="The Arcaders"
+                    style={{
+                      width: 540,
+                      maxWidth: '75%',
+                      height: 'auto',
+                      imageRendering: 'pixelated',
+                      filter: 'drop-shadow(0 0 26px rgba(77,166,255,0.95)) drop-shadow(0 0 42px rgba(204,51,255,0.55))',
+                      opacity: 0.98,
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 16,
+                    right: 16,
+                    top: '55%',
+                    transform: 'translateY(-50%)',
+                    height: 900,
+                    zIndex: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 34,
+                      top: '50%',
+                      width: 8,
+                      height: iconSize,
+                      transform: 'translateY(-50%)',
+                      borderRadius: 999,
+                      background: `linear-gradient(180deg, transparent, ${accent}88, transparent)`,
+                      boxShadow: `0 0 22px ${accent}22`,
+                    }}
+                  />
+
+                  {wheelItems.map(({ g, offset }) => {
+                    const abs = Math.abs(offset)
+                    const y = offset * itemSpacing
+                    const curve = -28 * (abs * abs)
+                    const x = 118 + curve
+                    const scale = clamp(1 - abs * 0.08, 0.56, 1)
+                    const opacity = clamp(1 - abs * 0.20, 0.22, 1)
+                    const rot = clamp(offset * 3.1, -12, 12)
+                    const isFocus = g.id === (hoveredId ?? selectedId)
+                    const isSelected = g.id === selectedId
+
+                    return (
+                      <div
+                        key={g.id}
+                        onMouseEnter={() => setHoveredId(g.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                        onClick={() => setSelectedId(g.id)}
+                        onDoubleClick={startSelected}
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: '50%',
+                          transform: `translate(${x}px, ${y}px) translateY(-50%) rotate(${rot}deg) scale(${scale})`,
+                          transformOrigin: 'center',
+                          transition: 'transform 0.14s ease, opacity 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease, border 0.14s ease',
+                          opacity,
+                          cursor: 'pointer',
+                          width: iconSize,
+                          height: iconSize,
+                          borderRadius: 28,
+                          overflow: 'hidden',
+                          border: isFocus ? `3px solid ${g.accent}` : '1px solid rgba(120,160,220,0.14)',
+                          background: 'rgba(0,0,0,0.35)',
+                          boxShadow: isFocus
+                            ? `0 0 0 1px rgba(0,0,0,0.75), 0 0 40px ${g.accent}30`
+                            : isSelected
+                              ? `0 0 22px ${g.accent}18`
+                              : 'none',
+                          filter: isFocus ? 'brightness(1.02) saturate(1.08)' : 'brightness(0.78) saturate(0.92)',
+                          willChange: 'transform',
+                        }}
+                      >
+                        <img
+                          src={g.image}
+                          alt={g.title}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block',
+                            imageRendering: 'pixelated',
+                          }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    zIndex: 4,
+                    padding: '10px 10px',
+                    background: 'transparent',
+                  }}
+                >
+                  <div style={{ color: 'rgba(190,220,255,0.70)', fontWeight: 900, letterSpacing: 2, fontSize: 11, textShadow: '0 0 10px rgba(0,204,255,0.25)' }}>
+                    ↑/↓ (arriba/abajo) · SCROLL
+                  </div>
+                  <div style={{ color: '#ffff00', fontWeight: 950, letterSpacing: 2, fontSize: 11, textShadow: '0 0 12px rgba(255,255,0,0.45)' }}>
+                    ENTER = PLAY
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ position: 'relative', overflow: 'hidden' }}>
+            <div
+              style={{
+                border: '6px solid #0088ff',
+                background: '#000814',
+                boxShadow: '0 0 30px rgba(0,136,255,0.45), inset 0 0 20px rgba(0,136,255,0.18), 6px 6px 0 rgba(0,0,0,0.6)',
+                padding: 6,
+                borderRadius: 18,
+                height: '100%',
+              }}
+            >
+              <div
+                style={{
+                  border: '4px solid #004488',
+                  background: 'linear-gradient(180deg, #001122, #000a14)',
+                  boxShadow: 'inset 0 0 30px rgba(0,68,136,0.28)',
+                  borderRadius: 14,
+                  height: '100%',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ position: 'absolute', inset: 0 }}>
+                  <img
+                    src={focusGame?.image}
+                    alt={focusGame?.title}
                     style={{
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
                       display: 'block',
                       imageRendering: 'pixelated',
+                      filter: 'brightness(0.96) saturate(1.02)',
                     }}
                   />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.10) 0%, transparent 35%, rgba(0,0,0,0.88) 100%)' }} />
                 </div>
-              )
-            })}
-          </div>
 
-          <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <div style={{ color: 'rgba(190,220,255,0.55)', fontWeight: 900, letterSpacing: 1, fontSize: 11 }}>
-              ↑/↓ (arriba/abajo) · SCROLL
-            </div>
-            <div style={{ color: accent, fontWeight: 950, letterSpacing: 1.1, fontSize: 11 }}>
-              ENTER = PLAY
+                <div style={{ position: 'absolute', left: 18, right: 18, bottom: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          color: '#ffffff',
+                          fontWeight: 950,
+                          letterSpacing: 2,
+                          fontSize: 26,
+                          textShadow: `0 0 18px ${accent}22, 3px 3px 0 rgba(0,0,0,0.55)`,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {focusGame?.title ?? '—'}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 8,
+                          color: 'rgba(200,230,255,0.78)',
+                          fontWeight: 800,
+                          letterSpacing: 1.2,
+                          fontSize: 13,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          textShadow: '0 0 10px rgba(0,204,255,0.22)',
+                        }}
+                      >
+                        {focusGame?.tagline ?? ''}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={startSelected}
+                      style={{
+                        cursor: 'pointer',
+                        padding: '16px 26px',
+                        borderRadius: 2,
+                        border: `3px solid ${accent}`,
+                        background: `linear-gradient(180deg, ${accent}22, rgba(0,8,20,0.65))`,
+                        color: '#ffffff',
+                        fontWeight: 950,
+                        letterSpacing: 3,
+                        fontSize: 13,
+                        boxShadow: `0 0 28px ${accent}22`,
+                        fontFamily: 'inherit',
+                        flex: '0 0 auto',
+                        textShadow: '2px 2px 0 rgba(0,0,0,0.6)',
+                      }}
+                    >
+                      PLAY
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ color: '#00ccff', fontWeight: 900, letterSpacing: 2, fontSize: 11, textShadow: '0 0 10px rgba(0,204,255,0.35)' }}>
+                      yalla (هيا) select & go
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 6,
+                    background: `linear-gradient(90deg, transparent, ${accent}aa 12%, ${accent}55 50%, ${accent}aa 88%, transparent)`,
+                    opacity: 0.7,
+                    boxShadow: `0 0 26px ${accent}25`,
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
 
         <div
           style={{
-            borderRadius: 18,
-            border: `1px solid ${accent}33`,
-            background: 'linear-gradient(180deg, rgba(10,16,40,0.55), rgba(6,10,26,0.30))',
-            boxShadow: `0 0 34px ${accent}12, inset 0 0 70px ${accent}08`,
-            overflow: 'hidden',
-            position: 'relative',
+            position: 'absolute',
+            bottom: 18,
+            left: 0,
+            right: 0,
+            textAlign: 'center',
+            fontSize: 13,
+            color: '#0088ff',
+            letterSpacing: 2,
+            textShadow: '0 0 10px rgba(0,136,255,0.6)',
+            zIndex: 70,
+            pointerEvents: 'none',
           }}
         >
-          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(760px 420px at 70% 0%, ${accent}16, transparent 70%)`, pointerEvents: 'none' }} />
-
-          <div style={{ position: 'absolute', inset: 0 }}>
-            <img
-              src={focusGame?.image}
-              alt={focusGame?.title}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-                imageRendering: 'pixelated',
-                filter: 'brightness(0.96) saturate(1.02)',
-              }}
-            />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.22) 0%, transparent 34%, rgba(0,0,0,0.86) 100%)' }} />
-          </div>
-
-          <div style={{ position: 'absolute', left: 22, right: 22, bottom: 22 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: '#e9f4ff', fontWeight: 950, letterSpacing: 1.2, fontSize: 28, textShadow: `0 0 18px ${accent}22`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {focusGame?.title ?? '—'}
-                </div>
-                <div style={{ marginTop: 8, color: 'rgba(200,230,255,0.72)', fontWeight: 800, letterSpacing: 1.2, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {focusGame?.tagline ?? ''}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={startSelected}
-                style={{
-                  cursor: 'pointer',
-                  padding: '16px 26px',
-                  borderRadius: 18,
-                  border: `1px solid ${accent}60`,
-                  background: `linear-gradient(180deg, ${accent}26, rgba(8,12,30,0.55))`,
-                  color: '#e9f4ff',
-                  fontWeight: 950,
-                  letterSpacing: 1.6,
-                  fontSize: 13,
-                  boxShadow: `0 0 34px ${accent}18`,
-                  fontFamily: 'inherit',
-                  flex: '0 0 auto',
-                }}
-              >
-                PLAY
-              </button>
-            </div>
-
-            <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ color: 'rgba(190,220,255,0.55)', fontWeight: 900, letterSpacing: 1, fontSize: 11 }}>
-                yalla (هيا) select & go
-              </div>
-            </div>
-          </div>
+          © 1992 THE ARCADERS • GAME SELECT • STEREO
         </div>
       </div>
-    </div>
+
+      <style>{`
+        @keyframes starfield-drift {
+          from { background-position: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px; }
+          to   { background-position: 0 200px, 40px 260px, 130px 470px, 70px 300px, 150px 250px, 200px 380px, 90px 420px; }
+        }
+      `}</style>
+    </>
   )
 }

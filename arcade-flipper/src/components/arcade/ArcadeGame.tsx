@@ -1,5 +1,5 @@
 import React from 'react'
-import { games } from './menu'
+import { games } from './GameMenu'
 
 type ArcadeGameProps = {
   gameId: string

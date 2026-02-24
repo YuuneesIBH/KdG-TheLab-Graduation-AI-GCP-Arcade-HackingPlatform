@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BootScreen } from "./components/arcade/boot"
-import { MenuScreen } from "./components/arcade/menu"
+import { BootScreen } from "./components/arcade/Boot"
+import { MenuScreen } from "./components/arcade/GameMenu"
 import { ArcadeGame } from "./components/arcade/ArcadeGame"
 import HackerMenu from "./components/flipper/HackerMenu"
 

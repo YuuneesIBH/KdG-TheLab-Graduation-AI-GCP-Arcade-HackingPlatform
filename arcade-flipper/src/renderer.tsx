@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BootScreen } from "./components/arcade/boot";
-import { MenuScreen } from "./components/arcade/menu";
-import { GameLaunch } from "./components/arcade/gamelaunch";
-import { GameDisplay } from "./components/arcade/gamedisplay";
-import HackerMenu from "./components/flipper/HackerMenu";
+import { BootScreen } from "./components/arcade/boot"
+import { MenuScreen } from "./components/arcade/menu"
+import { ArcadeGame } from "./components/arcade/ArcadeGame"
+import HackerMenu from "./components/flipper/HackerMenu"
 
-type Screen = 'boot' | 'arcade-menu' | 'game-launch' | 'game-display' | 'hacker-menu'
+type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
 type DiyFlipperStatus = {
   connected: boolean
   connecting: boolean
@@ -17,9 +16,9 @@ type DiyFlipperStatus = {
 }
 
 function App() {
-  const [screen, setScreen]             = useState<Screen>('boot')
+  const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
-  const [displayGame, setDisplayGame]   = useState<string | null>(null)
+
   const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>({
     connected: false,
     connecting: false,
@@ -28,19 +27,19 @@ function App() {
   const [diyFlipperLastLine, setDiyFlipperLastLine] = useState<string>('')
 
   // ── arcade boot state ─────────────────────────────────────────
-  const [coins, setCoins]                   = useState(0)
-  const [time, setTime]                     = useState(0)
-  const [highScore, setHighScore]           = useState(999999)
-  const [scrollText, setScrollText]         = useState(0)
-  const [explosions, setExplosions]         = useState<Array<{x: number, y: number, id: number}>>([])
-  const [particles, setParticles]           = useState<Array<{x: number, y: number, vx: number, vy: number, color: string, id: number}>>([])
-  const [crtFlicker, setCrtFlicker]         = useState(false)
+  const [coins, setCoins] = useState(0)
+  const [time, setTime] = useState(0)
+  const [highScore, setHighScore] = useState(999999)
+  const [scrollText, setScrollText] = useState(0)
+  const [explosions, setExplosions] = useState<Array<{ x: number; y: number; id: number }>>([])
+  const [particles, setParticles] = useState<Array<{ x: number; y: number; vx: number; vy: number; color: string; id: number }>>([])
+  const [crtFlicker, setCrtFlicker] = useState(false)
   const [scanlineOffset, setScanlineOffset] = useState(0)
-  const [pixelShift, setPixelShift]         = useState(0)
-  const [borderBlink, setBorderBlink]       = useState(false)
-  const [coinBlink, setCoinBlink]           = useState(false)
-  const [glitchLine, setGlitchLine]         = useState(-1)
-  const [logoShake, setLogoShake]           = useState({x: 0, y: 0})
+  const [pixelShift, setPixelShift] = useState(0)
+  const [borderBlink, setBorderBlink] = useState(false)
+  const [coinBlink, setCoinBlink] = useState(false)
+  const [glitchLine, setGlitchLine] = useState(-1)
+  const [logoShake, setLogoShake] = useState({ x: 0, y: 0 })
 
   const bootLines = [
     'ARCADE-TRONIX BIOS v2.41', 'Copyright (C) 1991-1996', '',
@@ -48,16 +47,16 @@ function App() {
     'Init Sound Blaster.....OK', 'Init Joystick..........OK', 'Init Coin Mech.........OK',
     'Loading game data......', '', 'Press COIN to continue...'
   ]
-  const marqueeText      = '★ ARCADE ZONE ★ INSERT COIN ★ PLAY TO WIN ★ HIGH SCORES ★ '
+  const marqueeText = '★ ARCADE ZONE ★ INSERT COIN ★ PLAY TO WIN ★ HIGH SCORES ★ '
   const scrollingMarquee = (marqueeText + marqueeText + marqueeText).substring(Math.floor(scrollText / 3) % marqueeText.length)
-  const bootLineCount    = Math.min(bootLines.length, Math.floor(time / 7))
-  const progress         = Math.min(100, coins * 10)
+  const bootLineCount = Math.min(bootLines.length, Math.floor(time / 7))
+  const progress = Math.min(100, coins * 10)
 
   useEffect(() => {
-    document.body.style.margin         = '0'
-    document.body.style.padding        = '0'
-    document.body.style.overflow       = 'hidden'
-    document.body.style.background     = '#000'
+    document.body.style.margin = '0'
+    document.body.style.padding = '0'
+    document.body.style.overflow = 'hidden'
+    document.body.style.background = '#000'
     document.body.style.imageRendering = 'pixelated'
 
     const logoShakeInterval = setInterval(() => {
@@ -66,23 +65,29 @@ function App() {
         setTimeout(() => setLogoShake({ x: 0, y: 0 }), 100)
       }
     }, 150)
+
     const flickerInterval = setInterval(() => {
       if (Math.random() > 0.85) { setCrtFlicker(true); setTimeout(() => setCrtFlicker(false), 60) }
     }, 80)
-    const borderInterval    = setInterval(() => setBorderBlink(b => !b), 400)
+
+    const borderInterval = setInterval(() => setBorderBlink(b => !b), 400)
     const coinBlinkInterval = setInterval(() => setCoinBlink(b => !b), 250)
-    const scanlineInterval  = setInterval(() => setScanlineOffset(Math.random() * 2), 50)
+    const scanlineInterval = setInterval(() => setScanlineOffset(Math.random() * 2), 50)
+
     const pixelInterval = setInterval(() => {
       if (Math.random() > 0.9) { setPixelShift(Math.random() * 3 - 1.5); setTimeout(() => setPixelShift(0), 100) }
     }, 150)
+
     const glitchInterval = setInterval(() => {
       if (Math.random() > 0.92) { setGlitchLine(Math.floor(Math.random() * 20)); setTimeout(() => setGlitchLine(-1), 100) }
     }, 200)
+
     const particleInterval = setInterval(() => {
       setParticles(prev => prev
         .map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, vy: p.vy + 0.2 }))
         .filter(p => p.y < window.innerHeight + 50))
     }, 30)
+
     const coinInterval = setInterval(() => {
       setCoins(prev => {
         if (prev < 10) {
@@ -108,16 +113,24 @@ function App() {
         return prev + 1
       })
     }, 350)
+
     const timeInterval = setInterval(() => {
-      setTime(t => t + 1); setHighScore(h => Math.max(0, h - 5)); setScrollText(s => s + 1)
+      setTime(t => t + 1)
+      setHighScore(h => Math.max(0, h - 5))
+      setScrollText(s => s + 1)
     }, 50)
 
     return () => {
-      clearInterval(coinInterval);    clearInterval(timeInterval)
-      clearInterval(flickerInterval); clearInterval(scanlineInterval)
-      clearInterval(pixelInterval);   clearInterval(borderInterval)
-      clearInterval(coinBlinkInterval); clearInterval(glitchInterval)
-      clearInterval(particleInterval);  clearInterval(logoShakeInterval)
+      clearInterval(coinInterval)
+      clearInterval(timeInterval)
+      clearInterval(flickerInterval)
+      clearInterval(scanlineInterval)
+      clearInterval(pixelInterval)
+      clearInterval(borderInterval)
+      clearInterval(coinBlinkInterval)
+      clearInterval(glitchInterval)
+      clearInterval(particleInterval)
+      clearInterval(logoShakeInterval)
     }
   }, [])
 
@@ -146,8 +159,6 @@ function App() {
     }
   }, [])
 
-  // ── navigatie ─────────────────────────────────────────────────
-  // useCallback → stabiele ref, HackTransition reset listener NIET
   const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
 
   const handleModuleSelect = useCallback(async (key: string) => {
@@ -173,30 +184,40 @@ function App() {
       />
     )
 
-  if (screen === 'game-display' && displayGame)
-    return <GameDisplay gameId={displayGame} onExit={() => { setDisplayGame(null); setSelectedGame(null); setScreen('arcade-menu') }} />
-
-  if (screen === 'game-launch' && selectedGame)
-    return <GameLaunch gameId={selectedGame} onBack={() => { setSelectedGame(null); setScreen('arcade-menu') }} onOpenDisplay={(id) => { setDisplayGame(id); setScreen('game-display') }} />
+  if (screen === 'arcade-game' && selectedGame)
+    return (
+      <ArcadeGame
+        gameId={selectedGame}
+        onExit={() => {
+          setSelectedGame(null)
+          setScreen('arcade-menu')
+        }}
+      />
+    )
 
   if (screen === 'arcade-menu')
-    return <MenuScreen particles={particles} onSelectGame={(id) => { setSelectedGame(id); setScreen('game-launch') }} />
+    return (
+      <MenuScreen
+        particles={particles}
+        onSelectGame={(id) => {
+          setSelectedGame(id)
+          setScreen('arcade-game')
+        }}
+      />
+    )
 
   // boot (default)
   return (
-    <>
-      <BootScreen
-        coins={coins} time={time} highScore={highScore} scrollText={scrollText}
-        explosions={explosions} particles={particles} crtFlicker={crtFlicker}
-        scanlineOffset={scanlineOffset} pixelShift={pixelShift} borderBlink={borderBlink}
-        coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
-        bootLines={bootLines} bootLineCount={bootLineCount} progress={progress}
-        scrollingMarquee={scrollingMarquee}
-        onStart={() => setScreen('arcade-menu')}
-        onGoToHacker={goToHackerMenu}
-      />
-
-    </>
+    <BootScreen
+      coins={coins} time={time} highScore={highScore} scrollText={scrollText}
+      explosions={explosions} particles={particles} crtFlicker={crtFlicker}
+      scanlineOffset={scanlineOffset} pixelShift={pixelShift} borderBlink={borderBlink}
+      coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
+      bootLines={bootLines} bootLineCount={bootLineCount} progress={progress}
+      scrollingMarquee={scrollingMarquee}
+      onStart={() => setScreen('arcade-menu')}
+      onGoToHacker={goToHackerMenu}
+    />
   )
 }
 

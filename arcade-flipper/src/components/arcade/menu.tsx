@@ -113,6 +113,25 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const itemSpacing = 140
   const iconSize = 132
 
+  const INFO_SCALE = 2.5
+  const titleFont = Math.round(34 * INFO_SCALE)
+  const taglineFont = Math.round(17 * INFO_SCALE)
+  const playFont = Math.round(15 * INFO_SCALE)
+  const yallaFont = Math.round(13 * INFO_SCALE)
+
+  const titleGlow = Math.round(18 * INFO_SCALE)
+  const titleOffset = Math.round(3 * INFO_SCALE)
+  const taglineGlow = Math.round(10 * INFO_SCALE)
+
+  const playPadY = Math.round(18 * INFO_SCALE)
+  const playPadX = Math.round(30 * INFO_SCALE)
+  const playBorder = Math.max(3, Math.round(3 * INFO_SCALE))
+  const playShadow = Math.round(28 * INFO_SCALE)
+
+  const yallaGlow = Math.round(10 * INFO_SCALE)
+  const barHeight = Math.round(6 * INFO_SCALE)
+  const barGlow = Math.round(26 * INFO_SCALE)
+
   const circularOffset = React.useCallback((idx: number, sel: number, len: number) => {
     if (len <= 0) return 0
     let d = idx - sel
@@ -404,10 +423,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                     background: 'transparent',
                   }}
                 >
-                  <div style={{ color: 'rgba(190,220,255,0.70)', fontWeight: 900, letterSpacing: 2, fontSize: 11, textShadow: '0 0 10px rgba(0,204,255,0.25)' }}>
+                  <div style={{ color: 'rgba(190,220,255,0.70)', fontWeight: 900, letterSpacing: 2, fontSize: 13, textShadow: '0 0 10px rgba(0,204,255,0.25)' }}>
                     ↑/↓ (arriba/abajo) · SCROLL
                   </div>
-                  <div style={{ color: '#ffff00', fontWeight: 950, letterSpacing: 2, fontSize: 11, textShadow: '0 0 12px rgba(255,255,0,0.45)' }}>
+                  <div style={{ color: '#ffff00', fontWeight: 950, letterSpacing: 2, fontSize: 13, textShadow: '0 0 12px rgba(255,255,0,0.45)' }}>
                     ENTER = PLAY
                   </div>
                 </div>
@@ -453,34 +472,40 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.10) 0%, transparent 35%, rgba(0,0,0,0.88) 100%)' }} />
                 </div>
 
-                <div style={{ position: 'absolute', left: 18, right: 18, bottom: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14 }}>
-                    <div style={{ minWidth: 0 }}>
+                <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: 0, flex: '1 1 520px' }}>
                       <div
                         style={{
                           color: '#ffffff',
                           fontWeight: 950,
                           letterSpacing: 2,
-                          fontSize: 26,
-                          textShadow: `0 0 18px ${accent}22, 3px 3px 0 rgba(0,0,0,0.55)`,
-                          whiteSpace: 'nowrap',
+                          fontSize: titleFont,
+                          lineHeight: 0.98,
+                          textShadow: `0 0 ${titleGlow}px ${accent}22, ${titleOffset}px ${titleOffset}px 0 rgba(0,0,0,0.55)`,
+                          whiteSpace: 'normal',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
                         }}
                       >
                         {focusGame?.title ?? '—'}
                       </div>
                       <div
                         style={{
-                          marginTop: 8,
+                          marginTop: 10,
                           color: 'rgba(200,230,255,0.78)',
                           fontWeight: 800,
                           letterSpacing: 1.2,
-                          fontSize: 13,
-                          whiteSpace: 'nowrap',
+                          fontSize: taglineFont,
+                          lineHeight: 1.08,
+                          textShadow: `0 0 ${taglineGlow}px rgba(0,204,255,0.22)`,
+                          whiteSpace: 'normal',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          textShadow: '0 0 10px rgba(0,204,255,0.22)',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
                         }}
                       >
                         {focusGame?.tagline ?? ''}
@@ -492,18 +517,18 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       onClick={startSelected}
                       style={{
                         cursor: 'pointer',
-                        padding: '16px 26px',
+                        padding: `${playPadY}px ${playPadX}px`,
                         borderRadius: 2,
-                        border: `3px solid ${accent}`,
+                        border: `${playBorder}px solid ${accent}`,
                         background: `linear-gradient(180deg, ${accent}22, rgba(0,8,20,0.65))`,
                         color: '#ffffff',
                         fontWeight: 950,
                         letterSpacing: 3,
-                        fontSize: 13,
-                        boxShadow: `0 0 28px ${accent}22`,
+                        fontSize: playFont,
+                        boxShadow: `0 0 ${playShadow}px ${accent}22`,
                         fontFamily: 'inherit',
                         flex: '0 0 auto',
-                        textShadow: '2px 2px 0 rgba(0,0,0,0.6)',
+                        textShadow: `${Math.round(2 * INFO_SCALE)}px ${Math.round(2 * INFO_SCALE)}px 0 rgba(0,0,0,0.6)`,
                       }}
                     >
                       PLAY
@@ -511,7 +536,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                   </div>
 
                   <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ color: '#00ccff', fontWeight: 900, letterSpacing: 2, fontSize: 11, textShadow: '0 0 10px rgba(0,204,255,0.35)' }}>
+                    <div style={{ color: '#00ccff', fontWeight: 900, letterSpacing: 2, fontSize: yallaFont, textShadow: `0 0 ${yallaGlow}px rgba(0,204,255,0.35)` }}>
                       yalla (هيا) select & go
                     </div>
                   </div>
@@ -523,10 +548,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                     top: 0,
                     left: 0,
                     right: 0,
-                    height: 6,
+                    height: barHeight,
                     background: `linear-gradient(90deg, transparent, ${accent}aa 12%, ${accent}55 50%, ${accent}aa 88%, transparent)`,
                     opacity: 0.7,
-                    boxShadow: `0 0 26px ${accent}25`,
+                    boxShadow: `0 0 ${barGlow}px ${accent}25`,
                   }}
                 />
               </div>
@@ -541,7 +566,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             left: 0,
             right: 0,
             textAlign: 'center',
-            fontSize: 13,
+            fontSize: 15,
             color: '#0088ff',
             letterSpacing: 2,
             textShadow: '0 0 10px rgba(0,136,255,0.6)',

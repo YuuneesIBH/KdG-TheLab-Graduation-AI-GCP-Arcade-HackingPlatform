@@ -25,52 +25,44 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
   const viewportRef = React.useRef<HTMLDivElement | null>(null)
 
-  const [status, setStatus] = React.useState<'launching' | 'running' | 'error'>('launching')
-  const [progress, setProgress] = React.useState(0)
+  const [status, setStatus]             = React.useState<'launching' | 'running' | 'error'>('launching')
+  const [progress, setProgress]         = React.useState(0)
   const [errorMessage, setErrorMessage] = React.useState('')
 
-  const [crtFlicker, setCrtFlicker] = React.useState(false)
-  const [scanlineOffset, setScanlineOffset] = React.useState(0)
-  const [glitchLine, setGlitchLine] = React.useState(-1)
-  const [pixelShift, setPixelShift] = React.useState(0)
-  const [borderBlink, setBorderBlink] = React.useState(false)
-  const [marqueeFlicker, setMarqueeFlicker] = React.useState(false)
-  const [ledPhase, setLedPhase] = React.useState(0)
+  const [crtFlicker, setCrtFlicker]           = React.useState(false)
+  const [scanlineOffset, setScanlineOffset]   = React.useState(0)
+  const [glitchLine, setGlitchLine]           = React.useState(-1)
+  const [pixelShift, setPixelShift]           = React.useState(0)
+  const [borderBlink, setBorderBlink]         = React.useState(false)
+  const [marqueeFlicker, setMarqueeFlicker]   = React.useState(false)
+  const [ledPhase, setLedPhase]               = React.useState(0)
+  const [joystickAngle, setJoystickAngle]     = React.useState(0)
+  const [coinBlink, setCoinBlink]             = React.useState(false)
+  const [marqueePos, setMarqueePos]           = React.useState(0)
 
-  const game = React.useMemo(() => games.find(g => g.id === gameId), [gameId])
-  const title = game?.title ?? formatTitle(gameId)
-  const accent = game?.accent ?? '#00ccff'
-  const tagline = game?.tagline ?? 'INSERT COIN TO PLAY'
-  const genre = game?.genre ?? 'ARCADE'
-  const year = game?.year ?? '????'
+  const game       = React.useMemo(() => games.find(g => g.id === gameId), [gameId])
+  const title      = game?.title      ?? formatTitle(gameId)
+  const accent     = game?.accent     ?? '#00ccff'
+  const genre      = game?.genre      ?? 'ARCADE'
+  const year       = game?.year       ?? '????'
   const difficulty = game?.difficulty ?? '★☆☆'
-  const players = game?.players ?? '1P'
-  const art = game?.image
+  const players    = game?.players    ?? '1P'
 
-  const accentGlow = `0 0 14px ${accent}66, 0 0 34px ${accent}22`
-  const blueGlow = borderBlink
-    ? '0 0 44px rgba(0,136,255,0.70), 0 0 90px rgba(0,136,255,0.22), 8px 10px 0 rgba(0,0,0,0.65)'
-    : '0 0 34px rgba(0,136,255,0.55), 0 0 70px rgba(0,136,255,0.18), 8px 10px 0 rgba(0,0,0,0.65)'
+  const accentGlow  = `0 0 14px ${accent}66, 0 0 34px ${accent}22`
+  const ledColor    = (offset: number) => `hsl(${(ledPhase * 1.5 + offset) % 360}, 100%, 60%)`
+  const neonOpacity = marqueeFlicker ? 0.35 : 1
 
+  // ── Electron helpers ──────────────────────────────────────────────
   const waitForLayoutCommit = React.useCallback(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => resolve())
-        })
-      }),
-    []
+    () => new Promise<void>(resolve => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    }), []
   )
 
   const getViewport = React.useCallback((): ViewportRect | undefined => {
     if (!viewportRef.current) return undefined
-    const rect = viewportRef.current.getBoundingClientRect()
-    return {
-      x: Math.round(rect.left),
-      y: Math.round(rect.top),
-      width: Math.round(rect.width),
-      height: Math.round(rect.height)
-    }
+    const r = viewportRef.current.getBoundingClientRect()
+    return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }
   }, [])
 
   const stopGameIfPossible = React.useCallback(() => {
@@ -81,44 +73,25 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
 
   const exit = React.useCallback(() => {
     stopGameIfPossible()
-    const api = (window as any).electron
-    api?.setFullscreen?.(false)
+    ;(window as any).electron?.setFullscreen?.(false)
     onExit()
   }, [onExit, stopGameIfPossible])
 
   const launch = React.useCallback(async () => {
-    if (!game) {
-      setErrorMessage('Game not found')
-      setStatus('error')
-      return
-    }
-
+    if (!game) { setErrorMessage('Game not found'); setStatus('error'); return }
     if (!window.electron?.launchGame) {
-      setErrorMessage('Electron API not available (window.electron.launchGame missing)')
-      setStatus('error')
-      return
+      setErrorMessage('Electron API not available'); setStatus('error'); return
     }
-
-    setStatus('launching')
-    setErrorMessage('')
-    setProgress(0)
-
+    setStatus('launching'); setErrorMessage(''); setProgress(0)
     await waitForLayoutCommit()
-
     try {
       const viewport = getViewport()
       const result = await window.electron.launchGame({
         gamePath: game.executable,
         mode: viewport ? 'embedded' : 'external',
-        viewport
+        viewport,
       })
-
-      if (result?.success) {
-        setProgress(100)
-        setStatus('running')
-        return
-      }
-
+      if (result?.success) { setProgress(100); setStatus('running'); return }
       setErrorMessage(result?.message ?? 'Launch failed')
       setStatus('error')
     } catch (err) {
@@ -127,96 +100,64 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     }
   }, [game, getViewport, waitForLayoutCommit])
 
+  // ── Effects ──────────────────────────────────────────────────────
   React.useEffect(() => {
-    const api = (window as any).electron
-    api?.setFullscreen?.(true)
+    ;(window as any).electron?.setFullscreen?.(true)
     launch()
-    return () => {
-      stopGameIfPossible()
-    }
+    return () => stopGameIfPossible()
   }, [launch, stopGameIfPossible])
 
   React.useEffect(() => {
     if (status !== 'launching') return
     const t = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 92) return p
-        const bump = Math.max(1, Math.floor(Math.random() * 6))
-        return Math.min(92, p + bump)
-      })
+      setProgress(p => p >= 92 ? p : Math.min(92, p + Math.max(1, Math.floor(Math.random() * 6))))
     }, 120)
     return () => clearInterval(t)
   }, [status])
 
   React.useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        exit()
-      }
-      if ((e.key === 'Enter' || e.key === 'r' || e.key === 'R') && status === 'error') {
-        e.preventDefault()
-        launch()
-      }
+      if (e.key === 'Escape') { e.preventDefault(); exit() }
+      if ((e.key === 'Enter' || e.key === 'r' || e.key === 'R') && status === 'error') { e.preventDefault(); launch() }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [exit, launch, status])
 
   React.useEffect(() => {
-    const cleanup = window.electron?.onGameExit?.(() => {
-      exit()
-    })
+    const cleanup = window.electron?.onGameExit?.(() => exit())
     return () => cleanup?.()
   }, [exit])
 
   React.useEffect(() => {
     if (status !== 'running') return
-
     const api = (window as any).electron
-    const update = () => {
-      const viewport = getViewport()
-      if (!viewport) return
-      api?.updateGameViewport?.(viewport)
-      api?.resizeGame?.(viewport)
-    }
-
+    const update = () => { const v = getViewport(); if (!v) return; api?.updateGameViewport?.(v); api?.resizeGame?.(v) }
     update()
-
-    const onResize = () => update()
-    window.addEventListener('resize', onResize)
-
+    window.addEventListener('resize', update)
     let ro: ResizeObserver | null = null
     if (typeof ResizeObserver !== 'undefined' && viewportRef.current) {
-      ro = new ResizeObserver(() => update())
+      ro = new ResizeObserver(update)
       ro.observe(viewportRef.current)
     }
-
-    return () => {
-      window.removeEventListener('resize', onResize)
-      ro?.disconnect()
-    }
+    return () => { window.removeEventListener('resize', update); ro?.disconnect() }
   }, [getViewport, status])
 
+  // Visual FX
   React.useEffect(() => {
     const t = setInterval(() => {
       if (Math.random() < 0.02) {
         setCrtFlicker(true)
         setPixelShift(Math.random() < 0.5 ? -1 : 1)
-        setTimeout(() => {
-          setCrtFlicker(false)
-          setPixelShift(0)
-        }, 60)
+        setTimeout(() => { setCrtFlicker(false); setPixelShift(0) }, 60)
       }
     }, 120)
     return () => clearInterval(t)
   }, [])
-
   React.useEffect(() => {
     const t = setInterval(() => setScanlineOffset(p => (p + 1) % 6), 60)
     return () => clearInterval(t)
   }, [])
-
   React.useEffect(() => {
     const t = setInterval(() => {
       if (Math.random() < 0.06) {
@@ -226,1159 +167,521 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     }, 520)
     return () => clearInterval(t)
   }, [])
-
   React.useEffect(() => {
-    const t = setInterval(() => {
-      setBorderBlink(true)
-      setTimeout(() => setBorderBlink(false), 140)
-    }, 1800)
+    const t = setInterval(() => { setBorderBlink(true); setTimeout(() => setBorderBlink(false), 140) }, 1800)
     return () => clearInterval(t)
   }, [])
-
   React.useEffect(() => {
     const t = setInterval(() => {
       setLedPhase(p => (p + 1) % 240)
-      if (Math.random() < 0.03) {
-        setMarqueeFlicker(true)
-        setTimeout(() => setMarqueeFlicker(false), 70)
-      }
+      if (Math.random() < 0.03) { setMarqueeFlicker(true); setTimeout(() => setMarqueeFlicker(false), 70) }
     }, 36)
     return () => clearInterval(t)
   }, [])
+  React.useEffect(() => {
+    const t = setInterval(() => setJoystickAngle(Math.sin(Date.now() / 2000) * 7), 50)
+    return () => clearInterval(t)
+  }, [])
+  React.useEffect(() => {
+    const t = setInterval(() => setCoinBlink(v => !v), 650)
+    return () => clearInterval(t)
+  }, [])
+  React.useEffect(() => {
+    const t = setInterval(() => setMarqueePos(p => (p + 1) % 600), 22)
+    return () => clearInterval(t)
+  }, [])
 
-  const ledBg = `repeating-linear-gradient(90deg,
-    rgba(255,255,255,0.00) 0px,
-    rgba(255,255,255,0.00) 10px,
-    rgba(255,255,255,0.10) 10px,
-    rgba(255,255,255,0.10) 14px
-  )`
+  // ── Shared sub-components ─────────────────────────────────────────
+  const LedDot = ({ offset }: { offset: number }) => (
+    <div style={{
+      width: 9, height: 9, borderRadius: '50%',
+      background: `radial-gradient(circle at 35% 35%, #fff, ${ledColor(offset)})`,
+      boxShadow: `0 0 6px ${ledColor(offset)}, 0 0 12px ${ledColor(offset)}44`,
+    }} />
+  )
 
-  const screenStatus = status === 'running' ? 'GAME MODE' : status === 'launching' ? 'BOOTING CABINET' : 'SYSTEM ERROR'
+  const ArcadeBtn = ({ color, dim }: { color: string; dim?: boolean }) => (
+    <div style={{
+      width: 36, height: 36, borderRadius: '50%',
+      background: `radial-gradient(circle at 32% 28%, ${color}${dim ? '44' : 'dd'}, ${color}${dim ? '14' : '44'})`,
+      border: `2px solid ${color}${dim ? '28' : '88'}`,
+      boxShadow: dim
+        ? '0 2px 5px rgba(0,0,0,0.7)'
+        : `0 0 10px ${color}55, 0 3px 6px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.2)`,
+      cursor: 'pointer',
+    }} />
+  )
+
+  const Joystick = ({ flip }: { flip?: boolean }) => (
+    <div style={{ position: 'relative', width: 52, height: 52 }}>
+      {/* Base disc */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: '50%',
+        background: 'radial-gradient(circle at 38% 32%, #1e2e44, #07101c)',
+        border: '2px solid #1a3050',
+        boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.9), 0 3px 10px rgba(0,0,0,0.7)',
+      }} />
+      {/* Gate */}
+      <div style={{
+        position: 'absolute', inset: '12px',
+        background: '#04080f', border: '1.5px solid #0a1828', transform: 'rotate(45deg)',
+      }} />
+      {/* Shaft */}
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%',
+        width: 11, height: 30, marginLeft: -5.5, marginTop: -22,
+        background: 'linear-gradient(180deg, #3a5070, #152030)',
+        borderRadius: '3px 3px 2px 2px',
+        border: '1px solid rgba(255,255,255,0.07)',
+        transform: `rotate(${flip ? -joystickAngle : joystickAngle}deg)`,
+        transformOrigin: 'bottom center', transition: 'transform 0.1s ease-out',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.8)',
+      }}>
+        {/* Ball */}
+        <div style={{
+          position: 'absolute', top: -8, left: -4.5,
+          width: 20, height: 20, borderRadius: '50%',
+          background: flip
+            ? 'radial-gradient(circle at 35% 35%, #604050, #160e18)'
+            : 'radial-gradient(circle at 35% 35%, #486080, #0e1820)',
+          border: '1.5px solid rgba(255,255,255,0.09)',
+          boxShadow: '0 3px 8px rgba(0,0,0,0.7)',
+        }} />
+      </div>
+    </div>
+  )
+
+  const RgbStrip = ({ top, bottom, flip }: { top?: boolean; bottom?: boolean; flip?: boolean }) => (
+    <div style={{
+      position: 'absolute',
+      top: top ? 0 : 'auto',
+      bottom: bottom ? 0 : 'auto',
+      left: 0, right: 0, height: 4,
+      background: flip
+        ? `linear-gradient(90deg, ${ledColor(180)}, ${ledColor(240)}, ${ledColor(300)}, ${ledColor(0)}, ${ledColor(60)}, ${ledColor(120)}, ${ledColor(180)})`
+        : `linear-gradient(90deg, ${ledColor(0)}, ${ledColor(60)}, ${ledColor(120)}, ${ledColor(180)}, ${ledColor(240)}, ${ledColor(300)}, ${ledColor(0)})`,
+      boxShadow: `0 0 12px ${ledColor(120)}66`,
+      opacity: neonOpacity,
+    }} />
+  )
 
   return (
     <>
-      <div
-        style={{
-          background: 'linear-gradient(180deg, #001a40 0%, #000d1f 40%, #000510 70%, #000000 100%)',
-          width: '100vw',
-          height: '100vh',
-          position: 'relative',
-          overflow: 'hidden',
-          fontFamily: '"Courier New", "Press Start 2P", monospace',
-          filter: crtFlicker ? 'brightness(0.75) contrast(1.30)' : 'brightness(1) contrast(1.15)',
-          transition: 'filter 0.06s',
-          transform: `translateX(${pixelShift}px)`
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `
-              radial-gradient(1px 1px at 20% 30%, #0088ff, transparent),
-              radial-gradient(1px 1px at 60% 70%, #00ccff, transparent),
-              radial-gradient(2px 2px at 50% 50%, #ffffff, transparent),
-              radial-gradient(1px 1px at 80% 10%, #0088ff, transparent),
-              radial-gradient(1px 1px at 90% 60%, #00aaff, transparent),
-              radial-gradient(1px 1px at 15% 80%, #00ddff, transparent),
-              radial-gradient(2px 2px at 35% 25%, #ffffff, transparent)
-            `,
-            backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px, 280px 280px',
-            backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px',
-            animation: 'starfield-drift 120s linear infinite',
-            opacity: 0.45,
-            pointerEvents: 'none',
-            zIndex: 1
-          }}
-        />
+      {/* ==============================================================
+          LAYER 0 — GAME VIEWPORT (fills 100% of the screen)
+          The electron game window embeds here, covering everything.
+          ============================================================== */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 0,
+        background: '#000000',
+        fontFamily: '"Courier New", monospace',
+        filter: crtFlicker ? 'brightness(0.78) contrast(1.28)' : 'brightness(1) contrast(1.08)',
+        transition: 'filter 0.06s',
+        transform: `translateX(${pixelShift}px)`,
+      }}>
+        {/* ← Electron embeds the game process here */}
+        <div ref={viewportRef} style={{ position: 'absolute', inset: 0 }} />
 
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `
-              repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,136,255,0.04) 3px, rgba(0,136,255,0.04) 4px),
-              repeating-linear-gradient(90deg, transparent 0px, transparent 3px, rgba(0,136,255,0.04) 3px, rgba(0,136,255,0.04) 4px)
-            `,
-            pointerEvents: 'none',
-            zIndex: 2
-          }}
-        />
-
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '-20%',
-            left: '-30%',
-            right: '-30%',
-            height: '65%',
-            backgroundImage: `
-              repeating-linear-gradient(0deg, transparent 0px, transparent 38px, #0099ff 38px, #0099ff 41px),
-              repeating-linear-gradient(90deg, transparent 0px, transparent 58px, #0066ff 58px, #0066ff 61px)
-            `,
-            transform: 'perspective(350px) rotateX(68deg)',
-            backgroundPosition: `0 ${(ledPhase * 2.5) % 41}px`,
-            opacity: 0.55,
-            filter: 'blur(0.3px)',
-            boxShadow: '0 -40px 100px rgba(0,136,255,0.38), 0 -80px 150px rgba(0,102,255,0.22)',
-            animation: 'grid-pulse 3s ease-in-out infinite',
-            pointerEvents: 'none',
-            zIndex: 0
-          }}
-        />
-
-        <div
-          style={{
-            position: 'absolute',
-            top: '46%',
-            left: '-5%',
-            right: '-5%',
-            height: 4,
-            background:
-              'linear-gradient(90deg, transparent, #0066ff 10%, #0099ff 30%, #00ccff 50%, #0099ff 70%, #0066ff 90%, transparent)',
-            boxShadow: '0 0 30px #0088ff, 0 0 60px #0066ff, 0 0 90px rgba(0,136,255,0.25)',
-            opacity: 0.75,
-            animation: 'horizon-glow 2.5s ease-in-out infinite',
-            pointerEvents: 'none',
-            zIndex: 3
-          }}
-        />
-
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'radial-gradient(ellipse at center, transparent 0%, transparent 55%, rgba(0,0,0,0.5) 82%, rgba(0,0,0,0.92) 100%)',
-            pointerEvents: 'none',
-            zIndex: 90
-          }}
-        />
-
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 2px, transparent 2px, transparent 4px)',
-            pointerEvents: 'none',
-            zIndex: 95,
-            transform: `translateY(${scanlineOffset}px)`,
-            opacity: 0.6
-          }}
-        />
-
-        {glitchLine >= 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: `${glitchLine * 5}%`,
-              left: 0,
-              right: 0,
-              height: 3,
-              background: 'rgba(0,200,255,0.85)',
-              mixBlendMode: 'screen',
-              zIndex: 96,
-              pointerEvents: 'none'
-            }}
-          />
-        )}
-
-        <div
-          style={{
-            position: 'absolute',
-            top: 14,
-            left: 18,
-            color: 'rgba(190,220,255,0.82)',
-            fontWeight: 900,
-            letterSpacing: 2,
-            fontSize: 13,
-            textShadow: '0 0 10px rgba(0,204,255,0.25)',
-            zIndex: 120,
-            pointerEvents: 'none'
-          }}
-        >
-          {screenStatus} · ESC = EXIT
-        </div>
-
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 10,
-            width: '100%',
-            height: '100%',
-            display: 'grid',
-            placeItems: 'center',
-            padding: '22px'
-          }}
-        >
-          <div
-            style={{
-              width: 'min(1240px, 96vw)',
-              height: 'min(940px, 94vh)',
-              position: 'relative'
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: 34,
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.72))',
-                boxShadow: `0 40px 140px rgba(0,0,0,0.82), 0 0 0 1px rgba(255,255,255,0.06), 0 0 72px rgba(0,136,255,0.14)`,
-                opacity: 0.95
-              }}
-            />
-
-            <div
-              style={{
-                position: 'absolute',
-                top: 16,
-                left: 16,
-                right: 16,
-                bottom: 16,
-                borderRadius: 28,
-                border: `6px solid ${BASE_BLUE}`,
-                background: '#000814',
-                boxShadow: blueGlow,
-                padding: 6
-              }}
-            >
-              <div
-                style={{
-                  border: `4px solid ${BASE_BLUE_DARK}`,
-                  borderRadius: 22,
-                  height: '100%',
-                  overflow: 'hidden',
-                  background: 'linear-gradient(180deg, #001122, #000a14)',
-                  boxShadow: 'inset 0 0 30px rgba(0,68,136,0.28)',
-                  position: 'relative',
-                  display: 'grid',
-                  gridTemplateRows: '190px 1fr 250px'
-                }}
-              >
-                <div
-                  style={{
-                    position: 'relative',
-                    borderBottom: '2px solid rgba(0,170,255,0.18)',
-                    background: marqueeFlicker
-                      ? 'linear-gradient(180deg, rgba(0,220,255,0.22), rgba(0,0,0,0.05))'
-                      : 'linear-gradient(180deg, rgba(0,136,255,0.22), rgba(0,0,0,0.05))',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: `radial-gradient(circle at 50% 0%, ${accent}22 0%, transparent 55%)`,
-                      pointerEvents: 'none'
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 18,
-                      top: 18,
-                      width: 168,
-                      height: 92,
-                      borderRadius: 16,
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06), rgba(0,0,0,0.28))',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.45)',
-                      opacity: 0.92
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 44,
-                      top: 46,
-                      width: 16,
-                      height: 16,
-                      borderRadius: 999,
-                      background: `radial-gradient(circle at 30% 30%, #ffffff 0%, ${accent} 35%, #00121f 100%)`,
-                      boxShadow: accentGlow,
-                      opacity: 0.96
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 74,
-                      top: 44,
-                      fontSize: 10,
-                      letterSpacing: 2,
-                      color: '#0b0f14',
-                      opacity: 0.85
-                    }}
-                  >
-                    COIN
-                  </div>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 74,
-                      top: 64,
-                      fontSize: 10,
-                      letterSpacing: 2,
-                      color: '#0b0f14',
-                      opacity: 0.85
-                    }}
-                  >
-                    READY
-                  </div>
-
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 18,
-                      top: 18,
-                      width: 210,
-                      height: 92,
-                      borderRadius: 16,
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(0,0,0,0.28))',
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.45)',
-                      opacity: 0.92
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 34,
-                      top: 40,
-                      display: 'grid',
-                      gap: 10,
-                      justifyItems: 'end'
-                    }}
-                  >
-                    <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(190,220,255,0.78)' }}>NOW PLAYING</div>
-                    <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(210,240,255,0.86)' }}>{genre} · {year}</div>
-                    <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(190,220,255,0.78)' }}>{players} · DIFF {difficulty}</div>
-                  </div>
-
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      height: 8,
-                      background: 'linear-gradient(90deg, transparent, rgba(0,200,255,0.32), rgba(255,255,255,0.18), rgba(0,200,255,0.32), transparent)',
-                      opacity: 0.8
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 18,
-                      right: 18,
-                      bottom: 14,
-                      height: 18,
-                      borderRadius: 14,
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      background: 'rgba(0,0,0,0.42)',
-                      overflow: 'hidden',
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.55)'
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: ledBg,
-                        backgroundPositionX: `${-ledPhase}px`,
-                        opacity: 0.75
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: `linear-gradient(90deg, transparent, ${accent}22, transparent)`,
-                        opacity: 0.9
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: 28,
-                      display: 'flex',
-                      justifyContent: 'center',
-                      pointerEvents: 'none'
-                    }}
-                  >
-                    <img
-                      src="../assets/thearcaders_logo.png"
-                      alt="The Arcaders"
-                      style={{
-                        width: 760,
-                        maxWidth: '76%',
-                        height: 'auto',
-                        imageRendering: 'pixelated',
-                        opacity: marqueeFlicker ? 0.72 : 0.98,
-                        filter:
-                          'drop-shadow(0 0 26px rgba(77,166,255,0.95)) drop-shadow(0 0 52px rgba(204,51,255,0.55)) drop-shadow(0 0 22px rgba(0,255,255,0.25))'
-                      }}
-                    />
-                  </div>
+        {/* Launching / Error overlay */}
+        {status !== 'running' && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 5,
+            display: 'grid', placeItems: 'center',
+            background: 'radial-gradient(circle at 50% 42%, rgba(0,80,180,0.2) 0%, rgba(0,0,0,0.92) 55%, rgba(0,0,0,0.98) 100%)',
+            color: '#d7f3ff',
+            fontFamily: '"Courier New", monospace',
+          }}>
+            <div style={{ width: 'min(520px, 80vw)', display: 'grid', gap: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 15, letterSpacing: 3, textShadow: accentGlow }}>
+                {status === 'launching' ? '◈ LOADING GAME' : '✕ LAUNCH FAILED'}
+              </div>
+              <div style={{ fontSize: 11, letterSpacing: 1.4, color: 'rgba(200,230,255,0.8)', lineHeight: 1.65 }}>
+                {status === 'launching'
+                  ? `Mounting ${title} into the cabinet…`
+                  : (errorMessage || 'Unknown error')}
+              </div>
+              {/* Progress bar */}
+              <div style={{
+                height: 12, borderRadius: 999,
+                border: `1px solid ${accent}66`,
+                background: 'rgba(0,0,0,0.65)', overflow: 'hidden',
+                boxShadow: `0 0 18px ${accent}22`,
+              }}>
+                <div style={{
+                  width: `${clamp(progress, 0, 100)}%`, height: '100%',
+                  background: `linear-gradient(90deg, ${accent}, #fff 40%, ${accent})`,
+                  boxShadow: accentGlow, transition: 'width 0.12s linear',
+                }} />
+              </div>
+              {/* Segment dots */}
+              {status === 'launching' && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} style={{
+                      flex: 1, height: 7, borderRadius: 4,
+                      background: i < progress / 10
+                        ? (i % 2 === 0 ? '#00ff88' : accent)
+                        : 'rgba(0,50,100,0.55)',
+                      boxShadow: i < progress / 10
+                        ? `0 0 7px ${i % 2 === 0 ? '#00ff88' : accent}`
+                        : 'none',
+                      transition: 'all 0.2s',
+                    }} />
+                  ))}
                 </div>
-
-                <div
-                  style={{
-                    position: 'relative',
-                    display: 'grid',
-                    gridTemplateColumns: '164px 1fr 164px',
-                    gap: 14,
-                    padding: '18px'
-                  }}
-                >
-                  <div
-                    style={{
-                      borderRadius: 18,
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.32))',
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.6)',
-                      overflow: 'hidden',
-                      position: 'relative'
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background:
-                          'repeating-linear-gradient(0deg, rgba(255,255,255,0.0) 0px, rgba(255,255,255,0.0) 10px, rgba(0,180,255,0.08) 10px, rgba(0,180,255,0.08) 12px)',
-                        opacity: 0.55
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 12,
-                        left: 12,
-                        right: 12,
-                        display: 'grid',
-                        gap: 10
-                      }}
-                    >
-                      <div style={{ fontSize: 11, letterSpacing: 2, color: 'rgba(190,220,255,0.78)' }}>SIDE ART</div>
-                      <div
-                        style={{
-                          height: 12,
-                          borderRadius: 999,
-                          background: `linear-gradient(90deg, transparent, ${accent}55, transparent)`,
-                          boxShadow: accentGlow,
-                          opacity: 0.8
-                        }}
-                      />
-                    </div>
-
-                    {art ? (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: 10,
-                          right: 10,
-                          top: 56,
-                          bottom: 18,
-                          borderRadius: 14,
-                          background: 'rgba(0,0,0,0.45)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.65)',
-                          display: 'grid',
-                          placeItems: 'center',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        <img
-                          src={art}
-                          alt={title}
-                          style={{
-                            width: '92%',
-                            height: '92%',
-                            objectFit: 'contain',
-                            imageRendering: 'pixelated',
-                            filter: 'drop-shadow(0 0 18px rgba(0,200,255,0.22))'
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: 12,
-                          right: 12,
-                          top: 64,
-                          bottom: 18,
-                          borderRadius: 14,
-                          background: 'rgba(0,0,0,0.45)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: 'rgba(190,220,255,0.65)',
-                          fontSize: 10,
-                          letterSpacing: 2
-                        }}
-                      >
-                        ART
-                      </div>
-                    )}
-
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: 10,
-                        top: 0,
-                        bottom: 0,
-                        width: 10,
-                        background: `linear-gradient(180deg, transparent, ${accent}66, transparent)`,
-                        boxShadow: accentGlow,
-                        opacity: 0.7
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      position: 'relative',
-                      display: 'grid',
-                      gridTemplateRows: 'auto 1fr',
-                      gap: 14
-                    }}
-                  >
-                    <div
-                      style={{
-                        borderRadius: 18,
-                        border: '1px solid rgba(255,255,255,0.10)',
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.32))',
-                        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.6)',
-                        padding: '14px 16px',
-                        display: 'grid',
-                        gridTemplateColumns: '1fr auto',
-                        gap: 12,
-                        alignItems: 'center'
-                      }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            color: '#ffffff',
-                            fontWeight: 950,
-                            letterSpacing: 2,
-                            fontSize: 30,
-                            lineHeight: 1.02,
-                            textShadow: `0 0 18px ${accent}22, 3px 3px 0 rgba(0,0,0,0.55)`,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
-                          {title}
-                        </div>
-                        <div
-                          style={{
-                            marginTop: 8,
-                            color: 'rgba(200,230,255,0.82)',
-                            fontWeight: 800,
-                            letterSpacing: 1.3,
-                            fontSize: 13,
-                            lineHeight: 1.2,
-                            textShadow: '0 0 12px rgba(0,204,255,0.22)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
-                          {tagline}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={exit}
-                        style={{
-                          background: 'rgba(180, 0, 0, 0.78)',
-                          color: '#ffffff',
-                          border: '1px solid rgba(255,130,130,0.9)',
-                          padding: '10px 12px',
-                          cursor: 'pointer',
-                          fontSize: 12,
-                          letterSpacing: 2,
-                          borderRadius: 12,
-                          boxShadow: '0 0 18px rgba(255,60,60,0.22)'
-                        }}
-                      >
-                        EXIT
-                      </button>
-                    </div>
-
-                    <div
-                      style={{
-                        position: 'relative',
-                        borderRadius: 26,
-                        padding: 14,
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.55))',
-                        border: '1px solid rgba(255,255,255,0.10)',
-                        boxShadow: `0 24px 90px rgba(0,0,0,0.78), 0 0 0 1px rgba(0,0,0,0.55), 0 0 54px ${accent}14`
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: 12,
-                          right: 12,
-                          top: 12,
-                          height: 10,
-                          borderRadius: 999,
-                          background: `linear-gradient(90deg, transparent, ${accent}55, transparent)`,
-                          opacity: 0.8,
-                          boxShadow: accentGlow
-                        }}
-                      />
-
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: 12,
-                          right: 12,
-                          bottom: 12,
-                          height: 10,
-                          borderRadius: 999,
-                          background: `linear-gradient(90deg, transparent, ${accent}55, transparent)`,
-                          opacity: 0.5,
-                          boxShadow: accentGlow
-                        }}
-                      />
-
-                      <div
-                        style={{
-                          borderRadius: 20,
-                          padding: 18,
-                          background: 'linear-gradient(180deg, #121826 0%, #04060c 100%)',
-                          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.07), inset 0 0 60px rgba(0,0,0,0.85)'
-                        }}
-                      >
-                        <div
-                          style={{
-                            borderRadius: 14,
-                            background: '#000000',
-                            overflow: 'hidden',
-                            position: 'relative',
-                            width: '100%',
-                            height: '100%',
-                            aspectRatio: '16 / 9',
-                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.06), 0 0 36px ${accent}1f`
-                          }}
-                        >
-                          <div
-                            ref={viewportRef}
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              background: '#000000'
-                            }}
-                          />
-
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              background:
-                                'linear-gradient(120deg, rgba(255,255,255,0.10), rgba(255,255,255,0.00) 40%, rgba(255,255,255,0.06) 70%, rgba(255,255,255,0.00))',
-                              opacity: 0.55,
-                              mixBlendMode: 'screen',
-                              pointerEvents: 'none'
-                            }}
-                          />
-
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              background: 'radial-gradient(ellipse at 50% 35%, rgba(0,180,255,0.14) 0%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.65) 100%)',
-                              pointerEvents: 'none'
-                            }}
-                          />
-
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.22) 2px, transparent 2px, transparent 5px)',
-                              opacity: 0.25,
-                              pointerEvents: 'none'
-                            }}
-                          />
-
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: 14,
-                              top: 14,
-                              display: 'flex',
-                              gap: 10,
-                              alignItems: 'center',
-                              pointerEvents: 'none',
-                              opacity: 0.92,
-                              zIndex: 5
-                            }}
-                          >
-                            <div
-                              style={{
-                                padding: '8px 10px',
-                                borderRadius: 12,
-                                border: `1px solid ${accent}55`,
-                                color: '#d9f4ff',
-                                fontSize: 11,
-                                letterSpacing: 2,
-                                textShadow: accentGlow,
-                                background: 'rgba(0,0,0,0.55)'
-                              }}
-                            >
-                              P1 READY
-                            </div>
-                            <div
-                              style={{
-                                padding: '8px 10px',
-                                borderRadius: 12,
-                                border: '1px solid rgba(255,255,255,0.18)',
-                                color: 'rgba(200,230,255,0.82)',
-                                fontSize: 11,
-                                letterSpacing: 2,
-                                background: 'rgba(0,0,0,0.42)'
-                              }}
-                            >
-                              {players}
-                            </div>
-                          </div>
-
-                          {status !== 'running' && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                display: 'grid',
-                                placeItems: 'center',
-                                background: 'radial-gradient(circle at 50% 40%, rgba(0,160,255,0.18) 0%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.95) 100%)',
-                                color: '#d7f3ff',
-                                zIndex: 10
-                              }}
-                            >
-                              <div style={{ width: 'min(620px, 90%)', display: 'grid', gap: 14 }}>
-                                <div style={{ fontSize: 18, letterSpacing: 3, textShadow: accentGlow }}>
-                                  {status === 'launching' ? 'LOADING' : 'LAUNCH FAILED'}
-                                </div>
-
-                                <div style={{ fontSize: 12, letterSpacing: 1.4, color: 'rgba(200,230,255,0.82)', lineHeight: 1.5 }}>
-                                  {status === 'launching' ? 'Mounting the game into the cabinet screen…' : (errorMessage || 'Unknown error')}
-                                </div>
-
-                                <div
-                                  style={{
-                                    height: 14,
-                                    borderRadius: 999,
-                                    border: `1px solid ${accent}66`,
-                                    background: 'rgba(0,0,0,0.55)',
-                                    overflow: 'hidden',
-                                    boxShadow: `0 0 22px ${accent}22`
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      width: `${clamp(progress, 0, 100)}%`,
-                                      height: '100%',
-                                      background: `linear-gradient(90deg, ${accent} 0%, #ffffff 40%, ${accent} 100%)`,
-                                      filter: 'brightness(0.9)',
-                                      boxShadow: accentGlow,
-                                      transition: 'width 0.12s linear'
-                                    }}
-                                  />
-                                </div>
-
-                                {status === 'error' && (
-                                  <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-                                    <button
-                                      type="button"
-                                      onClick={launch}
-                                      style={{
-                                        background: '#00a65a',
-                                        color: '#ffffff',
-                                        border: '1px solid #00ff99',
-                                        padding: '12px 16px',
-                                        cursor: 'pointer',
-                                        fontSize: 12,
-                                        letterSpacing: 2,
-                                        borderRadius: 12,
-                                        boxShadow: '0 0 18px rgba(0,255,150,0.22)'
-                                      }}
-                                    >
-                                      RETRY
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={exit}
-                                      style={{
-                                        background: '#1d1d1d',
-                                        color: '#ffffff',
-                                        border: '1px solid rgba(255,255,255,0.35)',
-                                        padding: '12px 16px',
-                                        cursor: 'pointer',
-                                        fontSize: 12,
-                                        letterSpacing: 2,
-                                        borderRadius: 12
-                                      }}
-                                    >
-                                      BACK
-                                    </button>
-                                  </div>
-                                )}
-
-                                <div style={{ fontSize: 11, letterSpacing: 1.6, color: 'rgba(190,220,255,0.74)', opacity: 0.95 }}>
-                                  {status === 'launching' ? 'PRESS ESC TO ABORT' : 'PRESS ENTER/R TO RETRY'}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              height: 10,
-                              background: `linear-gradient(90deg, transparent, ${accent}22, transparent)`,
-                              opacity: 0.75,
-                              pointerEvents: 'none',
-                              zIndex: 6
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      borderRadius: 18,
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.32))',
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.6)',
-                      overflow: 'hidden',
-                      position: 'relative'
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background:
-                          'repeating-linear-gradient(0deg, rgba(255,255,255,0.0) 0px, rgba(255,255,255,0.0) 10px, rgba(0,180,255,0.08) 10px, rgba(0,180,255,0.08) 12px)',
-                        opacity: 0.55
-                      }}
-                    />
-
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 12,
-                        left: 12,
-                        right: 12,
-                        display: 'grid',
-                        gap: 10
-                      }}
-                    >
-                      <div style={{ fontSize: 11, letterSpacing: 2, color: 'rgba(190,220,255,0.78)', textAlign: 'right' }}>CABINET</div>
-                      <div
-                        style={{
-                          height: 12,
-                          borderRadius: 999,
-                          background: `linear-gradient(90deg, transparent, ${accent}55, transparent)`,
-                          boxShadow: accentGlow,
-                          opacity: 0.8
-                        }}
-                      />
-                    </div>
-
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: 12,
-                        right: 12,
-                        top: 58,
-                        bottom: 18,
-                        display: 'grid',
-                        gap: 12
-                      }}
-                    >
-                      <div
-                        style={{
-                          borderRadius: 14,
-                          background: 'rgba(0,0,0,0.42)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          padding: 12,
-                          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.65)'
-                        }}
-                      >
-                        <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(210,240,255,0.86)' }}>STATUS</div>
-                        <div style={{ marginTop: 10, fontSize: 12, letterSpacing: 2, color: '#ffffff', textShadow: accentGlow }}>
-                          {status === 'running' ? 'READY' : status === 'launching' ? 'LOADING…' : 'FAILED'}
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          borderRadius: 14,
-                          background: 'rgba(0,0,0,0.42)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          padding: 12,
-                          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.65)'
-                        }}
-                      >
-                        <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(210,240,255,0.86)' }}>BUILD</div>
-                        <div style={{ marginTop: 10, fontSize: 10, letterSpacing: 2, color: 'rgba(190,220,255,0.70)' }}>
-                          CABINET MODE
-                        </div>
-                        <div style={{ marginTop: 8, fontSize: 10, letterSpacing: 2, color: 'rgba(190,220,255,0.70)' }}>
-                          STEREO · 60HZ
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          borderRadius: 14,
-                          background: 'rgba(0,0,0,0.42)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          padding: 12,
-                          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.65)'
-                        }}
-                      >
-                        <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(210,240,255,0.86)' }}>TIP</div>
-                        <div style={{ marginTop: 10, fontSize: 10, letterSpacing: 1.6, color: 'rgba(190,220,255,0.70)', lineHeight: 1.55 }}>
-                          ESC = EXIT · ENTER/R = RETRY
-                        </div>
-                        <div style={{ marginTop: 8, fontSize: 10, letterSpacing: 1.6, color: 'rgba(190,220,255,0.70)' }}>
-                          ركّز (focus) · yalla (komaan)
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        position: 'absolute',
-                        right: 10,
-                        top: 0,
-                        bottom: 0,
-                        width: 10,
-                        background: `linear-gradient(180deg, transparent, ${accent}66, transparent)`,
-                        boxShadow: accentGlow,
-                        opacity: 0.7
-                      }}
-                    />
-                  </div>
+              )}
+              {status === 'error' && (
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 6 }}>
+                  <button type="button" onClick={launch} style={{
+                    background: '#00a65a', color: '#fff', border: '1px solid #00ff99',
+                    padding: '10px 18px', cursor: 'pointer', fontSize: 11, letterSpacing: 2,
+                    borderRadius: 10, boxShadow: '0 0 14px rgba(0,255,150,0.22)', fontFamily: 'inherit',
+                  }}>RETRY</button>
+                  <button type="button" onClick={exit} style={{
+                    background: '#181818', color: '#fff', border: '1px solid rgba(255,255,255,0.28)',
+                    padding: '10px 18px', cursor: 'pointer', fontSize: 11, letterSpacing: 2,
+                    borderRadius: 10, fontFamily: 'inherit',
+                  }}>BACK</button>
                 </div>
-
-                <div
-                  style={{
-                    position: 'relative',
-                    borderTop: '2px solid rgba(0,170,255,0.18)',
-                    padding: '16px 18px 18px',
-                    background: 'linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,136,255,0.10))'
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: -22,
-                      right: -22,
-                      top: -38,
-                      height: 70,
-                      transform: 'skewX(-10deg)',
-                      borderRadius: 22,
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.38))',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      boxShadow: '0 24px 60px rgba(0,0,0,0.72)'
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      position: 'relative',
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto',
-                      gap: 16,
-                      alignItems: 'center'
-                    }}
-                  >
-                    <div style={{ display: 'grid', gap: 10 }}>
-                      <div style={{ color: 'rgba(190,220,255,0.74)', fontWeight: 900, letterSpacing: 2, fontSize: 13, textShadow: '0 0 10px rgba(0,204,255,0.25)' }}>
-                        CONTROL PANEL
-                      </div>
-                      <div style={{ color: 'rgba(200,230,255,0.82)', fontWeight: 800, letterSpacing: 1.2, fontSize: 12, lineHeight: 1.55 }}>
-                        Arcade-grade cabinet UI. No filler. Pure vibe.
-                      </div>
-                      <div style={{ color: 'rgba(190,220,255,0.58)', fontWeight: 900, letterSpacing: 2, fontSize: 11 }}>
-                        © THE ARCADERS · NEON · STEREO
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                      <div
-                        style={{
-                          width: 76,
-                          height: 76,
-                          borderRadius: 999,
-                          background: `radial-gradient(circle at 30% 30%, #ffffff 0%, ${accent} 35%, #00121f 100%)`,
-                          boxShadow: `${accentGlow}, inset 0 0 0 2px rgba(0,0,0,0.35)`
-                        }}
-                      />
-                      <div
-                        style={{
-                          width: 76,
-                          height: 76,
-                          borderRadius: 999,
-                          background: 'radial-gradient(circle at 30% 30%, #ffffff 0%, #ff3b3b 35%, #2a0000 100%)',
-                          boxShadow: '0 0 18px rgba(255,80,80,0.55), inset 0 0 0 2px rgba(0,0,0,0.35)'
-                        }}
-                      />
-                      <div
-                        style={{
-                          width: 76,
-                          height: 76,
-                          borderRadius: 999,
-                          background: 'radial-gradient(circle at 30% 30%, #ffffff 0%, #ffd23b 35%, #2a1b00 100%)',
-                          boxShadow: '0 0 18px rgba(255,210,80,0.45), inset 0 0 0 2px rgba(0,0,0,0.35)'
-                        }}
-                      />
-                      <div
-                        style={{
-                          width: 76,
-                          height: 76,
-                          borderRadius: 999,
-                          background: 'radial-gradient(circle at 30% 30%, #ffffff 0%, #00ff88 35%, #002a14 100%)',
-                          boxShadow: '0 0 18px rgba(0,255,140,0.35), inset 0 0 0 2px rgba(0,0,0,0.35)'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 18,
-                      right: 18,
-                      bottom: 14,
-                      height: 18,
-                      borderRadius: 14,
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      background: 'rgba(0,0,0,0.42)',
-                      overflow: 'hidden',
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.55)'
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: ledBg,
-                        backgroundPositionX: `${-(ledPhase * 1.6)}px`,
-                        opacity: 0.7
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: `linear-gradient(90deg, transparent, ${accent}22, transparent)`,
-                        opacity: 0.9
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 18,
-                      top: 18,
-                      width: 220,
-                      height: 70,
-                      borderRadius: 16,
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.30))',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.45)',
-                      opacity: 0.34,
-                      pointerEvents: 'none'
-                    }}
-                  />
-                </div>
-
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 10,
-                    right: 10,
-                    top: 206,
-                    bottom: 276,
-                    pointerEvents: 'none'
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 6,
-                      top: 0,
-                      bottom: 0,
-                      width: 14,
-                      borderRadius: 999,
-                      background: `linear-gradient(180deg, transparent, ${accent}77, transparent)`,
-                      boxShadow: accentGlow,
-                      opacity: 0.55,
-                      animation: 'neon-breathe 2.6s ease-in-out infinite'
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 6,
-                      top: 0,
-                      bottom: 0,
-                      width: 14,
-                      borderRadius: 999,
-                      background: `linear-gradient(180deg, transparent, ${accent}77, transparent)`,
-                      boxShadow: accentGlow,
-                      opacity: 0.55,
-                      animation: 'neon-breathe 2.6s ease-in-out infinite'
-                    }}
-                  />
-                </div>
+              )}
+              <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(190,220,255,0.45)', marginTop: 4 }}>
+                {status === 'launching' ? 'PRESS ESC TO ABORT' : 'PRESS ENTER / R TO RETRY'}
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
+      {/* ==============================================================
+          LAYER 1 — CABINET OVERLAY
+          Floats on top of the game. Center is transparent / cut out.
+          All cabinet chrome lives here.
+          ============================================================== */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 10,
+        pointerEvents: 'none',
+        fontFamily: '"Courier New", "Press Start 2P", monospace',
+      }}>
+
+        {/* ── TOP MARQUEE ───────────────────────────────────────────── */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 160,
+          // Fade from solid dark at top to transparent at bottom
+          background: 'linear-gradient(180deg, rgba(5,10,22,0.97) 0%, rgba(4,8,18,0.93) 60%, rgba(2,5,12,0.0) 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'visible',
+          pointerEvents: 'auto',
+        }}>
+          <RgbStrip top />
+
+          {/* Scrolling background text */}
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', opacity: 0.055 }}>
+            <div style={{
+              whiteSpace: 'nowrap', fontSize: 11, letterSpacing: 4, color: '#00ccff',
+              transform: `translateX(${-marqueePos}px)`, willChange: 'transform',
+            }}>
+              {'★ THE ARCADERS ★ INSERT COIN ★ HIGH SCORE ★ PLAY NOW ★ 1UP ★ YALLA ★ KOMAAN ★ '.repeat(6)}
+            </div>
+          </div>
+
+          {/* Left info */}
+          <div style={{ position: 'absolute', left: 20, bottom: 18, display: 'grid', gap: 5 }}>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(130,170,255,0.4)' }}>NOW PLAYING</div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(210,240,255,0.9)', textShadow: accentGlow }}>{title}</div>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(150,190,255,0.45)' }}>{genre} · {year}</div>
+          </div>
+
+          {/* ═══ LOGO — big, centered, floats over game ═══ */}
+          <div style={{
+            position: 'absolute',
+            top: -290,          // pull it UP so it bleeds above the bar
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 50,
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}>
+            {/* Glow halo */}
+            <div style={{
+              position: 'absolute', inset: '-40px -120px',
+              background: 'radial-gradient(ellipse at center, rgba(0,110,255,0.25) 0%, transparent 60%)',
+              filter: 'blur(24px)', opacity: neonOpacity,
+            }} />
+            <img
+              src="../assets/thearcaders_logo.png"
+              alt="The Arcaders"
+              style={{
+                position: 'relative',
+                width: 'min(680px, 52vw)',
+                height: 'auto',
+                imageRendering: 'pixelated',
+                display: 'block',
+                opacity: marqueeFlicker ? 0.55 : 1,
+                filter: [
+                  'drop-shadow(0 0 24px rgba(77,166,255,0.98))',
+                  'drop-shadow(0 0 48px rgba(0,204,255,0.50))',
+                  'drop-shadow(0 4px 2px rgba(0,0,0,0.95))',
+                ].join(' '),
+                transition: 'opacity 0.07s',
+              }}
+            />
+            <div style={{
+              fontSize: 8, letterSpacing: 5, marginTop: 3,
+              color: `rgba(0,195,255,${neonOpacity * 0.9})`,
+              textShadow: '0 0 9px rgba(0,195,255,0.7)',
+              transition: 'color 0.07s',
+            }}>◆ ARCADE SYSTEM ◆ EST. 1992 ◆</div>
+          </div>
+
+          {/* Right info */}
+          <div style={{ position: 'absolute', right: 20, bottom: 18, display: 'grid', gap: 5, textAlign: 'right' }}>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(130,170,255,0.4)' }}>CABINET</div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: accent, textShadow: accentGlow }}>{players} · DIFF {difficulty}</div>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(150,190,255,0.45)' }}>STEREO · 60HZ</div>
+          </div>
+
+          {/* Corner bolts */}
+          {[{top:7,left:7},{top:7,right:7}].map((s,i) => (
+            <div key={i} style={{
+              position: 'absolute', ...s,
+              width: 10, height: 10, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 35%, #3a5a7a, #0a1a2a)',
+              border: '1.5px solid #1a3050',
+            }} />
+          ))}
+
+          {/* Bottom fade strip (RGB) */}
+          <RgbStrip bottom flip />
+        </div>
+
+        {/* ── LEFT SIDE PANEL ───────────────────────────────────────── */}
+        <div style={{
+          position: 'absolute', top: 154, bottom: 132, left: 0, width: 68,
+          background: 'linear-gradient(90deg, rgba(5,10,22,0.96) 0%, rgba(4,8,18,0.85) 65%, rgba(2,5,12,0.0) 100%)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 0',
+          overflow: 'hidden',
+        }}>
+          {/* Vertical neon stripe */}
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0, left: 9, width: 2,
+            background: `linear-gradient(180deg, transparent, ${ledColor(0)}77, ${ledColor(120)}77, transparent)`,
+            opacity: 0.55,
+          }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+            {[0,60,120,180,240,300].map(o => <LedDot key={o} offset={o} />)}
+          </div>
+          {/* Speaker grille */}
+          <div style={{ width: 46, display: 'flex', flexDirection: 'column', gap: 5, opacity: 0.38 }}>
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} style={{ height: 3, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(0,136,255,0.5), transparent)' }} />
+            ))}
+            <div style={{ marginTop: 4, fontSize: 6, letterSpacing: 1, color: 'rgba(0,136,255,0.38)', textAlign: 'center', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>STEREO L</div>
+          </div>
+          {/* 1UP */}
+          <div style={{
+            fontSize: 8, letterSpacing: 2,
+            color: coinBlink ? '#00ff88' : 'rgba(0,255,136,0.2)',
+            textShadow: coinBlink ? '0 0 8px #00ff88' : 'none',
+            transition: 'all 0.15s', writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+          }}>1UP</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+            {[300,240,180,120,60,0].map(o => <LedDot key={o} offset={o} />)}
+          </div>
+        </div>
+
+        {/* ── RIGHT SIDE PANEL ──────────────────────────────────────── */}
+        <div style={{
+          position: 'absolute', top: 154, bottom: 132, right: 0, width: 68,
+          background: 'linear-gradient(270deg, rgba(5,10,22,0.96) 0%, rgba(4,8,18,0.85) 65%, rgba(2,5,12,0.0) 100%)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 0',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0, right: 9, width: 2,
+            background: `linear-gradient(180deg, transparent, ${ledColor(180)}77, ${ledColor(300)}77, transparent)`,
+            opacity: 0.55,
+          }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+            {[300,240,180,120,60,0].map(o => <LedDot key={o} offset={o} />)}
+          </div>
+          <div style={{ width: 46, display: 'flex', flexDirection: 'column', gap: 5, opacity: 0.38 }}>
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} style={{ height: 3, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(0,136,255,0.5), transparent)' }} />
+            ))}
+            <div style={{ marginTop: 4, fontSize: 6, letterSpacing: 1, color: 'rgba(0,136,255,0.38)', textAlign: 'center', writingMode: 'vertical-rl' }}>STEREO R</div>
+          </div>
+          <div style={{
+            fontSize: 8, letterSpacing: 2,
+            color: !coinBlink ? '#ff4444' : 'rgba(255,68,68,0.2)',
+            textShadow: !coinBlink ? '0 0 8px #ff4444' : 'none',
+            transition: 'all 0.15s', writingMode: 'vertical-rl',
+          }}>2UP</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+            {[0,60,120,180,240,300].map(o => <LedDot key={o} offset={o} />)}
+          </div>
+        </div>
+
+        {/* ── SCREEN BORDER GLOW ────────────────────────────────────── */}
+        {/* Thin neon frame that traces the game area */}
+        <div style={{
+          position: 'absolute',
+          top: 150, left: 62, right: 62, bottom: 128,
+          border: `2px solid ${BASE_BLUE}`,
+          borderRadius: 4,
+          boxShadow: borderBlink
+            ? `0 0 28px rgba(0,136,255,0.65), 0 0 56px rgba(0,136,255,0.22), inset 0 0 28px rgba(0,136,255,0.08)`
+            : `0 0 18px rgba(0,136,255,0.45), 0 0 40px rgba(0,136,255,0.14), inset 0 0 18px rgba(0,136,255,0.05)`,
+          pointerEvents: 'none',
+          transition: 'box-shadow 0.14s',
+        }} />
+
+        {/* Neon side tubes */}
+        <div style={{
+          position: 'absolute', left: 56, top: 160, bottom: 140, width: 5,
+          background: `linear-gradient(180deg, transparent, ${accent}66, transparent)`,
+          boxShadow: accentGlow, opacity: 0.4, borderRadius: 999,
+          animation: 'neon-breathe 2.6s ease-in-out infinite',
+        }} />
+        <div style={{
+          position: 'absolute', right: 56, top: 160, bottom: 140, width: 5,
+          background: `linear-gradient(180deg, transparent, ${accent}66, transparent)`,
+          boxShadow: accentGlow, opacity: 0.4, borderRadius: 999,
+          animation: 'neon-breathe 2.6s ease-in-out infinite',
+        }} />
+
+        {/* ── CONTROL PANEL BOTTOM ──────────────────────────────────── */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: 132,
+          background: 'linear-gradient(0deg, rgba(5,10,22,0.98) 0%, rgba(4,8,18,0.95) 55%, rgba(2,5,12,0.0) 100%)',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 30px', gap: 12,
+          pointerEvents: 'auto',
+          overflow: 'hidden',
+        }}>
+          {/* Texture */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `
+              repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0,0,0,0.07) 8px, rgba(0,0,0,0.07) 9px),
+              repeating-linear-gradient(90deg, transparent 0, transparent 8px, rgba(0,0,0,0.05) 8px, rgba(0,0,0,0.05) 9px)
+            `,
+            pointerEvents: 'none',
+          }} />
+          <RgbStrip top />
+
+          {/* P1 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+            <Joystick />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+              <ArcadeBtn color="#ff3b3b" /><ArcadeBtn color="#00ccff" />
+              <ArcadeBtn color="#ffdd00" /><ArcadeBtn color="#00ff88" />
+            </div>
+          </div>
+
+          {/* Center */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+            {/* Score */}
+            <div style={{
+              background: 'rgba(0,2,7,0.88)', border: '1.5px solid #071525',
+              borderRadius: 5, padding: '5px 16px', textAlign: 'center',
+              boxShadow: 'inset 0 0 12px rgba(0,28,55,0.7)', minWidth: 150,
+            }}>
+              <div style={{ fontSize: 7, letterSpacing: 3, color: 'rgba(0,140,255,0.38)', marginBottom: 2 }}>HIGH SCORE</div>
+              <div style={{
+                fontSize: 17, fontWeight: 900, letterSpacing: 4, color: '#ffdd00',
+                textShadow: '0 0 14px rgba(255,220,0,0.9), 0 0 30px rgba(255,180,0,0.4)',
+              }}>000000</div>
+            </div>
+            {/* Coin insert */}
+            <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%',
+                background: 'radial-gradient(circle at 35% 35%, #c8a020, #5a4008)',
+                border: '1.5px solid #7a5010', boxShadow: '0 0 7px rgba(200,160,32,0.5)',
+              }} />
+              <div style={{
+                fontSize: 8, letterSpacing: 3,
+                color: coinBlink ? '#ffdd00' : 'rgba(255,220,0,0.18)',
+                textShadow: coinBlink ? '0 0 9px rgba(255,220,0,0.95)' : 'none',
+                transition: 'all 0.15s',
+              }}>INSERT COIN</div>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%',
+                background: 'radial-gradient(circle at 35% 35%, #c8a020, #5a4008)',
+                border: '1.5px solid #7a5010', boxShadow: '0 0 7px rgba(200,160,32,0.5)',
+              }} />
+            </div>
+            {/* Exit */}
+            <button type="button" onClick={exit} style={{
+              background: 'rgba(130,0,0,0.82)', color: '#fff',
+              border: '1px solid rgba(255,90,90,0.7)',
+              padding: '4px 13px', cursor: 'pointer',
+              fontSize: 9, letterSpacing: 2, borderRadius: 7,
+              boxShadow: '0 0 10px rgba(255,30,30,0.2)',
+              fontFamily: 'inherit',
+            }}>■ EXIT</button>
+          </div>
+
+          {/* P2 dimmed */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, flexDirection: 'row-reverse' }}>
+            <Joystick flip />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+              <ArcadeBtn color="#ff3b3b" dim /><ArcadeBtn color="#00ccff" dim />
+              <ArcadeBtn color="#ffdd00" dim /><ArcadeBtn color="#00ff88" dim />
+            </div>
+          </div>
+        </div>
+
+        {/* ── SCANLINES (full screen, very subtle) ──────────────────── */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px, transparent 1px, transparent 3px)',
+          transform: `translateY(${scanlineOffset}px)`,
+          pointerEvents: 'none', zIndex: 20, opacity: 0.3,
+        }} />
+
+        {/* Glitch line */}
+        {glitchLine >= 0 && (
+          <div style={{
+            position: 'absolute', top: `${glitchLine * 5}%`, left: 0, right: 0, height: 2,
+            background: 'rgba(0,200,255,0.7)', mixBlendMode: 'screen',
+            pointerEvents: 'none', zIndex: 21,
+          }} />
+        )}
+
+        {/* ── RUNNING: P1 status badge (top-left of game area) ─────── */}
+        {status === 'running' && (
+          <div style={{
+            position: 'absolute', top: 158, left: 76,
+            display: 'flex', gap: 7, alignItems: 'center',
+            pointerEvents: 'none', zIndex: 15,
+          }}>
+            <div style={{
+              padding: '5px 9px', borderRadius: 8,
+              border: `1px solid ${accent}55`, color: '#d9f4ff',
+              fontSize: 9, letterSpacing: 2, background: 'rgba(0,0,0,0.6)',
+              textShadow: accentGlow,
+            }}>P1 READY</div>
+            <div style={{
+              padding: '5px 9px', borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.14)',
+              color: 'rgba(200,230,255,0.75)', fontSize: 9, letterSpacing: 2,
+              background: 'rgba(0,0,0,0.5)',
+            }}>{players}</div>
+          </div>
+        )}
+
+      </div>{/* end overlay layer */}
+
       <style>{`
-        @keyframes starfield-drift {
-          from { background-position: 0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px; }
-          to   { background-position: 0 200px, 40px 260px, 130px 470px, 70px 300px, 150px 250px, 200px 380px, 90px 420px; }
-        }
-        @keyframes grid-pulse {
-          0%, 100% { opacity: 0.48; filter: blur(0.3px) }
-          50% { opacity: 0.62; filter: blur(0.15px) }
-        }
-        @keyframes horizon-glow {
-          0%, 100% { opacity: 0.70; filter: brightness(1) }
-          50% { opacity: 0.92; filter: brightness(1.25) }
-        }
         @keyframes neon-breathe {
-          0%, 100% { opacity: 0.45; filter: brightness(1) }
-          50% { opacity: 0.72; filter: brightness(1.22) }
+          0%, 100% { opacity: 0.30; filter: brightness(1); }
+          50%       { opacity: 0.60; filter: brightness(1.4); }
         }
       `}</style>
     </>

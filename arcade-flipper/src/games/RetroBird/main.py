@@ -1,5 +1,6 @@
 import pygame
 import random
+import os
 
 from objects import Grumpy, Pipe, Base, Score
 
@@ -8,15 +9,17 @@ from objects import Grumpy, Pipe, Base, Score
 pygame.init()
 SCREEN = WIDTH, HEIGHT = 288, 512
 display_height = 0.80 * HEIGHT
-info = pygame.display.Info()
 
-width = info.current_w
-height = info.current_h
+embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
+window_pos = os.environ.get('ARCADE_WINDOW_POS')
+if window_pos:
+	os.environ['SDL_VIDEO_WINDOW_POS'] = window_pos
 
-if width >= height:
-	win = pygame.display.set_mode(SCREEN, pygame.NOFRAME)
-else:
-	win = pygame.display.set_mode(SCREEN, pygame.NOFRAME | pygame.SCALED | pygame.FULLSCREEN)
+display_flags = pygame.NOFRAME | pygame.SCALED
+if not embedded_mode:
+	display_flags |= pygame.FULLSCREEN
+
+win = pygame.display.set_mode(SCREEN, display_flags)
 
 clock = pygame.time.Clock()
 FPS = 60

@@ -542,7 +542,17 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       height: displayBounds.height
     }
 
+    const zoomFactor = mainWindow?.webContents.getZoomFactor?.() ?? 1
+    const viewportScale = process.platform === 'win32' ? zoomFactor : 1
     const viewport = request.viewport
+      ? {
+          x: request.viewport.x * viewportScale,
+          y: request.viewport.y * viewportScale,
+          width: request.viewport.width * viewportScale,
+          height: request.viewport.height * viewportScale
+        }
+      : undefined
+
     const targetBounds = launchMode === 'embedded' && viewport
       ? (() => {
           const minWidth = Math.min(320, displayBounds.width)

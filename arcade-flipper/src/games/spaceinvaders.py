@@ -64,7 +64,9 @@ try:
 except:
     pass
 
-display_flags = pygame.NOFRAME if embedded_mode else 0
+display_flags = pygame.NOFRAME | pygame.SCALED
+if not embedded_mode:
+    display_flags |= pygame.FULLSCREEN
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), display_flags)
 pygame.display.set_caption("Space Battle - Alien Invasion")
 clock = pygame.time.Clock()

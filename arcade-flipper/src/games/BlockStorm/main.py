@@ -1,9 +1,19 @@
 import pygame
 import random
+import os
 
 pygame.init()
 SCREEN = WIDTH, HEIGHT = 300, 500
-win = pygame.display.set_mode(SCREEN, pygame.NOFRAME)
+embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
+window_pos = os.environ.get('ARCADE_WINDOW_POS')
+if window_pos:
+	os.environ['SDL_VIDEO_WINDOW_POS'] = window_pos
+
+display_flags = pygame.NOFRAME | pygame.SCALED
+if not embedded_mode:
+	display_flags |= pygame.FULLSCREEN
+
+win = pygame.display.set_mode(SCREEN, display_flags)
 
 CELLSIZE = 20
 ROWS = (HEIGHT-120) // CELLSIZE

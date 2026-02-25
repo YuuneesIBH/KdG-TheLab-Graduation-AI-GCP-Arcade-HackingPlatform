@@ -19,6 +19,7 @@ type ViewportRect = {
 
 const BASE_BLUE = '#c38a2e'
 const BASE_BLUE_DARK = '#6f4317'
+const GAME_SCREEN_INSET = { top: 150, left: 62, right: 62, bottom: 128 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
@@ -285,7 +286,16 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         transform: `translateX(${pixelShift}px)`,
       }}>
         {/* ← Electron embeds the game process here */}
-        <div ref={viewportRef} style={{ position: 'absolute', inset: 0 }} />
+        <div
+          ref={viewportRef}
+          style={{
+            position: 'absolute',
+            top: GAME_SCREEN_INSET.top,
+            left: GAME_SCREEN_INSET.left,
+            right: GAME_SCREEN_INSET.right,
+            bottom: GAME_SCREEN_INSET.bottom,
+          }}
+        />
 
         {/* Launching / Error overlay */}
         {status !== 'running' && (
@@ -636,7 +646,10 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         {/* Thin neon frame that traces the game area */}
         <div style={{
           position: 'absolute',
-          top: 150, left: 62, right: 62, bottom: 128,
+          top: GAME_SCREEN_INSET.top,
+          left: GAME_SCREEN_INSET.left,
+          right: GAME_SCREEN_INSET.right,
+          bottom: GAME_SCREEN_INSET.bottom,
           border: `2px solid ${BASE_BLUE}`,
           borderRadius: 6,
           boxShadow: borderBlink

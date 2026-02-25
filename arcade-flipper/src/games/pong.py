@@ -2,10 +2,31 @@ import pygame
 import sys
 import math
 import random
+import os
 
 pygame.init()
+embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
+window_size_raw = os.environ.get('ARCADE_WINDOW_SIZE')
+window_pos = os.environ.get('ARCADE_WINDOW_POS')
 
-screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+if window_pos:
+    os.environ['SDL_VIDEO_WINDOW_POS'] = window_pos
+
+screen_size = (0, 0)
+if embedded_mode and window_size_raw:
+    cleaned = window_size_raw.lower().replace(' ', '')
+    parts = cleaned.split('x' if 'x' in cleaned else ',')
+    if len(parts) == 2:
+        try:
+            screen_size = (max(320, int(parts[0])), max(240, int(parts[1])))
+        except ValueError:
+            screen_size = (0, 0)
+
+display_flags = pygame.NOFRAME | pygame.SCALED
+if not embedded_mode:
+    display_flags |= pygame.FULLSCREEN
+
+screen = pygame.display.set_mode(screen_size, display_flags)
 WIDTH, HEIGHT = screen.get_size()
 pygame.display.set_caption("PONG")
 clock = pygame.time.Clock()

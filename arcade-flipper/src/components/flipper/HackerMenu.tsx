@@ -39,6 +39,9 @@ type HackerMenuProps = {
   lastNfcUid?: string
   irDbEntries?: IrDatabaseEntry[]
   toolStatus?: string
+  serialLines?: string[]
+  onSendRawCommand?: (command: string) => void
+  onClearSerialLog?: () => void
 }
 
 function MatrixBg() {
@@ -87,10 +90,14 @@ export default function Menu({
   onIrSend,
   lastNfcUid,
   irDbEntries,
-  toolStatus
+  toolStatus,
+  serialLines,
+  onSendRawCommand,
+  onClearSerialLog
 }: HackerMenuProps) {
   const [selected, setSelected]   = useState(0)
   const [selectedIrId, setSelectedIrId] = useState('')
+  const [rawCommand, setRawCommand] = useState('')
   const [entered, setEntered]     = useState(false)
   const [glitch, setGlitch]       = useState(false)
   const [scanY, setScanY]         = useState(0)
@@ -98,11 +105,22 @@ export default function Menu({
   const [booted, setBooted]       = useState(false)
   const [bootLines, setBootLines] = useState<string[]>([])
   const selectedRef               = useRef(selected)
+  const serialLogRef              = useRef<HTMLDivElement>(null)
   selectedRef.current = selected
 
   useEffect(() => {
+    if (!serialLogRef.current) return
+    serialLogRef.current.scrollTop = serialLogRef.current.scrollHeight
+  }, [serialLines])
+
+  useEffect(() => {
     const firstId = irDbEntries?.[0]?.id ?? ''
-    if (!selectedIrId && firstId) {
+    if (!firstId) {
+      if (selectedIrId) setSelectedIrId('')
+      return
+    }
+    const hasSelected = (irDbEntries ?? []).some((entry) => entry.id === selectedIrId)
+    if (!hasSelected) {
       setSelectedIrId(firstId)
     }
   }, [irDbEntries, selectedIrId])
@@ -152,6 +170,12 @@ export default function Menu({
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        const isTextControl = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+        if (isTextControl || target.isContentEditable) return
+      }
       if (e.key === 'ArrowUp')   { e.preventDefault(); moveUp() }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveDown() }
       if (e.key === 'Enter')     confirm()
@@ -190,6 +214,13 @@ export default function Menu({
     : deviceStatus?.connecting
       ? '#ffff00'
       : '#ff4444'
+
+  const sendRawCommand = useCallback(() => {
+    const trimmed = rawCommand.trim()
+    if (!trimmed) return
+    onSendRawCommand?.(trimmed)
+    setRawCommand('')
+  }, [rawCommand, onSendRawCommand])
 
   return (
     <div style={{
@@ -439,11 +470,13 @@ export default function Menu({
                       fontSize:'11px',
                     }}
                   >
-                    {(irDbEntries ?? []).map((entry) => (
-                      <option key={entry.id} value={entry.id}>
-                        {entry.name} [{entry.protocol}]
-                      </option>
-                    ))}
+                    {(irDbEntries ?? []).length === 0
+                      ? <option value="">No IR entries loaded</option>
+                      : (irDbEntries ?? []).map((entry) => (
+                          <option key={entry.id} value={entry.id}>
+                            {entry.name} [{entry.protocol}]
+                          </option>
+                        ))}
                   </select>
                   <button
                     onClick={() => onIrReload?.()}
@@ -461,14 +494,16 @@ export default function Menu({
                   </button>
                   <button
                     onClick={() => selectedIrId && onIrSend?.(selectedIrId)}
+                    disabled={!selectedIrId}
                     style={{
                       background:'rgba(255, 136, 0, 0.18)',
                       border:'1px solid #ff8800',
-                      color:'#ffd9a8',
+                      color: selectedIrId ? '#ffd9a8' : '#8a6a44',
                       fontFamily:'inherit',
                       padding:'6px 10px',
                       fontSize:'11px',
-                      cursor:'pointer',
+                      cursor: selectedIrId ? 'pointer' : 'not-allowed',
+                      opacity: selectedIrId ? 1 : 0.7,
                     }}
                   >
                     SEND IR
@@ -478,10 +513,95 @@ export default function Menu({
                   NFC_UID::{lastNfcUid || 'none'} | IR_DB::{(irDbEntries ?? []).length} entries
                 </div>
                 {toolStatus && (
-                  <div style={{ gridColumn:'1 / -1', fontSize:'10px', color:'#3a5a3a', letterSpacing:'0.5px' }}>
+                  <div style={{ gridColumn:'1 / -1', fontSize:'10px', color:'#7fbf7f', letterSpacing:'0.5px' }}>
                     TOOL::{toolStatus}
                   </div>
                 )}
+                {deviceStatus?.error && (
+                  <div style={{ gridColumn:'1 / -1', fontSize:'10px', color:'#ff7777', letterSpacing:'0.5px' }}>
+                    HW_ERR::{deviceStatus.error}
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                borderTop: '1px solid #081408',
+                borderBottom: '1px solid #081408',
+                padding: '10px 18px',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto auto',
+                gap: '8px',
+                alignItems: 'center',
+              }}>
+                <input
+                  value={rawCommand}
+                  onChange={(e) => setRawCommand(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      sendRawCommand()
+                    }
+                  }}
+                  placeholder="raw serial command (example: PING, HELLO, NFC_READ, RUN GPIO_CTRL)"
+                  style={{
+                    background: '#020c02',
+                    border: '1px solid #2b5a2b',
+                    color: '#9fe49f',
+                    fontFamily: 'inherit',
+                    fontSize: '11px',
+                    padding: '6px 8px',
+                  }}
+                />
+                <button
+                  onClick={sendRawCommand}
+                  style={{
+                    background: 'rgba(0, 255, 136, 0.14)',
+                    border: '1px solid #00ff88',
+                    color: '#00ff88',
+                    fontFamily: 'inherit',
+                    padding: '6px 10px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  SEND
+                </button>
+                <button
+                  onClick={() => onClearSerialLog?.()}
+                  style={{
+                    background: 'rgba(255, 68, 68, 0.12)',
+                    border: '1px solid #ff4444',
+                    color: '#ff9999',
+                    fontFamily: 'inherit',
+                    padding: '6px 10px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  CLEAR LOG
+                </button>
+                <div
+                  ref={serialLogRef}
+                  style={{
+                    gridColumn: '1 / -1',
+                    minHeight: '110px',
+                    maxHeight: '160px',
+                    overflowY: 'auto',
+                    background: '#010701',
+                    border: '1px solid #103010',
+                    padding: '8px',
+                  }}
+                >
+                  {(serialLines ?? []).length === 0 ? (
+                    <div style={{ color: '#2b4a2b', fontSize: '10px' }}>No serial lines yet.</div>
+                  ) : (
+                    (serialLines ?? []).map((line, index) => (
+                      <div key={`${index}-${line.slice(0, 24)}`} style={{ color: '#69a869', fontSize: '10px', lineHeight: '1.4' }}>
+                        {line}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
 
               <div style={{

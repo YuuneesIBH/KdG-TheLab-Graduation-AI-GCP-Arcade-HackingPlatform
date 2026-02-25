@@ -17,8 +17,8 @@ type ViewportRect = {
   height: number
 }
 
-const BASE_BLUE = '#c38a2e'
-const BASE_BLUE_DARK = '#6f4317'
+const BASE_BLUE = '#0088ff'
+const BASE_BLUE_DARK = '#003a7a'
 const GAME_SCREEN_INSET = { top: 150, left: 62, right: 62, bottom: 128 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
@@ -50,7 +50,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
   const players    = game?.players    ?? '1P'
 
   const accentGlow  = `0 0 9px ${accent}66, 0 0 20px ${accent}22`
-  const bulbPalette = React.useMemo(() => ['#ff8a3d', '#ffb347', '#ffd166', '#d1495b'], [])
+  const bulbPalette = React.useMemo(() => ['#00ccff', '#00ff88', '#66d6ff', '#2d7ff1'], [])
   const ledColor    = (offset: number) => {
     const idx = Math.floor((ledPhase + offset) / 18) % bulbPalette.length
     return bulbPalette[(idx + bulbPalette.length) % bulbPalette.length]
@@ -264,11 +264,46 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
       bottom: bottom ? 0 : 'auto',
       left: 0, right: 0, height: 4,
       background: flip
-        ? 'linear-gradient(90deg, #7f1818, #bf5a24, #ffd166, #bf5a24, #7f1818)'
-        : 'linear-gradient(90deg, #7f1818, #bf5a24, #ffd166, #bf5a24, #7f1818)',
-      boxShadow: `0 0 9px ${ledColor(120)}66, 0 0 18px rgba(255,130,44,0.22)`,
+        ? 'linear-gradient(90deg, #00306a, #005dbb, #00c8ff, #005dbb, #00306a)'
+        : 'linear-gradient(90deg, #00306a, #005dbb, #00c8ff, #005dbb, #00306a)',
+      boxShadow: `0 0 9px ${ledColor(120)}66, 0 0 18px rgba(0,196,255,0.28)`,
       opacity: neonOpacity,
     }} />
+  )
+
+  const LabelChip = ({ text, tone = '#8fe8ff' }: { text: string; tone?: string }) => (
+    <div style={{
+      padding: '2px 7px',
+      borderRadius: 999,
+      border: `1px solid ${tone}66`,
+      background: 'rgba(0,28,56,0.74)',
+      color: tone,
+      fontSize: 6,
+      letterSpacing: 1.6,
+      lineHeight: 1.1,
+      textShadow: `0 0 6px ${tone}55`,
+      whiteSpace: 'nowrap',
+    }}>{text}</div>
+  )
+
+  const MiniMeter = ({ bars = 7, phase = 0, color = '#00b8ff' }: { bars?: number; phase?: number; color?: string }) => (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 16 }}>
+      {Array.from({ length: bars }).map((_, i) => {
+        const value = (Math.sin((ledPhase + phase + i * 14) / 10) + 1) / 2
+        const h = 4 + Math.round(value * 10)
+        return (
+          <div key={i} style={{
+            width: 4,
+            height: h,
+            borderRadius: 2,
+            background: `linear-gradient(180deg, ${color}, #004b8a)`,
+            opacity: 0.35 + value * 0.7,
+            boxShadow: `0 0 6px ${color}66`,
+            transition: 'height 0.08s linear, opacity 0.08s linear',
+          }} />
+        )
+      })}
+    </div>
   )
 
   return (
@@ -382,8 +417,8 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 160,
           background: `
-            linear-gradient(180deg, rgba(38,15,7,0.98) 0%, rgba(25,10,5,0.95) 60%, rgba(7,3,1,0.0) 100%),
-            repeating-linear-gradient(90deg, rgba(127,72,37,0.2) 0px, rgba(127,72,37,0.2) 16px, rgba(74,38,18,0.22) 16px, rgba(74,38,18,0.22) 32px)
+            linear-gradient(180deg, rgba(0,25,55,0.98) 0%, rgba(0,17,39,0.95) 60%, rgba(3,8,20,0.0) 100%),
+            repeating-linear-gradient(90deg, rgba(22,87,144,0.2) 0px, rgba(22,87,144,0.2) 16px, rgba(11,54,92,0.24) 16px, rgba(11,54,92,0.24) 32px)
           `,
           borderBottom: `2px solid ${BASE_BLUE}`,
           boxShadow: `0 8px 0 ${BASE_BLUE_DARK}, 0 14px 28px rgba(0,0,0,0.52)`,
@@ -396,18 +431,28 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           {/* Scrolling background text */}
           <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', opacity: 0.055 }}>
             <div style={{
-              whiteSpace: 'nowrap', fontSize: 11, letterSpacing: 4, color: '#ffcd7a',
+              whiteSpace: 'nowrap', fontSize: 11, letterSpacing: 4, color: '#8fe8ff',
               transform: `translateX(${-marqueePos}px)`, willChange: 'transform',
             }}>
               {'★ THE ARCADERS ★ INSERT COIN ★ HIGH SCORE ★ PLAY NOW ★ 1UP ★ YALLA ★ KOMAAN ★ '.repeat(6)}
             </div>
           </div>
 
+          {/* Service chips + tiny audio meter */}
+          <div style={{ position: 'absolute', left: 18, top: 14, display: 'flex', gap: 6 }}>
+            <LabelChip text="CRT SAFE" />
+            <LabelChip text={`MODE ${status === 'running' ? 'PLAY' : 'BOOT'}`} tone={status === 'running' ? '#9bffc9' : '#8fe8ff'} />
+          </div>
+          <div style={{ position: 'absolute', right: 18, top: 12, display: 'grid', gap: 4, justifyItems: 'end' }}>
+            <LabelChip text="AUDIO BUS" />
+            <MiniMeter bars={8} phase={20} />
+          </div>
+
           {/* Left info */}
           <div style={{ position: 'absolute', left: 20, bottom: 18, display: 'grid', gap: 5 }}>
-            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(255,206,149,0.55)' }}>NOW PLAYING</div>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(255,242,214,0.95)', textShadow: `0 0 8px rgba(255,190,120,0.45)` }}>{title}</div>
-            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(232,183,120,0.6)' }}>{genre} · {year}</div>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.55)' }}>NOW PLAYING</div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(226,249,255,0.95)', textShadow: `0 0 8px rgba(114,203,255,0.45)` }}>{title}</div>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.6)' }}>{genre} · {year}</div>
           </div>
 
           {/* ═══ LOGO — centered above the gameplay viewport ═══ */}
@@ -423,7 +468,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             {/* Glow halo */}
             <div style={{
               position: 'absolute', inset: '-18px -110px',
-              background: 'radial-gradient(ellipse at center, rgba(248,166,82,0.28) 0%, transparent 60%)',
+              background: 'radial-gradient(ellipse at center, rgba(100,203,255,0.35) 0%, transparent 60%)',
               filter: 'blur(24px)', opacity: neonOpacity,
             }} />
             <img
@@ -438,8 +483,8 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
                 margin: '0 auto',
                 opacity: marqueeFlicker ? 0.55 : 1,
                 filter: [
-                  'drop-shadow(0 0 24px rgba(247,182,94,0.95))',
-                  'drop-shadow(0 0 46px rgba(215,102,38,0.5))',
+                  'drop-shadow(0 0 24px rgba(97,200,255,0.9))',
+                  'drop-shadow(0 0 46px rgba(0,112,209,0.5))',
                   'drop-shadow(0 4px 2px rgba(0,0,0,0.95))',
                 ].join(' '),
                 transition: 'opacity 0.07s',
@@ -447,26 +492,48 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             />
             <div style={{
               fontSize: 7, letterSpacing: 4, marginTop: 1,
-              color: `rgba(255,196,122,${neonOpacity * 0.95})`,
-              textShadow: '0 0 9px rgba(255,171,84,0.75)',
+              color: `rgba(143,232,255,${neonOpacity * 0.95})`,
+              textShadow: '0 0 9px rgba(97,200,255,0.75)',
               transition: 'color 0.07s',
             }}>◆ ARCADE SYSTEM ◆ EST. 1992 ◆</div>
           </div>
 
           {/* Right info */}
           <div style={{ position: 'absolute', right: 20, bottom: 18, display: 'grid', gap: 5, textAlign: 'right' }}>
-            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(255,206,149,0.55)' }}>CABINET</div>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.55)' }}>CABINET</div>
             <div style={{ fontSize: 10, letterSpacing: 2, color: accent, textShadow: accentGlow }}>{players} · DIFF {difficulty}</div>
-            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(232,183,120,0.6)' }}>STEREO · 60HZ</div>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.6)' }}>STEREO · 60HZ</div>
           </div>
+
+          <button
+            type="button"
+            onClick={exit}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); exit() }}
+            style={{
+              position: 'absolute',
+              right: 18,
+              bottom: 52,
+              pointerEvents: 'auto',
+              background: 'linear-gradient(180deg, rgba(0,128,255,0.88), rgba(0,82,180,0.92))',
+              color: '#e8f7ff',
+              border: '1px solid rgba(143,232,255,0.88)',
+              padding: '4px 10px',
+              borderRadius: 4,
+              fontSize: 8,
+              letterSpacing: 1.8,
+              cursor: 'pointer',
+              boxShadow: '0 0 10px rgba(0,160,255,0.35)',
+              fontFamily: 'inherit',
+            }}
+          >EXIT</button>
 
           {/* Corner bolts */}
           {[{top:7,left:7},{top:7,right:7}].map((s,i) => (
             <div key={i} style={{
               position: 'absolute', ...s,
               width: 10, height: 10, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #d5b17a, #6f4317)',
-              border: '1.5px solid #3d200a',
+              background: 'radial-gradient(circle at 35% 35%, #c8eeff, #005da7)',
+              border: '1.5px solid #0c3f67',
             }} />
           ))}
 
@@ -477,8 +544,8 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         {/* ── LEFT SIDE PANEL ───────────────────────────────────────── */}
         <div style={{
           position: 'absolute', top: 154, bottom: 132, left: 0, width: 68,
-          background: 'linear-gradient(90deg, rgba(38,16,8,0.96) 0%, rgba(24,10,5,0.86) 65%, rgba(2,1,1,0.0) 100%)',
-          borderRight: '1px solid rgba(195,138,46,0.32)',
+          background: 'linear-gradient(90deg, rgba(0,36,74,0.96) 0%, rgba(0,19,44,0.88) 65%, rgba(1,6,16,0.0) 100%)',
+          borderRight: '1px solid rgba(0,136,255,0.32)',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'space-between',
           padding: '16px 0',
@@ -487,8 +554,8 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           <div style={{
             position: 'absolute', inset: 0,
             backgroundImage: `
-              repeating-linear-gradient(0deg, rgba(255,201,130,0.07) 0px, rgba(255,201,130,0.07) 1px, transparent 1px, transparent 7px),
-              repeating-linear-gradient(90deg, rgba(82,41,18,0.22) 0px, rgba(82,41,18,0.22) 5px, rgba(44,20,9,0.17) 5px, rgba(44,20,9,0.17) 10px)
+              repeating-linear-gradient(0deg, rgba(130,220,255,0.08) 0px, rgba(130,220,255,0.08) 1px, transparent 1px, transparent 7px),
+              repeating-linear-gradient(90deg, rgba(16,74,128,0.24) 0px, rgba(16,74,128,0.24) 5px, rgba(8,37,70,0.18) 5px, rgba(8,37,70,0.18) 10px)
             `,
             opacity: 0.55,
             pointerEvents: 'none',
@@ -497,62 +564,85 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             <div key={i} style={{
               position: 'absolute', left: 4, top,
               width: 6, height: 6, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #f2c789, #6f4317)',
-              border: '1px solid rgba(50,25,9,0.9)',
+              background: 'radial-gradient(circle at 35% 35%, #c8eeff, #005da7)',
+              border: '1px solid rgba(10,43,71,0.9)',
               boxShadow: '0 0 3px rgba(0,0,0,0.5)',
             }} />
           ))}
           {/* Vertical neon stripe */}
           <div style={{
             position: 'absolute', top: 0, bottom: 0, left: 9, width: 2,
-            background: 'linear-gradient(180deg, transparent, rgba(255,185,102,0.7), rgba(197,99,36,0.72), transparent)',
+            background: 'linear-gradient(180deg, transparent, rgba(0,198,255,0.74), rgba(0,104,214,0.74), transparent)',
             opacity: 0.55,
           }} />
           <div style={{
             position: 'absolute', top: 108, left: 16, right: 12,
-            border: '1px solid rgba(198,142,69,0.7)',
-            background: 'rgba(35,14,7,0.82)',
+            border: '1px solid rgba(114,203,255,0.7)',
+            background: 'rgba(0,28,56,0.82)',
             boxShadow: 'inset 0 0 6px rgba(0,0,0,0.5)',
             borderRadius: 3,
             padding: '4px 3px 3px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(255,206,147,0.74)' }}>CRED</div>
+            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(168,229,255,0.8)' }}>CRED</div>
             <div style={{
               marginTop: 1,
               fontSize: 8,
               fontWeight: 700,
               letterSpacing: 1.5,
-              color: coinBlink ? '#ffd166' : 'rgba(255,209,102,0.5)',
-              textShadow: coinBlink ? '0 0 6px rgba(255,209,102,0.75)' : 'none',
+              color: coinBlink ? '#8fe8ff' : 'rgba(143,232,255,0.45)',
+              textShadow: coinBlink ? '0 0 6px rgba(143,232,255,0.8)' : 'none',
             }}>{coinBlink ? '01' : '00'}</div>
           </div>
           <div style={{
             position: 'absolute', bottom: 154, left: 16, right: 12,
-            border: '1px solid rgba(198,142,69,0.55)',
-            background: 'rgba(29,12,6,0.75)',
+            border: '1px solid rgba(114,203,255,0.55)',
+            background: 'rgba(0,25,49,0.75)',
             borderRadius: 3,
             padding: '2px 0',
             textAlign: 'center',
             fontSize: 5,
             letterSpacing: 1.5,
-            color: 'rgba(255,196,127,0.74)',
+            color: 'rgba(168,229,255,0.78)',
           }}>PLAYER 1</div>
+          <div style={{
+            position: 'absolute', bottom: 214, left: 12, right: 10,
+            border: '1px solid rgba(114,203,255,0.52)',
+            background: 'rgba(0,22,44,0.78)',
+            borderRadius: 3,
+            padding: '3px 4px',
+            display: 'grid',
+            gap: 3,
+          }}>
+            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(168,229,255,0.74)', textAlign: 'center' }}>POWER BUS</div>
+            <MiniMeter bars={6} phase={96} />
+          </div>
+          <div style={{
+            position: 'absolute', bottom: 136, left: 12, right: 10,
+            border: '1px solid rgba(94,191,255,0.5)',
+            borderRadius: 3,
+            background: 'repeating-linear-gradient(90deg, rgba(8,34,68,0.88) 0 6px, rgba(0,136,255,0.55) 6px 12px)',
+            fontSize: 5,
+            letterSpacing: 1.4,
+            textAlign: 'center',
+            color: '#d7f4ff',
+            padding: '2px 0',
+          }}>HV LOCK</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
             {[0,60,120,180,240,300].map(o => <LedDot key={o} offset={o} />)}
           </div>
           {/* Speaker grille */}
           <div style={{ width: 46, display: 'flex', flexDirection: 'column', gap: 5, opacity: 0.38 }}>
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} style={{ height: 3, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(220,145,72,0.62), transparent)' }} />
+              <div key={i} style={{ height: 3, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(114,203,255,0.65), transparent)' }} />
             ))}
-            <div style={{ marginTop: 4, fontSize: 6, letterSpacing: 1, color: 'rgba(232,183,120,0.56)', textAlign: 'center', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>STEREO L</div>
+            <div style={{ marginTop: 4, fontSize: 6, letterSpacing: 1, color: 'rgba(168,229,255,0.62)', textAlign: 'center', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>STEREO L</div>
           </div>
           {/* 1UP */}
           <div style={{
             fontSize: 8, letterSpacing: 2,
-            color: coinBlink ? '#ffd166' : 'rgba(255,209,102,0.24)',
-            textShadow: coinBlink ? '0 0 8px #ffd166' : 'none',
+            color: coinBlink ? '#8fe8ff' : 'rgba(143,232,255,0.26)',
+            textShadow: coinBlink ? '0 0 8px #8fe8ff' : 'none',
             transition: 'all 0.15s', writingMode: 'vertical-rl', transform: 'rotate(180deg)',
           }}>1UP</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
@@ -563,8 +653,8 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         {/* ── RIGHT SIDE PANEL ──────────────────────────────────────── */}
         <div style={{
           position: 'absolute', top: 154, bottom: 132, right: 0, width: 68,
-          background: 'linear-gradient(270deg, rgba(38,16,8,0.96) 0%, rgba(24,10,5,0.86) 65%, rgba(2,1,1,0.0) 100%)',
-          borderLeft: '1px solid rgba(195,138,46,0.32)',
+          background: 'linear-gradient(270deg, rgba(0,36,74,0.96) 0%, rgba(0,19,44,0.88) 65%, rgba(1,6,16,0.0) 100%)',
+          borderLeft: '1px solid rgba(0,136,255,0.32)',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'space-between',
           padding: '16px 0',
@@ -573,8 +663,8 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           <div style={{
             position: 'absolute', inset: 0,
             backgroundImage: `
-              repeating-linear-gradient(0deg, rgba(255,201,130,0.07) 0px, rgba(255,201,130,0.07) 1px, transparent 1px, transparent 7px),
-              repeating-linear-gradient(90deg, rgba(82,41,18,0.22) 0px, rgba(82,41,18,0.22) 5px, rgba(44,20,9,0.17) 5px, rgba(44,20,9,0.17) 10px)
+              repeating-linear-gradient(0deg, rgba(130,220,255,0.08) 0px, rgba(130,220,255,0.08) 1px, transparent 1px, transparent 7px),
+              repeating-linear-gradient(90deg, rgba(16,74,128,0.24) 0px, rgba(16,74,128,0.24) 5px, rgba(8,37,70,0.18) 5px, rgba(8,37,70,0.18) 10px)
             `,
             opacity: 0.55,
             pointerEvents: 'none',
@@ -583,59 +673,82 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             <div key={i} style={{
               position: 'absolute', right: 4, top,
               width: 6, height: 6, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #f2c789, #6f4317)',
-              border: '1px solid rgba(50,25,9,0.9)',
+              background: 'radial-gradient(circle at 35% 35%, #c8eeff, #005da7)',
+              border: '1px solid rgba(10,43,71,0.9)',
               boxShadow: '0 0 3px rgba(0,0,0,0.5)',
             }} />
           ))}
           <div style={{
             position: 'absolute', top: 0, bottom: 0, right: 9, width: 2,
-            background: 'linear-gradient(180deg, transparent, rgba(255,185,102,0.7), rgba(197,99,36,0.72), transparent)',
+            background: 'linear-gradient(180deg, transparent, rgba(0,198,255,0.74), rgba(0,104,214,0.74), transparent)',
             opacity: 0.55,
           }} />
           <div style={{
             position: 'absolute', top: 108, left: 12, right: 16,
-            border: '1px solid rgba(198,142,69,0.7)',
-            background: 'rgba(35,14,7,0.82)',
+            border: '1px solid rgba(114,203,255,0.7)',
+            background: 'rgba(0,28,56,0.82)',
             boxShadow: 'inset 0 0 6px rgba(0,0,0,0.5)',
             borderRadius: 3,
             padding: '4px 3px 3px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(255,206,147,0.74)' }}>TEMP</div>
+            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(168,229,255,0.8)' }}>TEMP</div>
             <div style={{
               marginTop: 1,
               fontSize: 8,
               fontWeight: 700,
               letterSpacing: 1.4,
-              color: !coinBlink ? '#ff7f50' : 'rgba(255,127,80,0.5)',
-              textShadow: !coinBlink ? '0 0 6px rgba(255,127,80,0.7)' : 'none',
+              color: !coinBlink ? '#8fe8ff' : 'rgba(143,232,255,0.45)',
+              textShadow: !coinBlink ? '0 0 6px rgba(143,232,255,0.8)' : 'none',
             }}>{!coinBlink ? 'HI' : 'OK'}</div>
           </div>
           <div style={{
             position: 'absolute', bottom: 154, left: 12, right: 16,
-            border: '1px solid rgba(198,142,69,0.55)',
-            background: 'rgba(29,12,6,0.75)',
+            border: '1px solid rgba(114,203,255,0.55)',
+            background: 'rgba(0,25,49,0.75)',
             borderRadius: 3,
             padding: '2px 0',
             textAlign: 'center',
             fontSize: 5,
             letterSpacing: 1.2,
-            color: 'rgba(255,196,127,0.74)',
+            color: 'rgba(168,229,255,0.78)',
           }}>INSERT COIN</div>
+          <div style={{
+            position: 'absolute', bottom: 214, left: 10, right: 12,
+            border: '1px solid rgba(114,203,255,0.52)',
+            background: 'rgba(0,22,44,0.78)',
+            borderRadius: 3,
+            padding: '3px 4px',
+            display: 'grid',
+            gap: 3,
+          }}>
+            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(168,229,255,0.74)', textAlign: 'center' }}>NET LINK</div>
+            <MiniMeter bars={6} phase={134} color="#34b6ff" />
+          </div>
+          <div style={{
+            position: 'absolute', bottom: 136, left: 10, right: 12,
+            border: '1px solid rgba(94,191,255,0.5)',
+            borderRadius: 3,
+            background: 'repeating-linear-gradient(90deg, rgba(8,34,68,0.88) 0 6px, rgba(0,136,255,0.55) 6px 12px)',
+            fontSize: 5,
+            letterSpacing: 1.4,
+            textAlign: 'center',
+            color: '#d7f4ff',
+            padding: '2px 0',
+          }}>SYNC OK</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
             {[300,240,180,120,60,0].map(o => <LedDot key={o} offset={o} />)}
           </div>
           <div style={{ width: 46, display: 'flex', flexDirection: 'column', gap: 5, opacity: 0.38 }}>
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} style={{ height: 3, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(220,145,72,0.62), transparent)' }} />
+              <div key={i} style={{ height: 3, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(114,203,255,0.65), transparent)' }} />
             ))}
-            <div style={{ marginTop: 4, fontSize: 6, letterSpacing: 1, color: 'rgba(232,183,120,0.56)', textAlign: 'center', writingMode: 'vertical-rl' }}>STEREO R</div>
+            <div style={{ marginTop: 4, fontSize: 6, letterSpacing: 1, color: 'rgba(168,229,255,0.62)', textAlign: 'center', writingMode: 'vertical-rl' }}>STEREO R</div>
           </div>
           <div style={{
             fontSize: 8, letterSpacing: 2,
-            color: !coinBlink ? '#ff4444' : 'rgba(255,68,68,0.2)',
-            textShadow: !coinBlink ? '0 0 8px #ff4444' : 'none',
+            color: !coinBlink ? '#8fe8ff' : 'rgba(143,232,255,0.2)',
+            textShadow: !coinBlink ? '0 0 8px #8fe8ff' : 'none',
             transition: 'all 0.15s', writingMode: 'vertical-rl',
           }}>2UP</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
@@ -654,23 +767,68 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           border: `2px solid ${BASE_BLUE}`,
           borderRadius: 6,
           boxShadow: borderBlink
-            ? `0 0 0 1px rgba(111,67,23,0.85), 0 0 20px rgba(255,173,84,0.52), inset 0 0 24px rgba(111,67,23,0.25)`
-            : `0 0 0 1px rgba(111,67,23,0.7), 0 0 13px rgba(255,173,84,0.36), inset 0 0 16px rgba(111,67,23,0.18)`,
+            ? `0 0 0 1px rgba(0,58,122,0.9), 0 0 22px rgba(0,170,255,0.6), inset 0 0 24px rgba(0,58,122,0.35)`
+            : `0 0 0 1px rgba(0,58,122,0.72), 0 0 14px rgba(0,170,255,0.42), inset 0 0 16px rgba(0,58,122,0.22)`,
           pointerEvents: 'none',
           transition: 'box-shadow 0.14s',
         }} />
 
+        {/* Frame brackets + edge markers */}
+        {[
+          { top: GAME_SCREEN_INSET.top - 6, left: GAME_SCREEN_INSET.left - 6, borderTop: true, borderLeft: true },
+          { top: GAME_SCREEN_INSET.top - 6, right: GAME_SCREEN_INSET.right - 6, borderTop: true, borderRight: true },
+          { bottom: GAME_SCREEN_INSET.bottom - 6, left: GAME_SCREEN_INSET.left - 6, borderBottom: true, borderLeft: true },
+          { bottom: GAME_SCREEN_INSET.bottom - 6, right: GAME_SCREEN_INSET.right - 6, borderBottom: true, borderRight: true },
+        ].map((corner, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            width: 22,
+            height: 22,
+            ...corner,
+            borderTop: corner.borderTop ? '2px solid rgba(120,224,255,0.9)' : 'none',
+            borderBottom: corner.borderBottom ? '2px solid rgba(120,224,255,0.9)' : 'none',
+            borderLeft: corner.borderLeft ? '2px solid rgba(120,224,255,0.9)' : 'none',
+            borderRight: corner.borderRight ? '2px solid rgba(120,224,255,0.9)' : 'none',
+            boxShadow: '0 0 7px rgba(0,170,255,0.35)',
+            pointerEvents: 'none',
+          }} />
+        ))}
+        <div style={{
+          position: 'absolute', top: GAME_SCREEN_INSET.top - 18, left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 7, letterSpacing: 2.2,
+          color: 'rgba(154,235,255,0.86)',
+          textShadow: '0 0 8px rgba(0,196,255,0.55)',
+          pointerEvents: 'none',
+        }}>SYNC LOCK</div>
+        <div style={{
+          position: 'absolute', top: '50%', left: GAME_SCREEN_INSET.left - 23,
+          transform: 'translateY(-50%)',
+          fontSize: 11, letterSpacing: 1,
+          color: 'rgba(154,235,255,0.78)',
+          textShadow: '0 0 8px rgba(0,196,255,0.55)',
+          pointerEvents: 'none',
+        }}>▶▶</div>
+        <div style={{
+          position: 'absolute', top: '50%', right: GAME_SCREEN_INSET.right - 23,
+          transform: 'translateY(-50%)',
+          fontSize: 11, letterSpacing: 1,
+          color: 'rgba(154,235,255,0.78)',
+          textShadow: '0 0 8px rgba(0,196,255,0.55)',
+          pointerEvents: 'none',
+        }}>◀◀</div>
+
         {/* Neon side tubes */}
         <div style={{
           position: 'absolute', left: 56, top: 160, bottom: 140, width: 5,
-          background: 'linear-gradient(180deg, transparent 0%, rgba(255,197,118,0.78) 24%, rgba(195,90,31,0.72) 56%, transparent 100%)',
-          boxShadow: '0 0 10px rgba(255,173,84,0.45), 0 0 22px rgba(191,87,20,0.28)', opacity: 0.48, borderRadius: 999,
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,208,255,0.82) 24%, rgba(0,112,224,0.74) 56%, transparent 100%)',
+          boxShadow: '0 0 10px rgba(0,184,255,0.48), 0 0 22px rgba(0,96,214,0.3)', opacity: 0.52, borderRadius: 999,
           animation: 'neon-breathe 2.6s ease-in-out infinite',
         }} />
         <div style={{
           position: 'absolute', right: 56, top: 160, bottom: 140, width: 5,
-          background: 'linear-gradient(180deg, transparent 0%, rgba(255,197,118,0.78) 24%, rgba(195,90,31,0.72) 56%, transparent 100%)',
-          boxShadow: '0 0 10px rgba(255,173,84,0.45), 0 0 22px rgba(191,87,20,0.28)', opacity: 0.48, borderRadius: 999,
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,208,255,0.82) 24%, rgba(0,112,224,0.74) 56%, transparent 100%)',
+          boxShadow: '0 0 10px rgba(0,184,255,0.48), 0 0 22px rgba(0,96,214,0.3)', opacity: 0.52, borderRadius: 999,
           animation: 'neon-breathe 2.6s ease-in-out infinite',
         }} />
 
@@ -678,8 +836,8 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0, height: 132,
           background: `
-            linear-gradient(0deg, rgba(26,9,4,0.98) 0%, rgba(40,16,8,0.96) 56%, rgba(7,3,1,0.0) 100%),
-            repeating-linear-gradient(90deg, rgba(120,70,36,0.24) 0px, rgba(120,70,36,0.24) 18px, rgba(76,38,18,0.25) 18px, rgba(76,38,18,0.25) 36px)
+            linear-gradient(0deg, rgba(0,14,30,0.98) 0%, rgba(0,29,58,0.96) 56%, rgba(3,9,20,0.0) 100%),
+            repeating-linear-gradient(90deg, rgba(0,110,190,0.24) 0px, rgba(0,110,190,0.24) 18px, rgba(0,64,116,0.26) 18px, rgba(0,64,116,0.26) 36px)
           `,
           borderTop: `2px solid ${BASE_BLUE}`,
           boxShadow: '0 -10px 25px rgba(0,0,0,0.55)',
@@ -713,42 +871,50 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
             {/* Score */}
             <div style={{
-              background: 'rgba(23,9,4,0.88)', border: '1.5px solid #7a4a1f',
+              background: 'rgba(0,20,43,0.9)', border: '1.5px solid rgba(114,203,255,0.72)',
               borderRadius: 5, padding: '5px 16px', textAlign: 'center',
-              boxShadow: 'inset 0 0 12px rgba(100,56,22,0.52)', minWidth: 150,
+              boxShadow: 'inset 0 0 12px rgba(0,104,194,0.5)', minWidth: 150,
             }}>
-              <div style={{ fontSize: 7, letterSpacing: 3, color: 'rgba(255,186,114,0.58)', marginBottom: 2 }}>HIGH SCORE</div>
+              <div style={{ fontSize: 7, letterSpacing: 3, color: 'rgba(168,229,255,0.72)', marginBottom: 2 }}>HIGH SCORE</div>
               <div style={{
-                fontSize: 17, fontWeight: 900, letterSpacing: 4, color: '#ffd166',
-                textShadow: '0 0 14px rgba(255,209,102,0.82), 0 0 26px rgba(214,93,44,0.34)',
+                fontSize: 17, fontWeight: 900, letterSpacing: 4, color: '#8fe8ff',
+                textShadow: '0 0 14px rgba(143,232,255,0.82), 0 0 26px rgba(0,121,199,0.38)',
               }}>000000</div>
+            </div>
+            <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+              <LabelChip text="CAB LINK" tone="#9cdfff" />
+              <MiniMeter bars={9} phase={160} color="#42beff" />
             </div>
             {/* Coin insert */}
             <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
               <div style={{
                 width: 24, height: 24, borderRadius: '50%',
-                background: 'radial-gradient(circle at 35% 35%, #c8a020, #5a4008)',
-                border: '1.5px solid #7a5010', boxShadow: '0 0 7px rgba(200,160,32,0.5)',
+                background: 'radial-gradient(circle at 35% 35%, #9ed9ff, #005c9f)',
+                border: '1.5px solid #2b75b8', boxShadow: '0 0 7px rgba(0,169,255,0.5)',
               }} />
               <div style={{
                 fontSize: 8, letterSpacing: 3,
-                color: coinBlink ? '#ffdd00' : 'rgba(255,220,0,0.18)',
-                textShadow: coinBlink ? '0 0 9px rgba(255,220,0,0.95)' : 'none',
+                color: coinBlink ? '#9be9ff' : 'rgba(155,233,255,0.18)',
+                textShadow: coinBlink ? '0 0 9px rgba(155,233,255,0.95)' : 'none',
                 transition: 'all 0.15s',
               }}>INSERT COIN</div>
               <div style={{
                 width: 24, height: 24, borderRadius: '50%',
-                background: 'radial-gradient(circle at 35% 35%, #c8a020, #5a4008)',
-                border: '1.5px solid #7a5010', boxShadow: '0 0 7px rgba(200,160,32,0.5)',
+                background: 'radial-gradient(circle at 35% 35%, #9ed9ff, #005c9f)',
+                border: '1.5px solid #2b75b8', boxShadow: '0 0 7px rgba(0,169,255,0.5)',
               }} />
             </div>
             {/* Exit */}
-            <button type="button" onClick={exit} style={{
-              background: 'rgba(106,24,13,0.9)', color: '#fff',
-              border: '1px solid rgba(255,181,111,0.75)',
+            <button
+              type="button"
+              onClick={exit}
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); exit() }}
+              style={{
+              background: 'linear-gradient(180deg, rgba(0,128,255,0.88), rgba(0,82,180,0.92))', color: '#e8f7ff',
+              border: '1px solid rgba(143,232,255,0.9)',
               padding: '4px 13px', cursor: 'pointer',
               fontSize: 9, letterSpacing: 2, borderRadius: 4,
-              boxShadow: '0 0 10px rgba(242,141,76,0.28)',
+              boxShadow: '0 0 10px rgba(0,160,255,0.35)',
               fontFamily: 'inherit',
             }}>■ EXIT</button>
           </div>
@@ -775,7 +941,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         {glitchLine >= 0 && (
           <div style={{
             position: 'absolute', top: `${glitchLine * 5}%`, left: 0, right: 0, height: 2,
-            background: 'rgba(255,176,96,0.75)', mixBlendMode: 'screen',
+            background: 'rgba(0,204,255,0.8)', mixBlendMode: 'screen',
             pointerEvents: 'none', zIndex: 21,
           }} />
         )}
@@ -789,15 +955,15 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           }}>
             <div style={{
               padding: '5px 9px', borderRadius: 8,
-              border: '1px solid rgba(255,197,118,0.66)', color: '#fff1d3',
-              fontSize: 9, letterSpacing: 2, background: 'rgba(28,12,5,0.68)',
-              textShadow: '0 0 8px rgba(255,197,118,0.55)',
+              border: '1px solid rgba(114,203,255,0.68)', color: '#e2f9ff',
+              fontSize: 9, letterSpacing: 2, background: 'rgba(0,23,46,0.68)',
+              textShadow: '0 0 8px rgba(114,203,255,0.55)',
             }}>P1 READY</div>
             <div style={{
               padding: '5px 9px', borderRadius: 8,
-              border: '1px solid rgba(255,205,143,0.3)',
-              color: 'rgba(255,226,180,0.78)', fontSize: 9, letterSpacing: 2,
-              background: 'rgba(24,10,4,0.52)',
+              border: '1px solid rgba(114,203,255,0.35)',
+              color: 'rgba(168,229,255,0.84)', fontSize: 9, letterSpacing: 2,
+              background: 'rgba(0,17,36,0.52)',
             }}>{players}</div>
           </div>
         )}

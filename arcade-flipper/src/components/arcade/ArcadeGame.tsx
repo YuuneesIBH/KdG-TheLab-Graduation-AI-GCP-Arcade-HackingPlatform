@@ -388,7 +388,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           borderBottom: `2px solid ${BASE_BLUE}`,
           boxShadow: `0 8px 0 ${BASE_BLUE_DARK}, 0 14px 28px rgba(0,0,0,0.52)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'visible',
+          overflow: 'hidden',
           pointerEvents: 'auto',
         }}>
           <RgbStrip top />
@@ -413,7 +413,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           {/* ═══ LOGO — centered above the gameplay viewport ═══ */}
           <div style={{
             position: 'absolute',
-            top: 0,
+            top: 2,
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 50,
@@ -422,39 +422,31 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           }}>
             {/* Glow halo */}
             <div style={{
-              position: 'absolute', inset: '-30px -150px',
+              position: 'absolute', inset: '-18px -110px',
               background: 'radial-gradient(ellipse at center, rgba(248,166,82,0.28) 0%, transparent 60%)',
               filter: 'blur(24px)', opacity: neonOpacity,
             }} />
+            <img
+              src="../assets/thearcaders_logo_cropped.png"
+              alt="The Arcaders"
+              style={{
+                position: 'relative',
+                width: 'clamp(210px, 17vw, 270px)',
+                height: 'auto',
+                imageRendering: 'pixelated',
+                display: 'block',
+                margin: '0 auto',
+                opacity: marqueeFlicker ? 0.55 : 1,
+                filter: [
+                  'drop-shadow(0 0 24px rgba(247,182,94,0.95))',
+                  'drop-shadow(0 0 46px rgba(215,102,38,0.5))',
+                  'drop-shadow(0 4px 2px rgba(0,0,0,0.95))',
+                ].join(' '),
+                transition: 'opacity 0.07s',
+              }}
+            />
             <div style={{
-              width: 'min(740px, 55vw)',
-              height: 320,
-              overflow: 'hidden',
-              margin: '0 auto',
-            }}>
-              <img
-                src="../assets/thearcaders_logo.png"
-                alt="The Arcaders"
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center 44%',
-                  imageRendering: 'pixelated',
-                  display: 'block',
-                  opacity: marqueeFlicker ? 0.55 : 1,
-                  filter: [
-                    'drop-shadow(0 0 24px rgba(247,182,94,0.95))',
-                    'drop-shadow(0 0 46px rgba(215,102,38,0.5))',
-                    'drop-shadow(0 4px 2px rgba(0,0,0,0.95))',
-                  ].join(' '),
-                  transition: 'opacity 0.07s',
-                }}
-              />
-            </div>
-            <div style={{
-              fontSize: 8, letterSpacing: 5, marginTop: 3,
+              fontSize: 7, letterSpacing: 4, marginTop: 1,
               color: `rgba(255,196,122,${neonOpacity * 0.95})`,
               textShadow: '0 0 9px rgba(255,171,84,0.75)',
               transition: 'color 0.07s',

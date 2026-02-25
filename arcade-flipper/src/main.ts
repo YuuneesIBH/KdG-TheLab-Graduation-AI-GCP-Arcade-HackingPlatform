@@ -297,6 +297,30 @@ function attachDiyFlipperPortListeners(port: SerialPort) {
   })
 }
 
+async function probeDiyFlipperHandshake(port: SerialPort, timeoutMs = 1600) {
+  return new Promise<boolean>((resolve) => {
+    let buffer = ''
+
+    const finish = (ok: boolean) => {
+      clearTimeout(timer)
+      port.off('data', onData)
+      resolve(ok)
+    }
+
+    const onData = (chunk: Buffer) => {
+      buffer += chunk.toString('utf8')
+      if (buffer.includes('DIYFLIPPER_READY') || buffer.includes('PONG')) {
+        finish(true)
+      }
+    }
+
+    const timer = setTimeout(() => finish(false), timeoutMs)
+    port.on('data', onData)
+    port.write('HELLO\n')
+    port.write('PING\n')
+  })
+}
+
 async function openDiyFlipperPort(portPath: string) {
   const port = new SerialPort({
     path: portPath,
@@ -314,6 +338,21 @@ async function openDiyFlipperPort(portPath: string) {
   diyFlipperPort = port
   diyFlipperLineBuffer = ''
   attachDiyFlipperPortListeners(port)
+
+  const handshakeOk = await probeDiyFlipperHandshake(port)
+  if (!handshakeOk) {
+    await new Promise<void>((resolve) => {
+      if (!port.isOpen) {
+        resolve()
+        return
+      }
+      port.close(() => resolve())
+    })
+    diyFlipperPort = null
+    diyFlipperLineBuffer = ''
+    throw new Error('No DIYFLIPPER handshake (HELLO/PING timeout)')
+  }
+
   setDiyFlipperStatus({
     connected: true,
     connecting: false,
@@ -321,9 +360,6 @@ async function openDiyFlipperPort(portPath: string) {
     error: undefined,
     lastSeenAt: Date.now()
   })
-
-  port.write('HELLO\n')
-  port.write('PING\n')
 }
 
 async function connectDiyFlipper(preferredPath?: string) {
@@ -430,6 +466,9 @@ async function writeDiyFlipperCommand(command: string) {
         return
       }
       setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('diyflipper-line', `TX ${command.trim()}`)
+      }
       resolve({ success: true, message: `Command sent: ${command}` })
     })
   })

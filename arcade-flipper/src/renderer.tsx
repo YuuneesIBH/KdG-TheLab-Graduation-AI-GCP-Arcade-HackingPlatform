@@ -194,10 +194,12 @@ function App() {
 
     const result = await window.electron.diyFlipperRunModule(key)
     if (!result.success) {
+      setToolStatus(`Module failed (${key}): ${result.message}`)
       console.warn('[DIYFLIPPER] Module launch failed:', result.message)
       return
     }
 
+    setToolStatus(`Module sent (${key})`)
     console.log('[DIYFLIPPER] Module command sent:', key)
   }, [])
 

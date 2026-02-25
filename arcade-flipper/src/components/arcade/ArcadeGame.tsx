@@ -410,10 +410,10 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(232,183,120,0.6)' }}>{genre} · {year}</div>
           </div>
 
-          {/* ═══ LOGO — big, centered, floats over game ═══ */}
+          {/* ═══ LOGO — centered above the gameplay viewport ═══ */}
           <div style={{
             position: 'absolute',
-            top: -290,          // pull it UP so it bleeds above the bar
+            top: 0,
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 50,
@@ -422,28 +422,37 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           }}>
             {/* Glow halo */}
             <div style={{
-              position: 'absolute', inset: '-40px -120px',
+              position: 'absolute', inset: '-30px -150px',
               background: 'radial-gradient(ellipse at center, rgba(248,166,82,0.28) 0%, transparent 60%)',
               filter: 'blur(24px)', opacity: neonOpacity,
             }} />
-            <img
-              src="../assets/thearcaders_logo.png"
-              alt="The Arcaders"
-              style={{
-                position: 'relative',
-                width: 'min(680px, 52vw)',
-                height: 'auto',
-                imageRendering: 'pixelated',
-                display: 'block',
-                opacity: marqueeFlicker ? 0.55 : 1,
-                filter: [
-                  'drop-shadow(0 0 24px rgba(247,182,94,0.95))',
-                  'drop-shadow(0 0 46px rgba(215,102,38,0.5))',
-                  'drop-shadow(0 4px 2px rgba(0,0,0,0.95))',
-                ].join(' '),
-                transition: 'opacity 0.07s',
-              }}
-            />
+            <div style={{
+              width: 'min(740px, 55vw)',
+              height: 320,
+              overflow: 'hidden',
+              margin: '0 auto',
+            }}>
+              <img
+                src="../assets/thearcaders_logo.png"
+                alt="The Arcaders"
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center 44%',
+                  imageRendering: 'pixelated',
+                  display: 'block',
+                  opacity: marqueeFlicker ? 0.55 : 1,
+                  filter: [
+                    'drop-shadow(0 0 24px rgba(247,182,94,0.95))',
+                    'drop-shadow(0 0 46px rgba(215,102,38,0.5))',
+                    'drop-shadow(0 4px 2px rgba(0,0,0,0.95))',
+                  ].join(' '),
+                  transition: 'opacity 0.07s',
+                }}
+              />
+            </div>
             <div style={{
               fontSize: 8, letterSpacing: 5, marginTop: 3,
               color: `rgba(255,196,122,${neonOpacity * 0.95})`,

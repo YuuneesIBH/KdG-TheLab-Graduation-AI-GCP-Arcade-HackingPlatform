@@ -1,65 +1,62 @@
 # The Lab Graduation - Arcade and Hacking Platform
 
-Desktop launcher with a retro arcade UI, built with Electron + React.
-The app combines a fullscreen arcade flow with a separate hacker terminal flow.
+Desktop launcher met retro arcade UI, gebouwd met Electron + React.
+De app combineert een fullscreen arcade flow met een Flipper-achtige hacker terminal flow en DIY hardware-integratie via serial.
 
-## Overview
+## Overzicht
 
-This project includes:
-- A boot screen with arcade animations and transition into the game menu
-- A game menu with card selection and launch flow
-- A display screen that can launch games in embedded or external mode through Electron IPC
-- A hacker transition + terminal menu as a second experience
-- Local Python/Pygame games in the repository
+Dit project bevat:
+- Een boot screen met arcade animaties en overgang naar de game menu
+- Een game menu met selectie en launch flow
+- Een game display-laag die lokale games start via Electron IPC
+- Een hacker transition + terminal menu als tweede experience
+- Auto-detect en auto-connect van DIY Flipper hardware (ESP32/serial)
+- Lokale Python/Pygame games in de repository
 
 ## Tech Stack
 
-<div align="center">
-  <img alt="TypeScript" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" width="28" height="28" />
-  <img alt="JavaScript" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg" width="28" height="28" />
-  <img alt="React" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" width="28" height="28" />
-  <img alt="Electron" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/electron/electron-original.svg" width="28" height="28" />
-  <img alt="Node.js" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg" width="28" height="28" />
-  <img alt="Vite" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vitejs/vitejs-original.svg" width="28" height="28" />
-  <img alt="Python" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" width="28" height="28" />
-</div>
+- Electron (desktop shell + main process)
+- React (renderer UI)
+- TypeScript (main/renderer typed code)
+- electron-vite (dev/build pipeline)
+- Python + Pygame (lokale arcade games)
+- serialport (USB serial communicatie met DIY Flipper hardware)
 
-- Electron for desktop shell and process management
-- React for UI screens and state transitions
-- TypeScript for typed renderer/main code
-- electron-vite for dev/build pipeline
-- Python (Pygame) for bundled arcade games
+## Belangrijkste Features
 
-## Main Features
+- Fullscreen arcade launcher flow (boot -> menu -> game)
+- IPC bridge tussen renderer en main process
+- Launch support voor `.py` en `.exe`
+- Embedded launch mode met viewport data
+- Hacker terminal mode met keyboard en gamepad navigatie
+- Auto-reconnect naar DIY Flipper hardware om de paar seconden
+- Module dispatch vanuit hacker menu (`RUN NFC_CLONE`, `RUN IR_BLAST`, ...)
 
-- Fullscreen arcade launcher flow (boot -> menu -> launch -> game display)
-- IPC bridge between renderer and main process for safe game launching
-- Support for `.py` and `.exe` launch types
-- Embedded launch mode with viewport info for game windows
-- Hacker terminal mode with keyboard and gamepad navigation
-- Preconfigured local games in `arcade-flipper/src/games`
-
-## Project Structure
+## Projectstructuur
 
 ```text
 .
-├── electron.vite.config.ts
-├── package.json
-├── tsconfig.json
 ├── README.md
+├── package.json
+├── electron.vite.config.ts
+├── tsconfig.json
+├── docs/
+│   └── DIYFLIPPER_QUICKSTART.md
+├── firmware/
+│   └── esp32_diyflipper/
+│       └── esp32_diyflipper.ino
+├── scripts/
+│   └── run-electron-vite.js
 └── arcade-flipper/
     └── src/
         ├── main.ts
         ├── preload.ts
         ├── renderer.tsx
-        ├── index.html
-        ├── electron.d.ts
         ├── components/
         │   ├── arcade/
         │   │   ├── boot.tsx
-        │   │   ├── menu.tsx
-        │   │   ├── gamelaunch.tsx
-        │   │   └── gamedisplay.tsx
+        │   │   ├── GameMenu.tsx
+        │   │   └── ArcadeGame.tsx
         │   └── flipper/
         │       ├── HackTransition.tsx
         │       └── HackerMenu.tsx
@@ -67,32 +64,37 @@ This project includes:
         └── games/
 ```
 
-## Architecture Summary
+## Architectuur Samenvatting
 
 - `arcade-flipper/src/main.ts`
-  Manages the Electron window, fullscreen behavior, IPC handlers, and game launch (`spawn`).
+  Beheert Electron window/fullscreen, game launch/stop, IPC handlers, en DIY Flipper serial auto-connect.
 - `arcade-flipper/src/preload.ts`
-  Exposes the `window.electron` API (`setFullscreen`, `launchGame`, `onGameExit`).
+  Exposeert `window.electron` API (`launchGame`, `stopGame`, `diyFlipper*`, `onGameExit`, ...).
 - `arcade-flipper/src/renderer.tsx`
-  Top-level screen routing between boot, arcade menu, launch, display, and hacker menu.
-- `arcade-flipper/src/components/arcade/menu.tsx`
-  Contains the game catalog (hardcoded array with `id`, `title`, `image`, `executable`).
+  Router tussen boot, arcade menu, arcade game view en hacker menu.
+- `arcade-flipper/src/components/arcade/GameMenu.tsx`
+  Bevat de hardcoded game catalogus (id/title/image/executable/...).
+- `arcade-flipper/src/components/flipper/HackerMenu.tsx`
+  UI voor modules en hardware status (`HW::CONNECTING`, `HW::ONLINE`, `HW::OFFLINE`).
 
-## Requirements
+## Vereisten
 
 - Node.js 18+
 - npm 9+
 - Python 3.10+
-- `pygame` installed in your active Python environment
+- `pygame` in je actieve Python-omgeving
 
-## Installation
+Optioneel (voor hardware flow):
+- DIY Flipper device via USB serial (ESP32 bridge firmware)
+
+## Installatie
 
 ```bash
 npm install
 python3 -m pip install pygame
 ```
 
-Optional with virtualenv:
+Optioneel met virtualenv:
 
 ```bash
 python3 -m venv .venv
@@ -100,7 +102,7 @@ source .venv/bin/activate
 pip install pygame
 ```
 
-## Development and Build
+## Development en Build
 
 ```bash
 npm run dev
@@ -110,64 +112,72 @@ npm run preview
 
 ## Controls
 
-- Boot screen: click `START` or the `READY TO START` button once loading reaches 100%
-- Arcade menu: `ArrowLeft` and `ArrowRight` to select, `Enter` to launch
-- Game launch screen: `Enter` to confirm, `Escape` to go back
-- Game display: `Escape` or `EXIT` to return to the menu
-- Hacker menu: `ArrowUp` and `ArrowDown`, `Enter`, `Escape` (gamepad is also polled)
+- Boot screen: klik `START` of `READY TO START` wanneer loading 100% is
+- Arcade menu: `ArrowUp` / `ArrowDown` selecteren, `Enter` starten
+- Game display: `Escape` of `EXIT` terug naar menu
+- Hacker menu: `ArrowUp` / `ArrowDown`, `Enter`, `Escape` (gamepad polling actief)
 
-## Adding Games
+## Huidige Games (default catalogus)
 
-In the current implementation, games are read from the `games` array in:
-`arcade-flipper/src/components/arcade/menu.tsx`.
+- SPACE INVADER (`games/spaceinvaders.py`)
+- RETRO BIRD (`games/RetroBird/main.py`)
+- EXTREME RACING (`games/CarRacingUltraMaxExtremeLevel1000/main.py`)
+- BLOCK STORM (`games/BlockStorm/main.py`)
+- ANGRY WALLS (`games/AngryWalls/main.py`)
+- PONG (`games/pong.py`)
 
-1. Add your game files to `arcade-flipper/src/games/<YourGame>/`
-2. Add a thumbnail to `arcade-flipper/src/assets/`
-3. Add an object to the `games` array in `menu.tsx`
-4. Use an executable path relative to `arcade-flipper/src`, for example:
+## Nieuwe Games Toevoegen
+
+Games worden gelezen uit de `games` array in:
+`arcade-flipper/src/components/arcade/GameMenu.tsx`
+
+1. Voeg game files toe onder `arcade-flipper/src/games/<YourGame>/`
+2. Voeg een thumbnail toe in `arcade-flipper/src/assets/`
+3. Voeg een object toe in de `games` array in `GameMenu.tsx`
+4. Gebruik een executable pad relatief vanaf `arcade-flipper/src`, bijvoorbeeld:
    - `games/RetroBird/main.py`
    - `games/pong.py`
    - `games/MyGame/game.exe`
 
-Example:
+## Launch Modes en IPC
 
-```ts
-{
-  id: 'my-game',
-  title: 'MY GAME',
-  genre: 'ARCADE',
-  badge: 'NEW',
-  tagline: 'Short description of your game.',
-  image: '../assets/mygame.png',
-  accent: '#00ffcc',
-  glow: '#00ffcc',
-  executable: 'games/MyGame/main.py'
-}
-```
+Renderer gebruikt `window.electron.launchGame(...)`.
+In `main.ts` wordt launch behavior bepaald op extensie:
 
-## Launch Modes and IPC
+- `.py`: via `python3` (`python` op Windows)
+- `.exe`: direct als executable process
 
-The renderer uses `window.electron.launchGame(...)`.
-In `main.ts`, launch behavior is selected by file extension:
+Voor Python launches worden deze env vars meegegeven:
 
-- `.py`: through `python3` (or `python` on Windows)
-- `.exe`: launched directly as an executable process
-
-For Python launches, these environment variables are passed:
-
-- `ARCADE_EMBEDDED` (`1` or `0`)
+- `ARCADE_EMBEDDED` (`1` of `0`)
 - `ARCADE_WINDOW_POS` (`x,y`)
 - `ARCADE_WINDOW_SIZE` (`widthxheight`)
 
+## DIY Flipper Hardware (Serial)
+
+De app ondersteunt momenteel:
+- Serial device auto-detect + auto-connect
+- Health check commands (`HELLO`, `PING`)
+- Module commands vanuit hacker menu:
+  - `RUN NFC_CLONE`
+  - `RUN BADUSB_INJECT`
+  - `RUN IR_BLAST`
+  - `RUN GPIO_CTRL`
+  - `RUN SHELL`
+
+Voor wiring + firmware setup:
+- Zie `docs/DIYFLIPPER_QUICKSTART.md`
+- Firmware: `firmware/esp32_diyflipper/esp32_diyflipper.ino`
+
 ## Platform Notes
 
-- On macOS, the app uses `osascript` in the main process to position Python windows or set them fullscreen.
-- If window control does not work on macOS, check Accessibility permissions for Terminal/Electron.
-- Without `pygame`, the bundled Python games will not start.
+- Op macOS gebruikt de app `osascript` om Python game windows te positioneren/fullscreenen.
+- Als window control niet werkt op macOS, controleer Accessibility permissions voor Terminal/Electron.
+- Zonder `pygame` starten de gebundelde Python games niet.
 
 ## Team Context
 
 The Lab Graduation Project:
-- Younes: arcade platform (launcher and interface)
-- Rayan: hardware (arcade cabinet, buttons, computer setup)
+- Younes: arcade platform (launcher en interface)
+- Rayan: hardware (arcade cabinet, knoppen, computer setup)
 - Matthias: Raspberry Pi Pico hacking tool

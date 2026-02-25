@@ -473,12 +473,60 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           padding: '16px 0',
           overflow: 'hidden',
         }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `
+              repeating-linear-gradient(0deg, rgba(255,201,130,0.07) 0px, rgba(255,201,130,0.07) 1px, transparent 1px, transparent 7px),
+              repeating-linear-gradient(90deg, rgba(82,41,18,0.22) 0px, rgba(82,41,18,0.22) 5px, rgba(44,20,9,0.17) 5px, rgba(44,20,9,0.17) 10px)
+            `,
+            opacity: 0.55,
+            pointerEvents: 'none',
+          }} />
+          {[12, 94, 176, 258].map((top, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: 4, top,
+              width: 6, height: 6, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 35%, #f2c789, #6f4317)',
+              border: '1px solid rgba(50,25,9,0.9)',
+              boxShadow: '0 0 3px rgba(0,0,0,0.5)',
+            }} />
+          ))}
           {/* Vertical neon stripe */}
           <div style={{
             position: 'absolute', top: 0, bottom: 0, left: 9, width: 2,
             background: 'linear-gradient(180deg, transparent, rgba(255,185,102,0.7), rgba(197,99,36,0.72), transparent)',
             opacity: 0.55,
           }} />
+          <div style={{
+            position: 'absolute', top: 108, left: 16, right: 12,
+            border: '1px solid rgba(198,142,69,0.7)',
+            background: 'rgba(35,14,7,0.82)',
+            boxShadow: 'inset 0 0 6px rgba(0,0,0,0.5)',
+            borderRadius: 3,
+            padding: '4px 3px 3px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(255,206,147,0.74)' }}>CRED</div>
+            <div style={{
+              marginTop: 1,
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.5,
+              color: coinBlink ? '#ffd166' : 'rgba(255,209,102,0.5)',
+              textShadow: coinBlink ? '0 0 6px rgba(255,209,102,0.75)' : 'none',
+            }}>{coinBlink ? '01' : '00'}</div>
+          </div>
+          <div style={{
+            position: 'absolute', bottom: 154, left: 16, right: 12,
+            border: '1px solid rgba(198,142,69,0.55)',
+            background: 'rgba(29,12,6,0.75)',
+            borderRadius: 3,
+            padding: '2px 0',
+            textAlign: 'center',
+            fontSize: 5,
+            letterSpacing: 1.5,
+            color: 'rgba(255,196,127,0.74)',
+          }}>PLAYER 1</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
             {[0,60,120,180,240,300].map(o => <LedDot key={o} offset={o} />)}
           </div>
@@ -512,10 +560,58 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           overflow: 'hidden',
         }}>
           <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `
+              repeating-linear-gradient(0deg, rgba(255,201,130,0.07) 0px, rgba(255,201,130,0.07) 1px, transparent 1px, transparent 7px),
+              repeating-linear-gradient(90deg, rgba(82,41,18,0.22) 0px, rgba(82,41,18,0.22) 5px, rgba(44,20,9,0.17) 5px, rgba(44,20,9,0.17) 10px)
+            `,
+            opacity: 0.55,
+            pointerEvents: 'none',
+          }} />
+          {[12, 94, 176, 258].map((top, i) => (
+            <div key={i} style={{
+              position: 'absolute', right: 4, top,
+              width: 6, height: 6, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 35%, #f2c789, #6f4317)',
+              border: '1px solid rgba(50,25,9,0.9)',
+              boxShadow: '0 0 3px rgba(0,0,0,0.5)',
+            }} />
+          ))}
+          <div style={{
             position: 'absolute', top: 0, bottom: 0, right: 9, width: 2,
             background: 'linear-gradient(180deg, transparent, rgba(255,185,102,0.7), rgba(197,99,36,0.72), transparent)',
             opacity: 0.55,
           }} />
+          <div style={{
+            position: 'absolute', top: 108, left: 12, right: 16,
+            border: '1px solid rgba(198,142,69,0.7)',
+            background: 'rgba(35,14,7,0.82)',
+            boxShadow: 'inset 0 0 6px rgba(0,0,0,0.5)',
+            borderRadius: 3,
+            padding: '4px 3px 3px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 5, letterSpacing: 1.1, color: 'rgba(255,206,147,0.74)' }}>TEMP</div>
+            <div style={{
+              marginTop: 1,
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.4,
+              color: !coinBlink ? '#ff7f50' : 'rgba(255,127,80,0.5)',
+              textShadow: !coinBlink ? '0 0 6px rgba(255,127,80,0.7)' : 'none',
+            }}>{!coinBlink ? 'HI' : 'OK'}</div>
+          </div>
+          <div style={{
+            position: 'absolute', bottom: 154, left: 12, right: 16,
+            border: '1px solid rgba(198,142,69,0.55)',
+            background: 'rgba(29,12,6,0.75)',
+            borderRadius: 3,
+            padding: '2px 0',
+            textAlign: 'center',
+            fontSize: 5,
+            letterSpacing: 1.2,
+            color: 'rgba(255,196,127,0.74)',
+          }}>INSERT COIN</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
             {[300,240,180,120,60,0].map(o => <LedDot key={o} offset={o} />)}
           </div>

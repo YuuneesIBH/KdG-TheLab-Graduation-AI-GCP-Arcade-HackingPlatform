@@ -24,6 +24,10 @@ export type DiyFlipperStatus = {
 export interface ElectronAPI {
   setFullscreen: (fullscreen: boolean) => Promise<{success: boolean}>
   launchGame: (request: string | LaunchRequest) => Promise<{success: boolean, message: string}>
+  stopGame: () => Promise<{success: boolean, message: string}>
+  killGame: () => Promise<{success: boolean, message: string}>
+  updateGameViewport: (viewport: LaunchViewport) => Promise<{success: boolean, message: string}>
+  resizeGame: (viewport: LaunchViewport) => Promise<{success: boolean, message: string}>
   diyFlipperGetStatus: () => Promise<DiyFlipperStatus>
   diyFlipperConnect: (preferredPath?: string) => Promise<{success: boolean, message: string}>
   diyFlipperDisconnect: () => Promise<{success: boolean, message: string}>

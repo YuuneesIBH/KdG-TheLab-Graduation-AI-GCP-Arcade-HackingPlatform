@@ -425,7 +425,7 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
         height: phase === 'crt-roll' ? `${rollHeight}vh` : '100vh',
         zIndex: 9000,
         overflow: 'hidden',
-        animation: showMatrix && phase !== 'crt-roll' ? 'htCrtOn 0.35s ease-out forwards' : 'none',
+        animation: showMatrix ? 'htCrtOn 0.35s ease-out forwards' : 'none',
         opacity: isDone ? 0 : 1,
         transition: isDone ? 'opacity 0.4s ease-out' : 'none',
         pointerEvents: isDone ? 'none' : 'auto',

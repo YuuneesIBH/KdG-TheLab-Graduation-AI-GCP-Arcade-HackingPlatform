@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BootScreen } from "./components/arcade/Boot"
+import { BootScreen } from "./components/arcade/boot"
 import { MenuScreen } from "./components/arcade/GameMenu"
 import { ArcadeGame } from "./components/arcade/ArcadeGame"
 import HackerMenu from "./components/flipper/HackerMenu"
@@ -18,6 +18,7 @@ type DiyFlipperStatus = {
 function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
+  const isBootScreen = screen === 'boot'
 
   const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>({
     connected: false,
@@ -58,6 +59,8 @@ function App() {
     document.body.style.overflow = 'hidden'
     document.body.style.background = '#000'
     document.body.style.imageRendering = 'pixelated'
+
+    if (!isBootScreen) return
 
     const logoShakeInterval = setInterval(() => {
       if (Math.random() > 0.7) {
@@ -132,7 +135,7 @@ function App() {
       clearInterval(particleInterval)
       clearInterval(logoShakeInterval)
     }
-  }, [])
+  }, [isBootScreen])
 
   useEffect(() => {
     if (!window.electron) return

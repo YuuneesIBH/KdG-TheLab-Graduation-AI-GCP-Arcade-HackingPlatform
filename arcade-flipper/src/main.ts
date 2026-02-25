@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
-import { spawn } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import fs from 'fs'
 import { SerialPort } from 'serialport'
 
@@ -28,6 +28,11 @@ type DiyFlipperStatus = {
   lastSeenAt?: number
 }
 
+type IpcResult = {
+  success: boolean
+  message: string
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
@@ -44,6 +49,7 @@ const DIY_MODULE_COMMANDS: Record<string, string> = {
 }
 
 let mainWindow: BrowserWindow | null = null
+let activeGameProcess: ChildProcess | null = null
 
 let diyFlipperPort: SerialPort | null = null
 let diyFlipperLineBuffer = ''
@@ -62,6 +68,87 @@ function publishDiyFlipperStatus() {
 function setDiyFlipperStatus(patch: Partial<DiyFlipperStatus>) {
   diyFlipperStatus = { ...diyFlipperStatus, ...patch }
   publishDiyFlipperStatus()
+}
+
+function publishGameExited() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('game-exited')
+}
+
+function trackActiveGameProcess(gameProcess: ChildProcess, label: string) {
+  activeGameProcess = gameProcess
+
+  gameProcess.once('exit', (code, signal) => {
+    console.log(`[LAUNCH] ${label} game exited`, { code, signal })
+    if (activeGameProcess === gameProcess) {
+      activeGameProcess = null
+      if (mainWindow) mainWindow.show()
+      publishGameExited()
+    }
+  })
+
+  gameProcess.once('error', (error) => {
+    console.error(`[LAUNCH] ${label} game process error:`, error)
+    if (activeGameProcess === gameProcess) {
+      activeGameProcess = null
+      if (mainWindow) mainWindow.show()
+    }
+  })
+}
+
+async function stopActiveGameProcess(force = false): Promise<IpcResult> {
+  const gameProcess = activeGameProcess
+  if (!gameProcess || gameProcess.exitCode !== null || gameProcess.killed) {
+    activeGameProcess = null
+    return { success: true, message: 'No active game process' }
+  }
+
+  const pid = gameProcess.pid
+  activeGameProcess = null
+
+  if (!pid) {
+    return { success: false, message: 'Active game process has no PID' }
+  }
+
+  try {
+    if (process.platform === 'win32') {
+      const args = ['/pid', String(pid), '/t']
+      if (force) args.push('/f')
+
+      const result = await new Promise<IpcResult>((resolve) => {
+        const killer = spawn('taskkill', args, { stdio: 'ignore' })
+        killer.once('error', (error) => {
+          resolve({ success: false, message: `Failed to stop game: ${error.message || error}` })
+        })
+        killer.once('exit', (code) => {
+          if (code === 0) {
+            resolve({ success: true, message: 'Game stopped' })
+            return
+          }
+          resolve({ success: false, message: `Failed to stop game (taskkill exit ${code ?? 'unknown'})` })
+        })
+      })
+
+      if (result.success) {
+        if (mainWindow) mainWindow.show()
+        publishGameExited()
+      }
+      return result
+    }
+
+    const signal: NodeJS.Signals = force ? 'SIGKILL' : 'SIGTERM'
+    try {
+      process.kill(-pid, signal)
+    } catch {
+      process.kill(pid, signal)
+    }
+
+    if (mainWindow) mainWindow.show()
+    publishGameExited()
+    return { success: true, message: 'Game stop signal sent' }
+  } catch (error: any) {
+    return { success: false, message: `Failed to stop game: ${error.message || error}` }
+  }
 }
 
 function portInfoText(port: PortInfo) {
@@ -373,6 +460,22 @@ ipcMain.handle('diyflipper-run-module', async (_event, moduleKey: string) => {
   return writeDiyFlipperCommand(`RUN ${command}`)
 })
 
+ipcMain.handle('stop-game', async () => {
+  return stopActiveGameProcess(false)
+})
+
+ipcMain.handle('kill-game', async () => {
+  return stopActiveGameProcess(true)
+})
+
+ipcMain.handle('update-game-viewport', async (_event, _viewport: LaunchViewport) => {
+  return { success: true, message: 'Viewport updated' }
+})
+
+ipcMain.handle('resize-game', async (_event, _viewport: LaunchViewport) => {
+  return { success: true, message: 'Resize updated' }
+})
+
 ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) => {
   try {
     const request: LaunchRequest = typeof payload === 'string'
@@ -426,6 +529,11 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       return { success: false, message: `Game file not found: ${gamePath}` }
     }
 
+    const stopResult = await stopActiveGameProcess(true)
+    if (!stopResult.success) {
+      console.warn('[LAUNCH] Could not fully stop previous game:', stopResult.message)
+    }
+
     const hostBounds = mainWindow?.getBounds() || displayBounds
     const defaultBounds = {
       x: displayBounds.x,
@@ -457,7 +565,6 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
 
       const pythonProcess = spawn(pythonCmd, [fullGamePath], {
-        detached: true,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: path.dirname(fullGamePath),
         env: {
@@ -479,14 +586,6 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       pythonProcess.on('error', (error) => {
         console.error('[LAUNCH] Python start failed:', error)
         if (mainWindow) mainWindow.show()
-      })
-
-      pythonProcess.on('exit', (code) => {
-        console.log('[LAUNCH] Python game exited with code:', code)
-        if (mainWindow) {
-          mainWindow.show()
-          mainWindow.webContents.send('game-exited')
-        }
       })
 
       if (process.platform === 'darwin' && mainWindow) {
@@ -531,7 +630,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
         }, 500)
       }
 
-      pythonProcess.unref()
+      trackActiveGameProcess(pythonProcess, 'python')
 
       return {
         success: true,
@@ -541,18 +640,9 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 
     if (gamePath.endsWith('.exe')) {
       const exeProcess = spawn(fullGamePath, [], {
-        detached: true,
         stdio: 'ignore'
       })
-
-      exeProcess.on('exit', () => {
-        if (mainWindow) {
-          mainWindow.show()
-          mainWindow.webContents.send('game-exited')
-        }
-      })
-
-      exeProcess.unref()
+      trackActiveGameProcess(exeProcess, 'exe')
 
       return {
         success: true,
@@ -583,6 +673,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', async () => {
   stopDiyFlipperAutoConnect()
+  await stopActiveGameProcess(true)
   if (diyFlipperPort?.isOpen) {
     await disconnectDiyFlipper()
   }

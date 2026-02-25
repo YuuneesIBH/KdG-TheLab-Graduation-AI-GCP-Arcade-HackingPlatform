@@ -1,7 +1,26 @@
 import pygame
 import random
+import os
 
-SCREEN = WIDTH, HEIGHT = 288, 512
+def parse_window_size(raw_value):
+	if not raw_value:
+		return None
+
+	cleaned = raw_value.strip().lower().replace(' ', '')
+	parts = cleaned.split('x' if 'x' in cleaned else ',')
+	if len(parts) != 2:
+		return None
+
+	try:
+		width = max(320, int(parts[0]))
+		height = max(240, int(parts[1]))
+		return width, height
+	except ValueError:
+		return None
+
+SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
+SCALE_X = WIDTH / 288
+SCALE_Y = HEIGHT / 512
 display_height = 0.80 * HEIGHT
 
 # RETRO COLORS
@@ -21,7 +40,7 @@ class Grumpy:
 	
 	def draw_bird(self):
 		# Simple retro bird - just colored squares/circles
-		size = 20
+		size = max(14, int(20 * min(SCALE_X, SCALE_Y)))
 		
 		# Body
 		pygame.draw.circle(self.win, self.color, 
@@ -30,16 +49,16 @@ class Grumpy:
 						 (self.rect.centerx, self.rect.centery), size, 2)
 		
 		# Eye
-		eye_x = self.rect.centerx + 8
-		eye_y = self.rect.centery - 5
-		pygame.draw.circle(self.win, WHITE, (eye_x, eye_y), 5)
-		pygame.draw.circle(self.win, BLACK, (eye_x, eye_y), 3)
+		eye_x = self.rect.centerx + max(6, int(8 * SCALE_X))
+		eye_y = self.rect.centery - max(3, int(5 * SCALE_Y))
+		pygame.draw.circle(self.win, WHITE, (eye_x, eye_y), max(3, int(5 * min(SCALE_X, SCALE_Y))))
+		pygame.draw.circle(self.win, BLACK, (eye_x, eye_y), max(2, int(3 * min(SCALE_X, SCALE_Y))))
 		
 		# Beak
 		beak_points = [
-			(self.rect.centerx + 15, self.rect.centery),
-			(self.rect.centerx + 25, self.rect.centery - 3),
-			(self.rect.centerx + 25, self.rect.centery + 3)
+			(self.rect.centerx + max(10, int(15 * SCALE_X)), self.rect.centery),
+			(self.rect.centerx + max(16, int(25 * SCALE_X)), self.rect.centery - max(2, int(3 * SCALE_Y))),
+			(self.rect.centerx + max(16, int(25 * SCALE_X)), self.rect.centery + max(2, int(3 * SCALE_Y)))
 		]
 		pygame.draw.polygon(self.win, NEON_YELLOW, beak_points)
 		pygame.draw.polygon(self.win, BLACK, beak_points, 2)
@@ -66,8 +85,8 @@ class Grumpy:
 				self.counter = 0
 		
 		# Update rect for collision
-		self.rect.width = 40
-		self.rect.height = 40
+		self.rect.width = max(28, int(40 * SCALE_X))
+		self.rect.height = max(28, int(40 * SCALE_Y))
 		
 		self.draw_bird()
 	
@@ -81,13 +100,13 @@ class Grumpy:
 			self.flap_inc *= -1
 		self.flap_pos += self.flap_inc
 		self.rect.y += self.flap_inc
-		self.rect.x = WIDTH // 2 - 20
+		self.rect.x = WIDTH // 2 - max(14, int(20 * SCALE_X))
 		
 		self.draw_bird()
 	
 	def reset(self):
-		self.rect = pygame.Rect(0, 0, 40, 40)
-		self.rect.x = 60
+		self.rect = pygame.Rect(0, 0, max(28, int(40 * SCALE_X)), max(28, int(40 * SCALE_Y)))
+		self.rect.x = max(40, int(60 * SCALE_X))
 		self.rect.y = int(display_height) // 2
 		self.counter = 0
 		self.vel = 0
@@ -136,9 +155,9 @@ class Pipe(pygame.sprite.Sprite):
 		
 		self.win = win
 		self.color = color
-		self.width = 52
-		self.height = 320
-		pipe_gap = 100 // 2
+		self.width = max(44, int(52 * SCALE_X))
+		self.height = max(220, int(320 * SCALE_Y))
+		pipe_gap = max(72, int(100 * SCALE_Y)) // 2
 		x = WIDTH
 		
 		if position == 1:

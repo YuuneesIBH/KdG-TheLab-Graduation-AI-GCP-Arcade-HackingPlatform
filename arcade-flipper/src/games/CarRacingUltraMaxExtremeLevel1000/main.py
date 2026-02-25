@@ -4,8 +4,24 @@ import os
 from objects import Road, Player, Nitro, Tree, Button, \
 					Obstacle, Coins, Fuel
 
+def parse_window_size(raw_value):
+	if not raw_value:
+		return None
+
+	cleaned = raw_value.strip().lower().replace(' ', '')
+	parts = cleaned.split('x' if 'x' in cleaned else ',')
+	if len(parts) != 2:
+		return None
+
+	try:
+		width = max(320, int(parts[0]))
+		height = max(240, int(parts[1]))
+		return width, height
+	except ValueError:
+		return None
+
 pygame.init()
-SCREEN = WIDTH, HEIGHT = 288, 512
+SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
 embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
 window_pos = os.environ.get('ARCADE_WINDOW_POS')
 if window_pos:
@@ -20,7 +36,9 @@ win = pygame.display.set_mode(SCREEN, display_flags)
 clock = pygame.time.Clock()
 FPS = 30
 
-lane_pos = [50, 95, 142, 190]
+scale_x = WIDTH / 288
+scale_y = HEIGHT / 512
+lane_pos = [int(v * scale_x) for v in [50, 95, 142, 190]]
 
 # COLORS **********************************************************************
 
@@ -78,8 +96,8 @@ def center(image):
 
 # BUTTONS *********************************************************************
 play_btn = Button(play_img, (100, 34), center(play_img)+10, HEIGHT-80)
-la_btn = Button(left_arrow, (32, 42), 40, 180)
-ra_btn = Button(right_arrow, (32, 42), WIDTH-60, 180)
+la_btn = Button(left_arrow, (32, 42), int(40 * scale_x), int(180 * scale_y))
+ra_btn = Button(right_arrow, (32, 42), WIDTH - int(60 * scale_x), int(180 * scale_y))
 
 home_btn = Button(home_btn_img, (24, 24), WIDTH // 4 - 18, HEIGHT - 80)
 replay_btn = Button(replay_img, (36,36), WIDTH // 2  - 18, HEIGHT - 86)
@@ -100,7 +118,7 @@ pygame.mixer.music.set_volume(0.6)
 # OBJECTS *********************************************************************
 road = Road()
 nitro = Nitro(WIDTH-80, HEIGHT-80)
-p = Player(100, HEIGHT-120, car_type)
+p = Player(int(100 * scale_x), HEIGHT - int(120 * scale_y), car_type)
 
 tree_group = pygame.sprite.Group()
 coin_group = pygame.sprite.Group()
@@ -208,7 +226,7 @@ while running:
 
 			start_fx.play()
 
-			p = Player(100, HEIGHT-120, car_type)
+			p = Player(int(100 * scale_x), HEIGHT - int(120 * scale_y), car_type)
 			counter = 0
 
 	if over_page:
@@ -225,11 +243,11 @@ while running:
 		num_dodge_img = font.render(f'{dodged}', True, WHITE)
 		distance_img = font.render(f'Distance : {counter/1000:.2f} km', True, WHITE)
 
-		win.blit(coin_img, (80, 240))
-		win.blit(dodge_img, (50, 280))
-		win.blit(num_coin_img, (180, 250))
-		win.blit(num_dodge_img, (180, 300))
-		win.blit(distance_img, (center(distance_img), (350)))
+		win.blit(coin_img, (int(80 * scale_x), int(240 * scale_y)))
+		win.blit(dodge_img, (int(50 * scale_x), int(280 * scale_y)))
+		win.blit(num_coin_img, (int(180 * scale_x), int(250 * scale_y)))
+		win.blit(num_dodge_img, (int(180 * scale_x), int(300 * scale_y)))
+		win.blit(distance_img, (center(distance_img), int(350 * scale_y)))
 
 		if home_btn.draw(win):
 			over_page = False
@@ -281,7 +299,7 @@ while running:
 
 		if counter % 270 == 0:
 			type = random.choices([1, 2], weights=[6, 4], k=1)[0]
-			x = random.choice(lane_pos)+10
+			x = random.choice(lane_pos) + max(8, int(10 * scale_x))
 			if type == 1:
 				count = random.randint(1, 3)
 				for i in range(count):

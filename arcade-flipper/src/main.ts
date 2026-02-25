@@ -75,6 +75,18 @@ function publishGameExited() {
   mainWindow.webContents.send('game-exited')
 }
 
+function restoreArcadeWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+
+  const activeDisplay = screen.getDisplayMatching(mainWindow.getBounds())
+  const displayBounds = activeDisplay.bounds
+
+  mainWindow.setBounds(displayBounds)
+  mainWindow.show()
+  mainWindow.focus()
+  mainWindow.setFullScreen(true)
+}
+
 function trackActiveGameProcess(gameProcess: ChildProcess, label: string) {
   activeGameProcess = gameProcess
 
@@ -82,7 +94,7 @@ function trackActiveGameProcess(gameProcess: ChildProcess, label: string) {
     console.log(`[LAUNCH] ${label} game exited`, { code, signal })
     if (activeGameProcess === gameProcess) {
       activeGameProcess = null
-      if (mainWindow) mainWindow.show()
+      restoreArcadeWindow()
       publishGameExited()
     }
   })
@@ -91,7 +103,7 @@ function trackActiveGameProcess(gameProcess: ChildProcess, label: string) {
     console.error(`[LAUNCH] ${label} game process error:`, error)
     if (activeGameProcess === gameProcess) {
       activeGameProcess = null
-      if (mainWindow) mainWindow.show()
+      restoreArcadeWindow()
     }
   })
 }
@@ -130,7 +142,7 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
       })
 
       if (result.success) {
-        if (mainWindow) mainWindow.show()
+        restoreArcadeWindow()
         publishGameExited()
       }
       return result
@@ -143,7 +155,7 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
       process.kill(pid, signal)
     }
 
-    if (mainWindow) mainWindow.show()
+    restoreArcadeWindow()
     publishGameExited()
     return { success: true, message: 'Game stop signal sent' }
   } catch (error: any) {
@@ -595,7 +607,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 
       pythonProcess.on('error', (error) => {
         console.error('[LAUNCH] Python start failed:', error)
-        if (mainWindow) mainWindow.show()
+        restoreArcadeWindow()
       })
 
       if (process.platform === 'darwin' && mainWindow) {
@@ -666,9 +678,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
     }
   } catch (error: any) {
     console.error('[LAUNCH] Error launching game:', error)
-    if (mainWindow) {
-      mainWindow.show()
-    }
+    restoreArcadeWindow()
     return {
       success: false,
       message: `Error: ${error.message || error}`

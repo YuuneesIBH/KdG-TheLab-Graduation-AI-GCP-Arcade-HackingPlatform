@@ -78,7 +78,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
 
   const exit = React.useCallback(() => {
     stopGameIfPossible()
-    ;(window as any).electron?.setFullscreen?.(false)
+    ;(window as any).electron?.setFullscreen?.(true)
     onExit()
   }, [onExit, stopGameIfPossible])
 

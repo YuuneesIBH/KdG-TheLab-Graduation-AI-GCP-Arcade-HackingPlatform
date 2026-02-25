@@ -1,19 +1,43 @@
 import math
 import pygame
 import random
+import os
 
-SCREEN = WIDTH, HEIGHT = 288, 512
+def parse_window_size(raw_value):
+	if not raw_value:
+		return None
+
+	cleaned = raw_value.strip().lower().replace(' ', '')
+	parts = cleaned.split('x' if 'x' in cleaned else ',')
+	if len(parts) != 2:
+		return None
+
+	try:
+		width = max(320, int(parts[0]))
+		height = max(240, int(parts[1]))
+		return width, height
+	except ValueError:
+		return None
+
+SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
+SCALE_X = WIDTH / 288
+SCALE_Y = HEIGHT / 512
+SIDE_MARGIN = max(24, int(30 * SCALE_X))
+ROAD_LEFT = SIDE_MARGIN
+ROAD_RIGHT = WIDTH - SIDE_MARGIN
+PLAYER_LEFT_LIMIT = ROAD_LEFT + max(8, int(10 * SCALE_X))
+PLAYER_RIGHT_LIMIT = ROAD_RIGHT - max(6, int(8 * SCALE_X))
 
 BLUE = (53, 81, 92)
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
-lane_pos = [50, 95, 142, 190]
+lane_pos = [int(v * SCALE_X) for v in [50, 95, 142, 190]]
 
 class Road():
 	def __init__(self):
 		self.image = pygame.image.load('Assets/road.png')
-		self.image = pygame.transform.scale(self.image, (WIDTH-60, HEIGHT))
+		self.image = pygame.transform.scale(self.image, (WIDTH - (SIDE_MARGIN * 2), HEIGHT))
 
 		self.reset()
 		self.move = True
@@ -33,7 +57,7 @@ class Road():
 		win.blit(self.image, (self.x, self.y2))
 
 	def reset(self):
-		self.x = 30
+		self.x = SIDE_MARGIN
 		self.y1 = 0
 		self.y2 = -HEIGHT
 
@@ -49,12 +73,12 @@ class Player(pygame.sprite.Sprite):
 	def update(self, left, right):
 		if left:
 			self.rect.x -= 5
-			if self.rect.x <= 40:
-				self.rect.x = 40
+			if self.rect.x <= PLAYER_LEFT_LIMIT:
+				self.rect.x = PLAYER_LEFT_LIMIT
 		if right:
 			self.rect.x += 5
-			if self.rect.right >= 250:
-				self.rect.right = 250
+			if self.rect.right >= PLAYER_RIGHT_LIMIT:
+				self.rect.right = PLAYER_RIGHT_LIMIT
 
 		self.mask = pygame.mask.from_surface(self.image)
 

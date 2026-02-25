@@ -1,7 +1,24 @@
 import pygame
 import random
+import os
 
-SCREEN = WIDTH, HEIGHT = 288, 512
+def parse_window_size(raw_value):
+	if not raw_value:
+		return None
+
+	cleaned = raw_value.strip().lower().replace(' ', '')
+	parts = cleaned.split('x' if 'x' in cleaned else ',')
+	if len(parts) != 2:
+		return None
+
+	try:
+		width = max(320, int(parts[0]))
+		height = max(240, int(parts[1]))
+		return width, height
+	except ValueError:
+		return None
+
+SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
 
 pygame.font.init()
 
@@ -18,8 +35,8 @@ class Player:
 		self.win.blit(self.image, self.rect)
 		
 	def reset(self):
-		self.x = 145
-		self.y = 270
+		self.x = WIDTH // 2
+		self.y = int(HEIGHT * 0.53)
 		self.rect = self.image.get_rect(center=(self.x,self.y))
 
 class Bar(pygame.sprite.Sprite):

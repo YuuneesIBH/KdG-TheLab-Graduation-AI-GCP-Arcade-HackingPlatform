@@ -4,8 +4,28 @@ import os
 
 from objects import Player, Bar, Ball, Block, ScoreCard, Message, Particle, generate_particles
 
+def parse_window_size(raw_value):
+	if not raw_value:
+		return None
+
+	cleaned = raw_value.strip().lower().replace(' ', '')
+	parts = cleaned.split('x' if 'x' in cleaned else ',')
+	if len(parts) != 2:
+		return None
+
+	try:
+		width = max(320, int(parts[0]))
+		height = max(240, int(parts[1]))
+		return width, height
+	except ValueError:
+		return None
+
 pygame.init()
-SCREEN = WIDTH, HEIGHT = 288, 512
+SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
+BASE_WIDTH = 288
+BASE_HEIGHT = 512
+scale_x = WIDTH / BASE_WIDTH
+scale_y = HEIGHT / BASE_HEIGHT
 embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
 window_pos = os.environ.get('ARCADE_WINDOW_POS')
 if window_pos:
@@ -61,12 +81,12 @@ ball_group = pygame.sprite.Group()
 block_group = pygame.sprite.Group()
 destruct_group = pygame.sprite.Group()
 win_particle_group = pygame.sprite.Group()
-bar_gap = 120
+bar_gap = max(100, int(120 * scale_x))
 	
 particles = []
 
 p = Player(win)
-score_card = ScoreCard(140, 40, win)
+score_card = ScoreCard(WIDTH // 2, max(36, int(40 * scale_y)), win)
 
 # Functions
 
@@ -85,16 +105,16 @@ def win_particles():
 
 # Messages
 title_font = "Fonts/Robus-BWqOd.otf"
-dodgy = Message(134, 90, 100, "Angry",title_font, WHITE, win)
-walls = Message(164, 145, 80, "Walls",title_font, WHITE, win)
+dodgy = Message(WIDTH // 2 - max(10, int(10 * scale_x)), int(90 * scale_y), int(100 * scale_y), "Angry",title_font, WHITE, win)
+walls = Message(WIDTH // 2 + max(20, int(20 * scale_x)), int(145 * scale_y), int(80 * scale_y), "Walls",title_font, WHITE, win)
 
 tap_to_play_font = "Fonts/DebugFreeTrial-MVdYB.otf"
-tap_to_play = Message(144, 400, 32, "TAP TO PLAY",tap_to_play_font, WHITE, win)
-tap_to_replay = Message(144, 400, 30, "Tap to Replay",tap_to_play_font, WHITE, win)
+tap_to_play = Message(WIDTH // 2, int(400 * scale_y), int(32 * scale_y), "TAP TO PLAY",tap_to_play_font, WHITE, win)
+tap_to_replay = Message(WIDTH // 2, int(400 * scale_y), int(30 * scale_y), "Tap to Replay",tap_to_play_font, WHITE, win)
 
 # Variables
 
-bar_width_list = [i for i in range (40,150,10)]
+bar_width_list = sorted(set(max(35, int(i * scale_x)) for i in range(40, 150, 10)))
 bar_frequency = 1200
 bar_speed = 4
 touched = False
@@ -266,11 +286,11 @@ while running:
 			score_page = True
 			font =  "Fonts/BubblegumSans-Regular.ttf"
 			if score < high_score:
-				score_msg = Message(144, 60, 55, "Score",font, WHITE, win)
+				score_msg = Message(WIDTH // 2, int(60 * scale_y), int(55 * scale_y), "Score",font, WHITE, win)
 			else:
-				score_msg = Message(144, 60, 55, "New High",font, WHITE, win)
+				score_msg = Message(WIDTH // 2, int(60 * scale_y), int(55 * scale_y), "New High",font, WHITE, win)
 			
-			score_point = Message(144, 110, 45, f"{score}", font, WHITE, win)
+			score_point = Message(WIDTH // 2, int(110 * scale_y), int(45 * scale_y), f"{score}", font, WHITE, win)
 	
 		if score_page:
 			block_group.empty()

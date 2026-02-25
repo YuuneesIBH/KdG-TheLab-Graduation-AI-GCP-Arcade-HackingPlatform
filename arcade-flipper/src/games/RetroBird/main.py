@@ -4,10 +4,26 @@ import os
 
 from objects import Grumpy, Pipe, Base, Score
 
+def parse_window_size(raw_value):
+	if not raw_value:
+		return None
+
+	cleaned = raw_value.strip().lower().replace(' ', '')
+	parts = cleaned.split('x' if 'x' in cleaned else ',')
+	if len(parts) != 2:
+		return None
+
+	try:
+		width = max(320, int(parts[0]))
+		height = max(240, int(parts[1]))
+		return width, height
+	except ValueError:
+		return None
+
 # Setup *******************************************
 
 pygame.init()
-SCREEN = WIDTH, HEIGHT = 288, 512
+SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
 display_height = 0.80 * HEIGHT
 
 embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'

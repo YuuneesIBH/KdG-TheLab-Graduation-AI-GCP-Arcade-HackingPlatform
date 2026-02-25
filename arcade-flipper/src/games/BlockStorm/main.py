@@ -2,8 +2,24 @@ import pygame
 import random
 import os
 
+def parse_window_size(raw_value):
+	if not raw_value:
+		return None
+
+	cleaned = raw_value.strip().lower().replace(' ', '')
+	parts = cleaned.split('x' if 'x' in cleaned else ',')
+	if len(parts) != 2:
+		return None
+
+	try:
+		width = max(320, int(parts[0]))
+		height = max(240, int(parts[1]))
+		return width, height
+	except ValueError:
+		return None
+
 pygame.init()
-SCREEN = WIDTH, HEIGHT = 300, 500
+SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (300, 500)
 embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
 window_pos = os.environ.get('ARCADE_WINDOW_POS')
 if window_pos:
@@ -15,9 +31,11 @@ if not embedded_mode:
 
 win = pygame.display.set_mode(SCREEN, display_flags)
 
-CELLSIZE = 20
-ROWS = (HEIGHT-120) // CELLSIZE
-COLS = WIDTH // CELLSIZE
+HUD_HEIGHT = max(96, int(HEIGHT * 0.24))
+CELLSIZE = max(18, min(WIDTH // 18, (HEIGHT - HUD_HEIGHT) // 20))
+ROWS = max(12, (HEIGHT - HUD_HEIGHT) // CELLSIZE)
+COLS = max(10, WIDTH // CELLSIZE)
+PLAYFIELD_HEIGHT = ROWS * CELLSIZE
 
 clock = pygame.time.Clock()
 FPS = 24
@@ -99,13 +117,14 @@ class Tetris:
 		for i in range(self.rows+1):
 			pygame.draw.line(win, WHITE, (0, CELLSIZE*i), (WIDTH, CELLSIZE*i))
 		for j in range(self.cols):
-			pygame.draw.line(win, WHITE, (CELLSIZE*j, 0), (CELLSIZE*j, HEIGHT-120))
+			pygame.draw.line(win, WHITE, (CELLSIZE*j, 0), (CELLSIZE*j, PLAYFIELD_HEIGHT))
 
 	def new_figure(self):
+		spawn_x = max(0, (self.cols // 2) - 2)
 		if not self.next:
-			self.next = Tetramino(5, 0)
+			self.next = Tetramino(spawn_x, 0)
 		self.figure = self.next
-		self.next = Tetramino(5, 0)
+		self.next = Tetramino(spawn_x, 0)
 
 	def intersects(self):
 		intersection = False
@@ -247,7 +266,7 @@ while running:
 	# GAMEOVER ***************************************************************
 
 	if tetris.gameover:
-		rect = pygame.Rect((50, 140, WIDTH-100, HEIGHT-350))
+		rect = pygame.Rect((max(20, int(WIDTH * 0.16)), int(HEIGHT * 0.28), WIDTH - max(40, int(WIDTH * 0.32)), max(120, int(HEIGHT * 0.26))))
 		pygame.draw.rect(win, BLACK, rect)
 		pygame.draw.rect(win, RED, rect, 2)
 
@@ -261,22 +280,24 @@ while running:
 
 	# HUD ********************************************************************
 
-	pygame.draw.rect(win, BLUE, (0, HEIGHT-120, WIDTH, 120))
+	hud_top = HEIGHT - HUD_HEIGHT
+	pygame.draw.rect(win, BLUE, (0, hud_top, WIDTH, HUD_HEIGHT))
 	if tetris.next:
 		for i in range(4):
 			for j in range(4):
 				if i * 4 + j in tetris.next.image():
 					img = Assets[tetris.next.color]
 					x = CELLSIZE * (tetris.next.x + j - 4)
-					y = HEIGHT - 100 + CELLSIZE * (tetris.next.y + i)
+					y = hud_top + max(18, CELLSIZE) + CELLSIZE * (tetris.next.y + i)
 					win.blit(img, (x, y))
 
 	scoreimg = font.render(f'{tetris.score}', True, WHITE)
 	levelimg = font2.render(f'Level : {tetris.level}', True, WHITE)
-	win.blit(scoreimg, (250-scoreimg.get_width()//2, HEIGHT-110))
-	win.blit(levelimg, (250-levelimg.get_width()//2, HEIGHT-30))
+	hud_text_x = int(WIDTH * 0.82)
+	win.blit(scoreimg, (hud_text_x - scoreimg.get_width() // 2, hud_top + 10))
+	win.blit(levelimg, (hud_text_x - levelimg.get_width() // 2, HEIGHT - 36))
 
-	pygame.draw.rect(win, BLUE, (0, 0, WIDTH, HEIGHT-120), 2)
+	pygame.draw.rect(win, BLUE, (0, 0, WIDTH, PLAYFIELD_HEIGHT), 2)
 	clock.tick(FPS)
 	pygame.display.update()
 pygame.quit()

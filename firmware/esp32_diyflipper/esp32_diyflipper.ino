@@ -29,6 +29,7 @@ static const int PN532_RST_PIN = 26;
 
 static String usbBuffer;
 static String picoBuffer;
+static String lastNfcUid = "";
 
 void printReadyBanner() {
   Serial.println("DIYFLIPPER_READY");
@@ -86,6 +87,32 @@ void runModule(const String& moduleName) {
   sendErr("UNKNOWN_MODULE");
 }
 
+String randomUidHex() {
+  uint32_t a = esp_random();
+  uint32_t b = esp_random();
+  char out[18];
+  snprintf(out, sizeof(out), "%08lX%08lX", static_cast<unsigned long>(a), static_cast<unsigned long>(b));
+  return String(out);
+}
+
+void handleNfcRead() {
+  // Placeholder UID generation until real PN532 read logic is added.
+  lastNfcUid = randomUidHex();
+  Serial.print("NFC_UID:");
+  Serial.println(lastNfcUid);
+  sendOk("NFC_READ");
+}
+
+void handleIrSend(const String& payload) {
+  // Placeholder pulse; replace with protocol-specific send logic.
+  digitalWrite(IR_TX_PIN, HIGH);
+  delay(10);
+  digitalWrite(IR_TX_PIN, LOW);
+  Serial.print("IR_SENT:");
+  Serial.println(payload);
+  sendOk("IR_SEND");
+}
+
 void handleUsbCommand(String cmd) {
   cmd.trim();
   if (cmd.length() == 0) return;
@@ -97,6 +124,18 @@ void handleUsbCommand(String cmd) {
 
   if (cmd == "PING") {
     Serial.println("PONG");
+    return;
+  }
+
+  if (cmd == "NFC_READ") {
+    handleNfcRead();
+    return;
+  }
+
+  if (cmd.startsWith("IR_SEND ")) {
+    String payload = cmd.substring(8);
+    payload.trim();
+    handleIrSend(payload);
     return;
   }
 

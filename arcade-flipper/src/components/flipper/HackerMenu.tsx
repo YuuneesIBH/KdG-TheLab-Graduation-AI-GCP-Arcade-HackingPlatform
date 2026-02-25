@@ -17,11 +17,28 @@ type DeviceStatus = {
   lastSeenAt?: number
 }
 
+type IrDatabaseEntry = {
+  id: string
+  name: string
+  protocol: string
+  address: string
+  command: string
+  carrierKhz?: number
+  source?: string
+}
+
 type HackerMenuProps = {
   onSelect?: (key: string) => void
   onBack?: () => void
   deviceStatus?: DeviceStatus
   lastDeviceLine?: string
+  onNfcRead?: () => void
+  onNfcSave?: () => void
+  onIrReload?: () => void
+  onIrSend?: (entryId: string) => void
+  lastNfcUid?: string
+  irDbEntries?: IrDatabaseEntry[]
+  toolStatus?: string
 }
 
 function MatrixBg() {
@@ -59,8 +76,21 @@ function MatrixBg() {
   return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, opacity: 0.15, pointerEvents: 'none' }} />
 }
 
-export default function Menu({ onSelect, onBack, deviceStatus, lastDeviceLine }: HackerMenuProps) {
+export default function Menu({
+  onSelect,
+  onBack,
+  deviceStatus,
+  lastDeviceLine,
+  onNfcRead,
+  onNfcSave,
+  onIrReload,
+  onIrSend,
+  lastNfcUid,
+  irDbEntries,
+  toolStatus
+}: HackerMenuProps) {
   const [selected, setSelected]   = useState(0)
+  const [selectedIrId, setSelectedIrId] = useState('')
   const [entered, setEntered]     = useState(false)
   const [glitch, setGlitch]       = useState(false)
   const [scanY, setScanY]         = useState(0)
@@ -69,6 +99,13 @@ export default function Menu({ onSelect, onBack, deviceStatus, lastDeviceLine }:
   const [bootLines, setBootLines] = useState<string[]>([])
   const selectedRef               = useRef(selected)
   selectedRef.current = selected
+
+  useEffect(() => {
+    const firstId = irDbEntries?.[0]?.id ?? ''
+    if (!selectedIrId && firstId) {
+      setSelectedIrId(firstId)
+    }
+  }, [irDbEntries, selectedIrId])
 
   const BOOT = [
     '> Flipper Zero OS v0.91.1  —  ARM Cortex-M4 @ 64MHz',
@@ -350,6 +387,103 @@ export default function Menu({ onSelect, onBack, deviceStatus, lastDeviceLine }:
               </div>
 
               {/* Active prompt at bottom */}
+              <div style={{
+                borderTop:'1px solid #081408',
+                borderBottom:'1px solid #081408',
+                padding:'10px 18px',
+                display:'grid',
+                gridTemplateColumns:'repeat(2, minmax(0, 1fr))',
+                gap:'8px',
+              }}>
+                <button
+                  onClick={() => onNfcRead?.()}
+                  style={{
+                    background:'rgba(0, 204, 255, 0.1)',
+                    border:'1px solid #00ccff',
+                    color:'#00ccff',
+                    fontFamily:'inherit',
+                    padding:'6px 10px',
+                    fontSize:'11px',
+                    letterSpacing:'1px',
+                    cursor:'pointer',
+                  }}
+                >
+                  NFC READ UID
+                </button>
+                <button
+                  onClick={() => onNfcSave?.()}
+                  style={{
+                    background:'rgba(0, 255, 136, 0.1)',
+                    border:'1px solid #00ff88',
+                    color:'#00ff88',
+                    fontFamily:'inherit',
+                    padding:'6px 10px',
+                    fontSize:'11px',
+                    letterSpacing:'1px',
+                    cursor:'pointer',
+                  }}
+                >
+                  SAVE NFC FILE
+                </button>
+                <div style={{ gridColumn:'1 / -1', display:'flex', gap:'8px', alignItems:'center' }}>
+                  <select
+                    value={selectedIrId}
+                    onChange={(e) => setSelectedIrId(e.target.value)}
+                    style={{
+                      flex: 1,
+                      background:'#031103',
+                      border:'1px solid #ff8800',
+                      color:'#ffbb66',
+                      fontFamily:'inherit',
+                      padding:'6px 8px',
+                      fontSize:'11px',
+                    }}
+                  >
+                    {(irDbEntries ?? []).map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name} [{entry.protocol}]
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => onIrReload?.()}
+                    style={{
+                      background:'rgba(255, 136, 0, 0.1)',
+                      border:'1px solid #ff8800',
+                      color:'#ff8800',
+                      fontFamily:'inherit',
+                      padding:'6px 10px',
+                      fontSize:'11px',
+                      cursor:'pointer',
+                    }}
+                  >
+                    RELOAD DB
+                  </button>
+                  <button
+                    onClick={() => selectedIrId && onIrSend?.(selectedIrId)}
+                    style={{
+                      background:'rgba(255, 136, 0, 0.18)',
+                      border:'1px solid #ff8800',
+                      color:'#ffd9a8',
+                      fontFamily:'inherit',
+                      padding:'6px 10px',
+                      fontSize:'11px',
+                      cursor:'pointer',
+                    }}
+                  >
+                    SEND IR
+                  </button>
+                </div>
+                <div style={{ gridColumn:'1 / -1', fontSize:'10px', color:'#2d4d2d', letterSpacing:'0.5px' }}>
+                  NFC_UID::{lastNfcUid || 'none'} | IR_DB::{(irDbEntries ?? []).length} entries
+                </div>
+                {toolStatus && (
+                  <div style={{ gridColumn:'1 / -1', fontSize:'10px', color:'#3a5a3a', letterSpacing:'0.5px' }}>
+                    TOOL::{toolStatus}
+                  </div>
+                )}
+              </div>
+
               <div style={{
                 borderTop:'1px solid #081408',
                 padding:'10px 18px',

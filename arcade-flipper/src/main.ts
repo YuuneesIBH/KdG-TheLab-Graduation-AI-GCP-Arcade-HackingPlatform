@@ -33,6 +33,22 @@ type IpcResult = {
   message: string
 }
 
+type NfcCapturePayload = {
+  uid: string
+  label?: string
+  rawLine?: string
+}
+
+type IrDatabaseEntry = {
+  id: string
+  name: string
+  protocol: string
+  address: string
+  command: string
+  carrierKhz?: number
+  source?: string
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
@@ -82,6 +98,7 @@ function resolvePythonCommand(basePath: string) {
 
 const DIY_FLIPPER_BAUD_RATE = 115200
 const DIY_FLIPPER_SCAN_INTERVAL_MS = 3000
+const DIY_NFC_CAPTURE_DIR = path.join(app.getPath('userData'), 'diyflipper', 'nfc-captures')
 
 const DIY_MODULE_COMMANDS: Record<string, string> = {
   nfc: 'NFC_CLONE',
@@ -479,6 +496,22 @@ function createWindow() {
   })
 }
 
+function sanitizeFilePart(value: string) {
+  return value
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48) || 'capture'
+}
+
+function resolveIrMiniDatabasePath() {
+  const candidates = [
+    path.resolve(__dirname, '../../docs/ir-mini-database.json'),
+    path.resolve(app.getAppPath(), 'docs/ir-mini-database.json')
+  ]
+  return candidates.find((candidate) => fs.existsSync(candidate))
+}
+
 ipcMain.handle('set-fullscreen', async (_event, fullscreen: boolean) => {
   if (mainWindow) {
     mainWindow.setFullScreen(fullscreen)
@@ -513,6 +546,65 @@ ipcMain.handle('diyflipper-run-module', async (_event, moduleKey: string) => {
     return { success: false, message: `Unknown module key: ${moduleKey}` }
   }
   return writeDiyFlipperCommand(`RUN ${command}`)
+})
+
+ipcMain.handle('diyflipper-save-nfc-capture', async (_event, payload: NfcCapturePayload) => {
+  try {
+    const uid = (payload?.uid ?? '').trim()
+    if (!uid) {
+      return { success: false, message: 'Missing NFC UID' }
+    }
+
+    const now = new Date()
+    const iso = now.toISOString()
+    const stamp = iso.replace(/[:.]/g, '-')
+    const safeLabel = sanitizeFilePart((payload?.label ?? uid).trim())
+    const filename = `${stamp}_${safeLabel}.json`
+    const filePath = path.join(DIY_NFC_CAPTURE_DIR, filename)
+
+    fs.mkdirSync(DIY_NFC_CAPTURE_DIR, { recursive: true })
+    fs.writeFileSync(filePath, JSON.stringify({
+      uid,
+      label: payload?.label ?? uid,
+      capturedAt: iso,
+      source: 'diyflipper',
+      rawLine: payload?.rawLine ?? ''
+    }, null, 2))
+
+    return { success: true, message: filePath }
+  } catch (error: any) {
+    return { success: false, message: `Failed to save NFC capture: ${error.message || error}` }
+  }
+})
+
+ipcMain.handle('diyflipper-load-ir-mini-db', async () => {
+  try {
+    const dbPath = resolveIrMiniDatabasePath()
+    if (!dbPath) {
+      return { success: false, message: 'IR mini database file not found', entries: [] as IrDatabaseEntry[] }
+    }
+
+    const raw = fs.readFileSync(dbPath, 'utf8')
+    const parsed = JSON.parse(raw)
+    const entries = Array.isArray(parsed?.entries) ? parsed.entries as IrDatabaseEntry[] : []
+    return { success: true, message: `Loaded ${entries.length} IR entries`, entries }
+  } catch (error: any) {
+    return { success: false, message: `Failed to load IR DB: ${error.message || error}`, entries: [] as IrDatabaseEntry[] }
+  }
+})
+
+ipcMain.handle('diyflipper-send-ir-entry', async (_event, entry: IrDatabaseEntry) => {
+  if (!entry || typeof entry !== 'object') {
+    return { success: false, message: 'Invalid IR entry payload' }
+  }
+  const protocol = (entry.protocol ?? '').trim()
+  const address = (entry.address ?? '').trim()
+  const command = (entry.command ?? '').trim()
+  const carrierKhz = Number.isFinite(entry.carrierKhz) ? Math.round(entry.carrierKhz!) : 38
+  if (!protocol || !address || !command) {
+    return { success: false, message: 'IR entry is missing protocol/address/command' }
+  }
+  return writeDiyFlipperCommand(`IR_SEND ${protocol} ${address} ${command} ${carrierKhz}`)
 })
 
 ipcMain.handle('stop-game', async () => {

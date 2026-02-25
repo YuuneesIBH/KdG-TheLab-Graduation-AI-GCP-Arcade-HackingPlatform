@@ -1,0 +1,40 @@
+﻿{
+  "entries": [
+    {
+      "id": "tv_power_nec_20df10ef",
+      "name": "TV Power (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0x10EF",
+      "carrierKhz": 38,
+      "source": "Public NEC example"
+    },
+    {
+      "id": "tv_volup_nec_20df40bf",
+      "name": "TV Vol+ (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0x40BF",
+      "carrierKhz": 38,
+      "source": "Public NEC example"
+    },
+    {
+      "id": "tv_voldown_nec_20dfc03f",
+      "name": "TV Vol- (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0xC03F",
+      "carrierKhz": 38,
+      "source": "Public NEC example"
+    },
+    {
+      "id": "projector_power_nec_807f12ed",
+      "name": "Projector Power (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x807F",
+      "command": "0x12ED",
+      "carrierKhz": 38,
+      "source": "Public NEC example"
+    }
+  ]
+}

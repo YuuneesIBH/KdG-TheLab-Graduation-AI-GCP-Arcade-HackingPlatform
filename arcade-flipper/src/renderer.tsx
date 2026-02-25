@@ -15,6 +15,16 @@ type DiyFlipperStatus = {
   lastSeenAt?: number
 }
 
+type IrDatabaseEntry = {
+  id: string
+  name: string
+  protocol: string
+  address: string
+  command: string
+  carrierKhz?: number
+  source?: string
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
@@ -26,6 +36,9 @@ function App() {
     autoConnect: true
   })
   const [diyFlipperLastLine, setDiyFlipperLastLine] = useState<string>('')
+  const [toolStatus, setToolStatus] = useState<string>('Ready')
+  const [lastNfcUid, setLastNfcUid] = useState<string>('')
+  const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
 
   // ── arcade boot state ─────────────────────────────────────────
   const [coins, setCoins] = useState(0)
@@ -144,6 +157,12 @@ function App() {
       const status = await window.electron!.diyFlipperGetStatus()
       setDiyFlipperStatus(status)
       await window.electron!.diyFlipperConnect()
+      const irLoad = await window.electron!.diyFlipperLoadIrMiniDb()
+      if (irLoad.success) {
+        setIrDbEntries(irLoad.entries ?? [])
+      } else {
+        setToolStatus(`IR DB load failed: ${irLoad.message}`)
+      }
     }
 
     const unsubscribeStatus = window.electron.onDiyFlipperStatus((status) => {
@@ -152,6 +171,12 @@ function App() {
 
     const unsubscribeLine = window.electron.onDiyFlipperLine((line) => {
       setDiyFlipperLastLine(line)
+      const uidMatch = line.match(/(?:NFC_UID|UID)\s*[:=]\s*([0-9A-Fa-f:_-]+)/)
+      if (uidMatch?.[1]) {
+        const uid = uidMatch[1].toUpperCase()
+        setLastNfcUid(uid)
+        setToolStatus(`NFC UID captured: ${uid}`)
+      }
     })
 
     void readInitialStatus()
@@ -176,6 +201,48 @@ function App() {
     console.log('[DIYFLIPPER] Module command sent:', key)
   }, [])
 
+  const handleNfcRead = useCallback(async () => {
+    if (!window.electron) return
+    const result = await window.electron.diyFlipperSendCommand('NFC_READ')
+    setToolStatus(result.success ? 'NFC read command sent' : `NFC read failed: ${result.message}`)
+  }, [])
+
+  const handleNfcSave = useCallback(async () => {
+    if (!window.electron) return
+    if (!lastNfcUid) {
+      setToolStatus('No NFC UID captured yet')
+      return
+    }
+    const result = await window.electron.diyFlipperSaveNfcCapture({
+      uid: lastNfcUid,
+      label: `nfc_${lastNfcUid}`,
+      rawLine: diyFlipperLastLine
+    })
+    setToolStatus(result.success ? `Saved NFC capture to ${result.message}` : `NFC save failed: ${result.message}`)
+  }, [lastNfcUid, diyFlipperLastLine])
+
+  const handleIrReload = useCallback(async () => {
+    if (!window.electron) return
+    const result = await window.electron.diyFlipperLoadIrMiniDb()
+    if (!result.success) {
+      setToolStatus(`IR DB load failed: ${result.message}`)
+      return
+    }
+    setIrDbEntries(result.entries ?? [])
+    setToolStatus(`Loaded ${result.entries?.length ?? 0} IR entries`)
+  }, [])
+
+  const handleIrSend = useCallback(async (entryId: string) => {
+    if (!window.electron) return
+    const entry = irDbEntries.find((candidate) => candidate.id === entryId)
+    if (!entry) {
+      setToolStatus('IR entry not found')
+      return
+    }
+    const result = await window.electron.diyFlipperSendIrEntry(entry)
+    setToolStatus(result.success ? `IR sent: ${entry.name}` : `IR send failed: ${result.message}`)
+  }, [irDbEntries])
+
   // ── render ────────────────────────────────────────────────────
   if (screen === 'hacker-menu')
     return (
@@ -184,6 +251,13 @@ function App() {
         onBack={() => setScreen('boot')}
         deviceStatus={diyFlipperStatus}
         lastDeviceLine={diyFlipperLastLine}
+        onNfcRead={handleNfcRead}
+        onNfcSave={handleNfcSave}
+        onIrReload={handleIrReload}
+        onIrSend={handleIrSend}
+        lastNfcUid={lastNfcUid}
+        irDbEntries={irDbEntries}
+        toolStatus={toolStatus}
       />
     )
 

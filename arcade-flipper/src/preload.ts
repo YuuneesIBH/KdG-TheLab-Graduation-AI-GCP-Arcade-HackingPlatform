@@ -22,6 +22,16 @@ type DiyFlipperStatus = {
   lastSeenAt?: number
 }
 
+type IrDatabaseEntry = {
+  id: string
+  name: string
+  protocol: string
+  address: string
+  command: string
+  carrierKhz?: number
+  source?: string
+}
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
@@ -36,6 +46,10 @@ contextBridge.exposeInMainWorld('electron', {
   diyFlipperDisconnect: () => ipcRenderer.invoke('diyflipper-disconnect'),
   diyFlipperSendCommand: (command: string) => ipcRenderer.invoke('diyflipper-send-command', command),
   diyFlipperRunModule: (moduleKey: string) => ipcRenderer.invoke('diyflipper-run-module', moduleKey),
+  diyFlipperSaveNfcCapture: (payload: { uid: string; label?: string; rawLine?: string }) =>
+    ipcRenderer.invoke('diyflipper-save-nfc-capture', payload),
+  diyFlipperLoadIrMiniDb: () => ipcRenderer.invoke('diyflipper-load-ir-mini-db'),
+  diyFlipperSendIrEntry: (entry: IrDatabaseEntry) => ipcRenderer.invoke('diyflipper-send-ir-entry', entry),
   onDiyFlipperStatus: (callback: (status: DiyFlipperStatus) => void) => {
     const listener = (_event: unknown, status: DiyFlipperStatus) => callback(status)
     ipcRenderer.on('diyflipper-status', listener)

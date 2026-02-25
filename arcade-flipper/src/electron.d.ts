@@ -21,6 +21,16 @@ export type DiyFlipperStatus = {
   lastSeenAt?: number
 }
 
+export type IrDatabaseEntry = {
+  id: string
+  name: string
+  protocol: string
+  address: string
+  command: string
+  carrierKhz?: number
+  source?: string
+}
+
 export interface ElectronAPI {
   setFullscreen: (fullscreen: boolean) => Promise<{success: boolean}>
   launchGame: (request: string | LaunchRequest) => Promise<{success: boolean, message: string}>
@@ -33,6 +43,9 @@ export interface ElectronAPI {
   diyFlipperDisconnect: () => Promise<{success: boolean, message: string}>
   diyFlipperSendCommand: (command: string) => Promise<{success: boolean, message: string}>
   diyFlipperRunModule: (moduleKey: string) => Promise<{success: boolean, message: string}>
+  diyFlipperSaveNfcCapture: (payload: { uid: string; label?: string; rawLine?: string }) => Promise<{success: boolean, message: string}>
+  diyFlipperLoadIrMiniDb: () => Promise<{success: boolean, message: string, entries: IrDatabaseEntry[]}>
+  diyFlipperSendIrEntry: (entry: IrDatabaseEntry) => Promise<{success: boolean, message: string}>
   onDiyFlipperStatus: (callback: (status: DiyFlipperStatus) => void) => () => void
   onDiyFlipperLine: (callback: (line: string) => void) => () => void
   onGameExit: (callback: () => void) => () => void

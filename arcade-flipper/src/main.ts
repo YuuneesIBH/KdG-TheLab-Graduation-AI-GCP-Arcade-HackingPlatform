@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
-import { spawn, type ChildProcess } from 'child_process'
+import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import fs from 'fs'
 import { SerialPort } from 'serialport'
 
@@ -35,6 +35,49 @@ type IpcResult = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
+}
+
+function hasPygame(pythonCommand: string) {
+  try {
+    const check = spawnSync(pythonCommand, ['-c', 'import pygame'], { stdio: 'ignore' })
+    return check.status === 0
+  } catch {
+    return false
+  }
+}
+
+function resolvePythonCommand(basePath: string) {
+  const explicitPython = process.env.ARCADE_PYTHON?.trim()
+  if (explicitPython) return explicitPython
+
+  const rootCandidates = [
+    path.resolve(basePath, '..'),
+    path.resolve(basePath, '../..')
+  ]
+
+  const interpreterCandidates = process.platform === 'win32'
+    ? [
+        path.join('.venv', 'Scripts', 'python.exe'),
+        path.join('.venv', 'Scripts', 'python')
+      ]
+    : [
+        path.join('.venv', 'bin', 'python3'),
+        path.join('.venv', 'bin', 'python')
+      ]
+
+  for (const root of rootCandidates) {
+    for (const relative of interpreterCandidates) {
+      const fullPath = path.join(root, relative)
+      if (!fs.existsSync(fullPath)) continue
+      if (!hasPygame(fullPath)) {
+        console.warn(`[LAUNCH] Ignoring python interpreter without pygame: ${fullPath}`)
+        continue
+      }
+      return fullPath
+    }
+  }
+
+  return process.platform === 'win32' ? 'python' : 'python3'
 }
 
 const DIY_FLIPPER_BAUD_RATE = 115200
@@ -584,7 +627,8 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       : defaultBounds
 
     if (gamePath.endsWith('.py')) {
-      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
+      const pythonCmd = resolvePythonCommand(basePath)
+      console.log('[LAUNCH] Python:', pythonCmd)
 
       const pythonProcess = spawn(pythonCmd, [fullGamePath], {
         stdio: ['ignore', 'pipe', 'pipe'],

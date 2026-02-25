@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "out/main/main.js",
   "scripts": {
+    "setup:python": "node scripts/setup-python-venv.js",
     "dev": "node scripts/run-electron-vite.js dev",
     "build": "node scripts/run-electron-vite.js build",
     "preview": "node scripts/run-electron-vite.js preview"

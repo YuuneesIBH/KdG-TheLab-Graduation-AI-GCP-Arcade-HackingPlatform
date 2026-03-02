@@ -130,6 +130,7 @@ npm run preview
 ## Huidige Games (default catalogus)
 
 - SPACE INVADER (`games/spaceinvaders.py`)
+- PAC-MAN (`games/PacMan/pacman.py`)
 - RETRO BIRD (`games/RetroBird/main.py`)
 - EXTREME RACING (`games/CarRacingUltraMaxExtremeLevel1000/main.py`)
 - BLOCK STORM (`games/BlockStorm/main.py`)

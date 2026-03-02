@@ -54,5 +54,6 @@ export interface ElectronAPI {
 declare global {
   interface Window {
     electron?: ElectronAPI
+    __hackTransitionTrigger?: () => void
   }
 }

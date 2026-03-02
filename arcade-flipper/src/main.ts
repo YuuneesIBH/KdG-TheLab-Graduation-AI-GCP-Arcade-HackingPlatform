@@ -53,6 +53,11 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+function toErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
 function hasPygame(pythonCommand: string) {
   try {
     const check = spawnSync(pythonCommand, ['-c', 'import pygame'], { stdio: 'ignore' })
@@ -190,7 +195,7 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
       const result = await new Promise<IpcResult>((resolve) => {
         const killer = spawn('taskkill', args, { stdio: 'ignore' })
         killer.once('error', (error) => {
-          resolve({ success: false, message: `Failed to stop game: ${error.message || error}` })
+          resolve({ success: false, message: `Failed to stop game: ${toErrorMessage(error)}` })
         })
         killer.once('exit', (code) => {
           if (code === 0) {
@@ -218,8 +223,8 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
     restoreArcadeWindow()
     publishGameExited()
     return { success: true, message: 'Game stop signal sent' }
-  } catch (error: any) {
-    return { success: false, message: `Failed to stop game: ${error.message || error}` }
+  } catch (error: unknown) {
+    return { success: false, message: `Failed to stop game: ${toErrorMessage(error)}` }
   }
 }
 
@@ -244,7 +249,7 @@ function scoreSerialPort(port: PortInfo) {
 async function listSerialPortsSafe() {
   try {
     return await SerialPort.list()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[DIYFLIPPER] Failed to list serial ports:', error)
     return []
   }
@@ -277,7 +282,7 @@ function attachDiyFlipperPortListeners(port: SerialPort) {
         connected: false,
         connecting: false,
         portPath: undefined,
-        error: `Serial error: ${error.message || error}`
+        error: `Serial error: ${toErrorMessage(error)}`
       })
     }
   })
@@ -401,8 +406,8 @@ async function connectDiyFlipper(preferredPath?: string) {
       await openDiyFlipperPort(candidate.path)
       console.log(`[DIYFLIPPER] Connected on ${candidate.path}`)
       return { success: true, message: `Connected on ${candidate.path}` }
-    } catch (error: any) {
-      const message = `${candidate.path}: ${error.message || error}`
+    } catch (error: unknown) {
+      const message = `${candidate.path}: ${toErrorMessage(error)}`
       errors.push(message)
       console.warn(`[DIYFLIPPER] Failed to open ${message}`)
     }
@@ -461,8 +466,8 @@ async function writeDiyFlipperCommand(command: string) {
   return new Promise<{ success: boolean; message: string }>((resolve) => {
     diyFlipperPort!.write(`${command.trim()}\n`, (error) => {
       if (error) {
-        setDiyFlipperStatus({ error: `Write failed: ${error.message || error}` })
-        resolve({ success: false, message: `Write failed: ${error.message || error}` })
+        setDiyFlipperStatus({ error: `Write failed: ${toErrorMessage(error)}` })
+        resolve({ success: false, message: `Write failed: ${toErrorMessage(error)}` })
         return
       }
       setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
@@ -611,8 +616,8 @@ ipcMain.handle('diyflipper-save-nfc-capture', async (_event, payload: NfcCapture
     }, null, 2))
 
     return { success: true, message: filePath }
-  } catch (error: any) {
-    return { success: false, message: `Failed to save NFC capture: ${error.message || error}` }
+  } catch (error: unknown) {
+    return { success: false, message: `Failed to save NFC capture: ${toErrorMessage(error)}` }
   }
 })
 
@@ -627,8 +632,8 @@ ipcMain.handle('diyflipper-load-ir-mini-db', async () => {
     const parsed = JSON.parse(raw)
     const entries = Array.isArray(parsed?.entries) ? parsed.entries as IrDatabaseEntry[] : []
     return { success: true, message: `Loaded ${entries.length} IR entries`, entries }
-  } catch (error: any) {
-    return { success: false, message: `Failed to load IR DB: ${error.message || error}`, entries: [] as IrDatabaseEntry[] }
+  } catch (error: unknown) {
+    return { success: false, message: `Failed to load IR DB: ${toErrorMessage(error)}`, entries: [] as IrDatabaseEntry[] }
   }
 })
 
@@ -851,12 +856,12 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       success: false,
       message: `Unsupported file type: ${path.extname(gamePath)}`
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[LAUNCH] Error launching game:', error)
     restoreArcadeWindow()
     return {
       success: false,
-      message: `Error: ${error.message || error}`
+      message: `Error: ${toErrorMessage(error)}`
     }
   }
 })

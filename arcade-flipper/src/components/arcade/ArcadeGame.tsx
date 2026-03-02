@@ -70,28 +70,37 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }
   }, [])
 
-  const stopGameIfPossible = React.useCallback(() => {
-    const api = (window as any).electron
-    api?.stopGame?.()
-    api?.killGame?.()
+  const setFullscreen = React.useCallback((enabled: boolean) => {
+    void window.electron?.setFullscreen?.(enabled)
+  }, [])
+
+  const stopGameIfPossible = React.useCallback(async () => {
+    const api = window.electron
+    if (!api) return
+
+    const result = await api.stopGame()
+    if (!result.success) {
+      await api.killGame()
+    }
   }, [])
 
   const exit = React.useCallback(() => {
-    stopGameIfPossible()
-    ;(window as any).electron?.setFullscreen?.(true)
+    void stopGameIfPossible()
+    setFullscreen(true)
     onExit()
-  }, [onExit, stopGameIfPossible])
+  }, [onExit, setFullscreen, stopGameIfPossible])
 
   const launch = React.useCallback(async () => {
     if (!game) { setErrorMessage('Game not found'); setStatus('error'); return }
-    if (!window.electron?.launchGame) {
+    const api = window.electron
+    if (!api?.launchGame) {
       setErrorMessage('Electron API not available'); setStatus('error'); return
     }
     setStatus('launching'); setErrorMessage(''); setProgress(0)
     await waitForLayoutCommit()
     try {
       const viewport = getViewport()
-      const result = await window.electron.launchGame({
+      const result = await api.launchGame({
         gamePath: game.executable,
         mode: viewport ? 'embedded' : 'external',
         viewport,
@@ -107,10 +116,12 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
 
   // ── Effects ──────────────────────────────────────────────────────
   React.useEffect(() => {
-    ;(window as any).electron?.setFullscreen?.(true)
-    launch()
-    return () => stopGameIfPossible()
-  }, [launch, stopGameIfPossible])
+    setFullscreen(true)
+    void launch()
+    return () => {
+      void stopGameIfPossible()
+    }
+  }, [launch, setFullscreen, stopGameIfPossible])
 
   React.useEffect(() => {
     if (status !== 'launching') return
@@ -136,8 +147,14 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
 
   React.useEffect(() => {
     if (status !== 'running') return
-    const api = (window as any).electron
-    const update = () => { const v = getViewport(); if (!v) return; api?.updateGameViewport?.(v); api?.resizeGame?.(v) }
+    const api = window.electron
+    if (!api) return
+    const update = () => {
+      const v = getViewport()
+      if (!v) return
+      void api.updateGameViewport(v)
+      void api.resizeGame(v)
+    }
     update()
     window.addEventListener('resize', update)
     let ro: ResizeObserver | null = null

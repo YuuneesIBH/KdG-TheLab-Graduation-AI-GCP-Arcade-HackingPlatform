@@ -215,7 +215,6 @@ function BreachSplash({ active }: { active: boolean }) {
 // ─────────────────────────────────────────────────────────────────
 //  HACK BUTTON
 //  Drop into the top-right of your arcade boot screen.
-//  Example:  <HackButton onClick={() => (window as any).__hackTransitionTrigger?.()} />
 // ─────────────────────────────────────────────────────────────────
 export function HackButton({ onClick }: { onClick: () => void }) {
   const [hover, setHover] = useState(false)
@@ -262,26 +261,7 @@ export function HackButton({ onClick }: { onClick: () => void }) {
 //  MAIN TRANSITION OVERLAY
 //
 //  Mount this alongside your current screen. It renders nothing
-//  until triggered. Call (window as any).__hackTransitionTrigger()
-//  from your HackButton or anywhere else.
-//
-//  Example wiring in your top-level App:
-//
-//    function App() {
-//      const [screen, setScreen] = useState<'boot' | 'hacker'>('boot')
-//      return (
-//        <>
-//          {screen === 'boot'   && <ArcadeBootScreen />}
-//          {screen === 'hacker' && <HackerTerminal />}
-//          {screen === 'boot'   && (
-//            <HackTransition onComplete={() => setScreen('hacker')} />
-//          )}
-//        </>
-//      )
-//    }
-//
-//  In your arcade status bar (top-right), add:
-//    <HackButton onClick={() => (window as any).__hackTransitionTrigger?.()} />
+//  until triggered through `window.__hackTransitionTrigger`.
 // ─────────────────────────────────────────────────────────────────
 export function HackTransition({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase]           = useState<Phase>('idle')
@@ -298,8 +278,8 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
   }
 
   useEffect(() => {
-    (window as any).__hackTransitionTrigger = trigger
-    return () => { delete (window as any).__hackTransitionTrigger }
+    window.__hackTransitionTrigger = trigger
+    return () => { delete window.__hackTransitionTrigger }
   }, [])
 
   // ── Phase 1: CRT rolls down ─────────────────────────────────

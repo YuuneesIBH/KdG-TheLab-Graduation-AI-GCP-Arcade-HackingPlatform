@@ -250,7 +250,7 @@ export function BootScreen({
           </div>
 
           {/* HACK TERMINAL BUTTON */}
-          <HackButton onClick={() => (window as any).__hackTransitionTrigger?.()} />
+          <HackButton onClick={() => window.__hackTransitionTrigger?.()} />
         </div>
 
         {/* LOGO + BOOT PANEL WRAPPER */}

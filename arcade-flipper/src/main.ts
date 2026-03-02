@@ -49,6 +49,45 @@ type IrDatabaseEntry = {
   source?: string
 }
 
+const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
+  {
+    id: 'tv_power_nec_20df10ef',
+    name: 'TV Power (NEC sample)',
+    protocol: 'NEC',
+    address: '0x20DF',
+    command: '0x10EF',
+    carrierKhz: 38,
+    source: 'Built-in fallback'
+  },
+  {
+    id: 'tv_volup_nec_20df40bf',
+    name: 'TV Vol+ (NEC sample)',
+    protocol: 'NEC',
+    address: '0x20DF',
+    command: '0x40BF',
+    carrierKhz: 38,
+    source: 'Built-in fallback'
+  },
+  {
+    id: 'tv_voldown_nec_20dfc03f',
+    name: 'TV Vol- (NEC sample)',
+    protocol: 'NEC',
+    address: '0x20DF',
+    command: '0xC03F',
+    carrierKhz: 38,
+    source: 'Built-in fallback'
+  },
+  {
+    id: 'projector_power_nec_807f12ed',
+    name: 'Projector Power (NEC sample)',
+    protocol: 'NEC',
+    address: '0x807F',
+    command: '0x12ED',
+    carrierKhz: 38,
+    source: 'Built-in fallback'
+  }
+]
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
@@ -652,7 +691,9 @@ function sanitizeFilePart(value: string) {
 function resolveIrMiniDatabasePath() {
   const candidates = [
     path.resolve(__dirname, '../../docs/ir-mini-database.json'),
-    path.resolve(app.getAppPath(), 'docs/ir-mini-database.json')
+    path.resolve(__dirname, '../../../docs/ir-mini-database.json'),
+    path.resolve(app.getAppPath(), 'docs/ir-mini-database.json'),
+    path.resolve(process.cwd(), 'docs/ir-mini-database.json')
   ]
   return candidates.find((candidate) => fs.existsSync(candidate))
 }
@@ -726,15 +767,39 @@ ipcMain.handle('diyflipper-load-ir-mini-db', async () => {
   try {
     const dbPath = resolveIrMiniDatabasePath()
     if (!dbPath) {
-      return { success: false, message: 'IR mini database file not found', entries: [] as IrDatabaseEntry[] }
+      return {
+        success: true,
+        message: 'IR mini database file not found, using built-in fallback',
+        entries: DEFAULT_IR_MINI_DATABASE
+      }
     }
 
     const raw = fs.readFileSync(dbPath, 'utf8')
-    const parsed = JSON.parse(raw)
+    const normalized = raw.replace(/^\uFEFF/, '')
+    const parsed = JSON.parse(normalized)
     const entries = Array.isArray(parsed?.entries) ? parsed.entries as IrDatabaseEntry[] : []
+<<<<<<< HEAD
     return { success: true, message: `Loaded ${entries.length} IR entries`, entries }
   } catch (error: unknown) {
     return { success: false, message: `Failed to load IR DB: ${toErrorMessage(error)}`, entries: [] as IrDatabaseEntry[] }
+=======
+
+    if (!entries.length) {
+      return {
+        success: true,
+        message: `IR DB at ${dbPath} is empty, using built-in fallback`,
+        entries: DEFAULT_IR_MINI_DATABASE
+      }
+    }
+
+    return { success: true, message: `Loaded ${entries.length} IR entries from ${dbPath}`, entries }
+  } catch (error: any) {
+    return {
+      success: true,
+      message: `Failed to load IR DB (${error.message || error}), using built-in fallback`,
+      entries: DEFAULT_IR_MINI_DATABASE
+    }
+>>>>>>> gitlab/main
   }
 })
 

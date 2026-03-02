@@ -36,6 +36,7 @@ function App() {
     autoConnect: true
   })
   const [diyFlipperLastLine, setDiyFlipperLastLine] = useState<string>('')
+  const [diyFlipperSerialLines, setDiyFlipperSerialLines] = useState<string[]>([])
   const [toolStatus, setToolStatus] = useState<string>('Ready')
   const [lastNfcUid, setLastNfcUid] = useState<string>('')
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
@@ -171,6 +172,11 @@ function App() {
 
     const unsubscribeLine = window.electron.onDiyFlipperLine((line) => {
       setDiyFlipperLastLine(line)
+      const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
+      setDiyFlipperSerialLines((prev) => {
+        const next = [...prev, `[${stamp}] ${line}`]
+        return next.length > 140 ? next.slice(next.length - 140) : next
+      })
       const uidMatch = line.match(/(?:NFC_UID|UID)\s*[:=]\s*([0-9A-Fa-f:_-]+)/)
       if (uidMatch?.[1]) {
         const uid = uidMatch[1].toUpperCase()
@@ -245,6 +251,18 @@ function App() {
     setToolStatus(result.success ? `IR sent: ${entry.name}` : `IR send failed: ${result.message}`)
   }, [irDbEntries])
 
+  const handleRawSerialCommand = useCallback(async (command: string) => {
+    if (!window.electron) return
+    const trimmed = command.trim()
+    if (!trimmed) return
+    const result = await window.electron.diyFlipperSendCommand(trimmed)
+    setToolStatus(result.success ? `Raw command sent: ${trimmed}` : `Raw command failed: ${result.message}`)
+  }, [])
+
+  const handleClearSerialLog = useCallback(() => {
+    setDiyFlipperSerialLines([])
+  }, [])
+
   // ── render ────────────────────────────────────────────────────
   if (screen === 'hacker-menu')
     return (
@@ -260,6 +278,9 @@ function App() {
         lastNfcUid={lastNfcUid}
         irDbEntries={irDbEntries}
         toolStatus={toolStatus}
+        serialLines={diyFlipperSerialLines}
+        onSendRawCommand={handleRawSerialCommand}
+        onClearSerialLog={handleClearSerialLog}
       />
     )
 

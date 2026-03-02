@@ -125,6 +125,35 @@ function resolveJavaCommand() {
   return 'java'
 }
 
+function applySuperMarioNesResolution(fullGamePath: string, targetBounds: LaunchViewport) {
+  const gameDir = path.basename(path.dirname(fullGamePath)).toLowerCase()
+  const gameFile = path.basename(fullGamePath).toLowerCase()
+  if (gameDir !== 'supermariones' || gameFile !== 'mario.jar') return
+
+  const settingsPath = path.join(path.dirname(fullGamePath), 'Setting.txt')
+  const width = clamp(Math.round(targetBounds.width), 320, 4096)
+  const height = clamp(Math.round(targetBounds.height), 240, 2160)
+  let flags = 0x01010101
+
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const existing = fs.readFileSync(settingsPath)
+      if (existing.length >= 4) {
+        flags = existing.readInt32BE(0)
+      }
+    }
+
+    const output = Buffer.alloc(12)
+    output.writeInt32BE(flags, 0)
+    output.writeInt32BE(width, 4)
+    output.writeInt32BE(height, 8)
+    fs.writeFileSync(settingsPath, output)
+    console.log(`[LAUNCH] SuperMarioNES Setting.txt updated to ${width}x${height}`)
+  } catch (error) {
+    console.warn('[LAUNCH] Failed to update SuperMarioNES resolution:', error)
+  }
+}
+
 const DIY_FLIPPER_BAUD_RATE = 115200
 const DIY_FLIPPER_SCAN_INTERVAL_MS = 3000
 const DIY_NFC_CAPTURE_DIR = path.join(app.getPath('userData'), 'diyflipper', 'nfc-captures')
@@ -174,6 +203,54 @@ function restoreArcadeWindow() {
   mainWindow.show()
   mainWindow.focus()
   mainWindow.setFullScreen(true)
+}
+
+function scheduleMacWindowPlacement(
+  processNameQuery: string,
+  targetBounds: LaunchViewport,
+  launchMode: 'external' | 'embedded'
+) {
+  if (process.platform !== 'darwin' || !mainWindow || mainWindow.isDestroyed()) return
+
+  let attempts = 0
+  const maxAttempts = 10
+
+  const positionWindow = setInterval(() => {
+    attempts++
+
+    const fullscreenScript = launchMode === 'embedded'
+      ? 'set value of attribute "AXFullScreen" of win to false'
+      : 'set value of attribute "AXFullScreen" of win to true'
+
+    const script = `
+      tell application "System Events"
+        try
+          set gameProcesses to every process whose name contains "${processNameQuery}"
+          repeat with proc in gameProcesses
+            try
+              set procWindows to windows of proc
+              repeat with win in procWindows
+                try
+                  set position of win to {${targetBounds.x}, ${targetBounds.y}}
+                  set size of win to {${targetBounds.width}, ${targetBounds.height}}
+                  ${fullscreenScript}
+                end try
+              end repeat
+            end try
+          end repeat
+        end try
+      end tell
+    `
+
+    spawn('osascript', ['-e', script], {
+      detached: true,
+      stdio: 'ignore'
+    }).unref()
+
+    if (attempts >= maxAttempts) {
+      clearInterval(positionWindow)
+    }
+  }, 500)
 }
 
 function trackActiveGameProcess(gameProcess: ChildProcess, label: string) {
@@ -816,47 +893,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
         restoreArcadeWindow()
       })
 
-      if (process.platform === 'darwin' && mainWindow) {
-        let attempts = 0
-        const maxAttempts = 10
-
-        const positionWindow = setInterval(() => {
-          attempts++
-
-          const fullscreenScript = launchMode === 'embedded'
-            ? 'set value of attribute "AXFullScreen" of win to false'
-            : 'set value of attribute "AXFullScreen" of win to true'
-
-          const script = `
-            tell application "System Events"
-              try
-                set pythonProcesses to every process whose name contains "Python"
-                repeat with proc in pythonProcesses
-                  try
-                    set procWindows to windows of proc
-                    repeat with win in procWindows
-                      try
-                        set position of win to {${targetBounds.x}, ${targetBounds.y}}
-                        set size of win to {${targetBounds.width}, ${targetBounds.height}}
-                        ${fullscreenScript}
-                      end try
-                    end repeat
-                  end try
-                end repeat
-              end try
-            end tell
-          `
-
-          spawn('osascript', ['-e', script], {
-            detached: true,
-            stdio: 'ignore'
-          }).unref()
-
-          if (attempts >= maxAttempts) {
-            clearInterval(positionWindow)
-          }
-        }, 500)
-      }
+      scheduleMacWindowPlacement('python', targetBounds, launchMode)
 
       trackActiveGameProcess(pythonProcess, 'python')
 
@@ -876,6 +913,8 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
           message: 'Java runtime not found. Install Java or set ARCADE_JAVA.'
         }
       }
+
+      applySuperMarioNesResolution(fullGamePath, targetBounds)
 
       const javaProcess = spawn(javaCmd, ['-jar', fullGamePath], {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -900,6 +939,8 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
         console.error('[LAUNCH] Java start failed:', error)
         restoreArcadeWindow()
       })
+
+      scheduleMacWindowPlacement('java', targetBounds, launchMode)
 
       trackActiveGameProcess(javaProcess, 'java')
 

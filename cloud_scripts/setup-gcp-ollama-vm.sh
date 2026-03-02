@@ -2,14 +2,6 @@
 
 set -Eeuo pipefail
 
-PROJECT_ID=thelab-488513 \
-ZONE=europe-west1-b \
-MACHINE_TYPE=e2-standard-4 \
-BOOT_DISK_SIZE=40GB \
-MODEL_NAME=llama3.2:3b \
-ALLOWED_CIDR="$(curl -s https://api.ipify.org)/32" \
-./cloud_scripts/setup-gcp-ollama-vm.sh
-
 # -----------------------------------------------------------------------------
 # Config (override via env vars, e.g. PROJECT_ID=... MODEL_NAME=... ./script.sh)
 # -----------------------------------------------------------------------------

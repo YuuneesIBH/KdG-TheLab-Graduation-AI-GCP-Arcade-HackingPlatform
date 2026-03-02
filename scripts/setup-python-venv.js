@@ -6,9 +6,7 @@ const repoRoot = path.resolve(__dirname, '..')
 const arcadeRoot = path.join(repoRoot, 'arcade-flipper')
 const venvDir = path.join(arcadeRoot, '.venv')
 const isWindows = process.platform === 'win32'
-const requirementsFiles = [
-  path.join(arcadeRoot, 'src', 'games', 'super-mario-python', 'requirements.txt')
-]
+const baselinePackages = ['pygame']
 
 function log(message) {
   console.log(`[python-venv] ${message}`)
@@ -72,6 +70,35 @@ function detectVenvPython() {
   return candidates.find((candidate) => fs.existsSync(candidate))
 }
 
+function collectRequirementsFiles(baseDir) {
+  if (!fs.existsSync(baseDir)) return []
+
+  const collected = []
+  const stack = [baseDir]
+
+  while (stack.length > 0) {
+    const current = stack.pop()
+    if (!current) continue
+
+    const entries = fs.readdirSync(current, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.name === '__pycache__' || entry.name.startsWith('.')) continue
+
+      const fullPath = path.join(current, entry.name)
+      if (entry.isDirectory()) {
+        stack.push(fullPath)
+        continue
+      }
+
+      if (/^requirements(\..+)?\.txt$/i.test(entry.name)) {
+        collected.push(fullPath)
+      }
+    }
+  }
+
+  return collected
+}
+
 if (!fs.existsSync(arcadeRoot)) {
   fail(`Arcade folder not found: ${arcadeRoot}`)
 }
@@ -95,9 +122,16 @@ if (!venvPython) {
 
 runCommand(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip'], { cwd: repoRoot })
 
+runCommand(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', ...baselinePackages], { cwd: repoRoot })
+
+const requirementsFiles = Array.from(new Set([
+  path.join(repoRoot, 'requirements.txt'),
+  path.join(arcadeRoot, 'requirements.txt'),
+  ...collectRequirementsFiles(path.join(arcadeRoot, 'src', 'games'))
+]))
+
 for (const requirementsPath of requirementsFiles) {
   if (!fs.existsSync(requirementsPath)) {
-    log(`Skipping missing requirements file: ${requirementsPath}`)
     continue
   }
   runCommand(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', '-r', requirementsPath], { cwd: repoRoot })

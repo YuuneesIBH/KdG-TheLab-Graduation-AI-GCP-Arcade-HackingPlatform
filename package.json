@@ -6,7 +6,10 @@
     "setup:python": "node scripts/setup-python-venv.js",
     "dev": "node scripts/run-electron-vite.js dev",
     "build": "node scripts/run-electron-vite.js build",
-    "preview": "node scripts/run-electron-vite.js preview"
+    "preview": "node scripts/run-electron-vite.js preview",
+    "typecheck": "tsc --noEmit -p arcade-flipper/tsconfig.json",
+    "check": "npm run typecheck && npm run build",
+    "test": "npm run check"
   },
   "keywords": [],
   "author": "",

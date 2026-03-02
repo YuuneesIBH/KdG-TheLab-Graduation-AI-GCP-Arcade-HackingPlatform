@@ -36,7 +36,7 @@ Dit project bevat:
 
 - Fullscreen arcade launcher flow (boot -> menu -> game)
 - IPC bridge tussen renderer en main process
-- Launch support voor `.py` en `.exe`
+- Launch support voor `.py`, `.jar` en `.exe`
 - Embedded launch mode met viewport data
 - Hacker terminal mode met keyboard en gamepad navigatie
 - Auto-reconnect naar DIY Flipper hardware om de paar seconden
@@ -56,7 +56,8 @@ Dit project bevat:
 │   └── esp32_diyflipper/
 │       └── esp32_diyflipper.ino
 ├── scripts/
-│   └── run-electron-vite.js
+│   ├── run-electron-vite.js
+│   └── setup-python-venv.js
 └── arcade-flipper/
     └── src/
         ├── main.ts
@@ -102,6 +103,8 @@ Optioneel (voor hardware flow):
 ```bash
 npm install
 python3 -m pip install pygame
+# of automatisch:
+npm run setup:python
 ```
 
 Optioneel met virtualenv:
@@ -118,6 +121,8 @@ pip install pygame
 npm run dev
 npm run build
 npm run preview
+npm run typecheck
+npm run check
 ```
 
 ## Controls
@@ -132,7 +137,9 @@ npm run preview
 - SPACE INVADER (`games/spaceinvaders.py`)
 - PAC-MAN (`games/PacMan/pacman.py`)
 - RETRO BIRD (`games/RetroBird/main.py`)
+- PIXEL QUEST ADVENTURE (`games/SuperMarioNES/Mario.jar`)
 - EXTREME RACING (`games/CarRacingUltraMaxExtremeLevel1000/main.py`)
+- RETRO RACE (`games/RetroRaceGame/RetroRaceGame.jar`)
 - BLOCK STORM (`games/BlockStorm/main.py`)
 - ANGRY WALLS (`games/AngryWalls/main.py`)
 - PONG (`games/pong.py`)
@@ -156,6 +163,7 @@ Renderer gebruikt `window.electron.launchGame(...)`.
 In `main.ts` wordt launch behavior bepaald op extensie:
 
 - `.py`: via `python3` (`python` op Windows)
+- `.jar`: via `java -jar`
 - `.exe`: direct als executable process
 
 Voor Python launches worden deze env vars meegegeven:

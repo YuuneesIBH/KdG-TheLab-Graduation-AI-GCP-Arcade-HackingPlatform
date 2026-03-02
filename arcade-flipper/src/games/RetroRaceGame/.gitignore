@@ -12,6 +12,7 @@
 
 # Package Files #
 *.jar
+!RetroRaceGame.jar
 *.war
 *.nar
 *.ear

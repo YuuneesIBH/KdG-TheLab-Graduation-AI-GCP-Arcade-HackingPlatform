@@ -101,6 +101,30 @@ function resolvePythonCommand(basePath: string) {
   return process.platform === 'win32' ? 'python' : 'python3'
 }
 
+function hasJava(javaCommand: string) {
+  try {
+    const check = spawnSync(javaCommand, ['-version'], { stdio: 'ignore' })
+    return check.status === 0
+  } catch {
+    return false
+  }
+}
+
+function resolveJavaCommand() {
+  const explicitJava = process.env.ARCADE_JAVA?.trim()
+  if (explicitJava) return explicitJava
+
+  const javaHome = process.env.JAVA_HOME?.trim()
+  if (javaHome) {
+    const candidate = process.platform === 'win32'
+      ? path.join(javaHome, 'bin', 'java.exe')
+      : path.join(javaHome, 'bin', 'java')
+    if (fs.existsSync(candidate)) return candidate
+  }
+
+  return 'java'
+}
+
 const DIY_FLIPPER_BAUD_RATE = 115200
 const DIY_FLIPPER_SCAN_INTERVAL_MS = 3000
 const DIY_NFC_CAPTURE_DIR = path.join(app.getPath('userData'), 'diyflipper', 'nfc-captures')
@@ -762,7 +786,9 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
         })()
       : defaultBounds
 
-    if (gamePath.endsWith('.py')) {
+    const gameExtension = path.extname(gamePath).toLowerCase()
+
+    if (gameExtension === '.py') {
       const pythonCmd = resolvePythonCommand(basePath)
       console.log('[LAUNCH] Python:', pythonCmd)
 
@@ -840,7 +866,50 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       }
     }
 
-    if (gamePath.endsWith('.exe')) {
+    if (gameExtension === '.jar') {
+      const javaCmd = resolveJavaCommand()
+      console.log('[LAUNCH] Java:', javaCmd)
+
+      if (!hasJava(javaCmd)) {
+        return {
+          success: false,
+          message: 'Java runtime not found. Install Java or set ARCADE_JAVA.'
+        }
+      }
+
+      const javaProcess = spawn(javaCmd, ['-jar', fullGamePath], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: path.dirname(fullGamePath),
+        env: {
+          ...process.env,
+          ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
+          ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
+          ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
+        }
+      })
+
+      javaProcess.stdout?.on('data', (data) => {
+        console.log('[JAVA STDOUT]', data.toString())
+      })
+
+      javaProcess.stderr?.on('data', (data) => {
+        console.error('[JAVA STDERR]', data.toString())
+      })
+
+      javaProcess.on('error', (error) => {
+        console.error('[LAUNCH] Java start failed:', error)
+        restoreArcadeWindow()
+      })
+
+      trackActiveGameProcess(javaProcess, 'java')
+
+      return {
+        success: true,
+        message: 'Game launched successfully'
+      }
+    }
+
+    if (gameExtension === '.exe') {
       const exeProcess = spawn(fullGamePath, [], {
         stdio: 'ignore'
       })
@@ -854,7 +923,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 
     return {
       success: false,
-      message: `Unsupported file type: ${path.extname(gamePath)}`
+      message: `Unsupported file type: ${gameExtension}`
     }
   } catch (error: unknown) {
     console.error('[LAUNCH] Error launching game:', error)

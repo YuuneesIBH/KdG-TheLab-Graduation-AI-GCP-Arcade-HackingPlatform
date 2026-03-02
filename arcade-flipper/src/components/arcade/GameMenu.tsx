@@ -23,7 +23,7 @@ const games: GameCard[] = [
   { id: 'space-invader', title: 'SPACE INVADER', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Defend Earth from the alien invasion!', image: '../assets/spaceinvaders.png', accent: '#00ff88', executable: 'games/spaceinvaders.py', difficulty: '★★☆', players: '1P', year: '1978' },
   { id: 'pac-man', title: 'PAC-MAN', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Eat all pellets and dodge the ghosts.', image: '../assets/TrollPacMan.png', accent: '#ffde00', executable: 'games/PacMan/pacman.py', difficulty: '★★☆', players: '1P', year: '1980' },
   { id: 'flappy-bird', title: 'RETRO BIRD', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Tap to flap and dodge the pipes!', image: '../assets/retrobird.png', accent: '#ff00aa', executable: 'games/RetroBird/main.py', difficulty: '★★★', players: '1P', year: '2013' },
-  { id: 'marioNES', title: 'MARIO NES', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Spring door de klassieke levels en versla Bowser!', image: '../assets/spaceinvaders.png', accent: '#ff2e2e', executable: 'games/SuperMarioNES/Mario.jar', difficulty: '★★☆', players: '1P', year: '1985' },
+  { id: 'marioNES', title: 'Pixel Quest Adventure', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Spring door de klassieke levels en versla Bowser!', image: '../assets/pixelquest_adventure.png', accent: '#ff2e2e', executable: 'games/SuperMarioNES/Mario.jar', difficulty: '★★☆', players: '1P', year: '1985' },
   { id: 'car-racing-extreme', title: 'EXTREME RACING', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Adrenaline at high speed!', image: '../assets/extremeracing.png', accent: '#ff6600', executable: 'games/CarRacingUltraMaxExtremeLevel1000/main.py', difficulty: '★★★', players: '1P', year: '1992' },
   { id: 'BlockStorm', title: 'BLOCK STORM', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arrange falling blocks to clear lines.', image: '../assets/blockstorm.png', accent: '#ffff00', executable: 'games/BlockStorm/main.py', difficulty: '★☆☆', players: '1P', year: '1984' },
   { id: 'retro-race-game', title: 'RETRO RACE', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Classic pseudo-3D race action in Java.', image: '../assets/retroracinggame.png', accent: '#44bbff', executable: 'games/RetroRaceGame/RetroRaceGame.jar', difficulty: '★★☆', players: '1P', year: '2024' },
@@ -120,7 +120,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const titleFont = Math.round(34 * INFO_SCALE)
   const taglineFont = Math.round(17 * INFO_SCALE)
   const playFont = Math.round(15 * INFO_SCALE)
-  const yallaFont = Math.round(13 * INFO_SCALE)
+  const hintFont = Math.round(13 * INFO_SCALE)
 
   const titleGlow = Math.round(18 * INFO_SCALE)
   const titleOffset = Math.round(3 * INFO_SCALE)
@@ -131,7 +131,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const playBorder = Math.max(3, Math.round(3 * INFO_SCALE))
   const playShadow = Math.round(28 * INFO_SCALE)
 
-  const yallaGlow = Math.round(10 * INFO_SCALE)
+  const hintGlow = Math.round(10 * INFO_SCALE)
   const barHeight = Math.round(6 * INFO_SCALE)
   const barGlow = Math.round(26 * INFO_SCALE)
 
@@ -539,8 +539,8 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                   </div>
 
                   <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ color: '#00ccff', fontWeight: 900, letterSpacing: 2, fontSize: yallaFont, textShadow: `0 0 ${yallaGlow}px rgba(0,204,255,0.35)` }}>
-                      yalla (هيا) select & go
+                    <div style={{ color: '#00ccff', fontWeight: 900, letterSpacing: 2, fontSize: hintFont, textShadow: `0 0 ${hintGlow}px rgba(0,204,255,0.35)` }}>
+                      Select & Go
                     </div>
                   </div>
                 </div>

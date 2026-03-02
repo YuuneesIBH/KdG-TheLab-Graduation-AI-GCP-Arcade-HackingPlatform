@@ -776,13 +776,8 @@ ipcMain.handle('diyflipper-load-ir-mini-db', async () => {
 
     const raw = fs.readFileSync(dbPath, 'utf8')
     const normalized = raw.replace(/^\uFEFF/, '')
-    const parsed = JSON.parse(normalized)
-    const entries = Array.isArray(parsed?.entries) ? parsed.entries as IrDatabaseEntry[] : []
-<<<<<<< HEAD
-    return { success: true, message: `Loaded ${entries.length} IR entries`, entries }
-  } catch (error: unknown) {
-    return { success: false, message: `Failed to load IR DB: ${toErrorMessage(error)}`, entries: [] as IrDatabaseEntry[] }
-=======
+    const parsed = JSON.parse(normalized) as { entries?: IrDatabaseEntry[] }
+    const entries = Array.isArray(parsed?.entries) ? parsed.entries : []
 
     if (!entries.length) {
       return {
@@ -792,14 +787,17 @@ ipcMain.handle('diyflipper-load-ir-mini-db', async () => {
       }
     }
 
-    return { success: true, message: `Loaded ${entries.length} IR entries from ${dbPath}`, entries }
-  } catch (error: any) {
     return {
       success: true,
-      message: `Failed to load IR DB (${error.message || error}), using built-in fallback`,
+      message: `Loaded ${entries.length} IR entries from ${dbPath}`,
+      entries
+    }
+  } catch (error: unknown) {
+    return {
+      success: true,
+      message: `Failed to load IR DB (${toErrorMessage(error)}), using built-in fallback`,
       entries: DEFAULT_IR_MINI_DATABASE
     }
->>>>>>> gitlab/main
   }
 })
 

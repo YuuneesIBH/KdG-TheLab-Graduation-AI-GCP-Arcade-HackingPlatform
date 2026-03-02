@@ -2,30 +2,111 @@
   "entries": [
     {
       "id": "tv_power_nec_20df10ef",
-      "name": "TV Power (NEC sample)",
+      "name": "Living Room TV Power (NEC sample)",
       "protocol": "NEC",
       "address": "0x20DF",
       "command": "0x10EF",
       "carrierKhz": 38,
-      "source": "Public NEC example"
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "tv_mute_nec_20df906f",
+      "name": "Living Room TV Mute (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0x906F",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
     },
     {
       "id": "tv_volup_nec_20df40bf",
-      "name": "TV Vol+ (NEC sample)",
+      "name": "Living Room TV Vol+ (NEC sample)",
       "protocol": "NEC",
       "address": "0x20DF",
       "command": "0x40BF",
       "carrierKhz": 38,
-      "source": "Public NEC example"
+      "source": "Public NEC sample set"
     },
     {
       "id": "tv_voldown_nec_20dfc03f",
-      "name": "TV Vol- (NEC sample)",
+      "name": "Living Room TV Vol- (NEC sample)",
       "protocol": "NEC",
       "address": "0x20DF",
       "command": "0xC03F",
       "carrierKhz": 38,
-      "source": "Public NEC example"
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "tv_input_nec_20dfd02f",
+      "name": "Living Room TV Input (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0xD02F",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "tv_channel_up_nec_20df00ff",
+      "name": "Living Room TV CH+ (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0x00FF",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "tv_channel_down_nec_20df807f",
+      "name": "Living Room TV CH- (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0x807F",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "tv_ok_nec_20df22dd",
+      "name": "Living Room TV OK/Enter (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x20DF",
+      "command": "0x22DD",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "soundbar_power_nec_e0e040bf",
+      "name": "Soundbar Power (NEC sample)",
+      "protocol": "NEC",
+      "address": "0xE0E0",
+      "command": "0x40BF",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "soundbar_volup_nec_e0e0e01f",
+      "name": "Soundbar Vol+ (NEC sample)",
+      "protocol": "NEC",
+      "address": "0xE0E0",
+      "command": "0xE01F",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "soundbar_voldown_nec_e0e0d02f",
+      "name": "Soundbar Vol- (NEC sample)",
+      "protocol": "NEC",
+      "address": "0xE0E0",
+      "command": "0xD02F",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "soundbar_mute_nec_e0e0f00f",
+      "name": "Soundbar Mute (NEC sample)",
+      "protocol": "NEC",
+      "address": "0xE0E0",
+      "command": "0xF00F",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
     },
     {
       "id": "projector_power_nec_807f12ed",
@@ -34,7 +115,106 @@
       "address": "0x807F",
       "command": "0x12ED",
       "carrierKhz": 38,
-      "source": "Public NEC example"
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "projector_source_nec_807f0af5",
+      "name": "Projector Source (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x807F",
+      "command": "0x0AF5",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "projector_menu_nec_807f04fb",
+      "name": "Projector Menu (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x807F",
+      "command": "0x04FB",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "projector_blank_nec_807f08f7",
+      "name": "Projector Blank/Freeze (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x807F",
+      "command": "0x08F7",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "led_strip_power_nec_00ff02fd",
+      "name": "LED Strip Power (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x00FF",
+      "command": "0x02FD",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "led_strip_brightness_up_nec_00ff3ac5",
+      "name": "LED Strip Brightness+ (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x00FF",
+      "command": "0x3AC5",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "led_strip_brightness_down_nec_00ffba45",
+      "name": "LED Strip Brightness- (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x00FF",
+      "command": "0xBA45",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "led_strip_flash_mode_nec_00ffd22d",
+      "name": "LED Strip Flash Mode (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x00FF",
+      "command": "0xD22D",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "fan_power_nec_a25d12ed",
+      "name": "Standing Fan Power (NEC sample)",
+      "protocol": "NEC",
+      "address": "0xA25D",
+      "command": "0x12ED",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "fan_speed_nec_a25d926d",
+      "name": "Standing Fan Speed (NEC sample)",
+      "protocol": "NEC",
+      "address": "0xA25D",
+      "command": "0x926D",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "fan_swing_nec_a25d52ad",
+      "name": "Standing Fan Swing (NEC sample)",
+      "protocol": "NEC",
+      "address": "0xA25D",
+      "command": "0x52AD",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
+    },
+    {
+      "id": "camera_trigger_nec_2fd0807f",
+      "name": "Camera Remote Trigger (NEC sample)",
+      "protocol": "NEC",
+      "address": "0x2FD0",
+      "command": "0x807F",
+      "carrierKhz": 38,
+      "source": "Public NEC sample set"
     }
   ]
 }

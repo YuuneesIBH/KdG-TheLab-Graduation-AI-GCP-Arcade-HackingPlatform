@@ -259,6 +259,12 @@ function App() {
     setToolStatus(result.success ? `Raw command sent: ${trimmed}` : `Raw command failed: ${result.message}`)
   }, [])
 
+  const handleReconnectHardware = useCallback(async () => {
+    if (!window.electron) return
+    const result = await window.electron.diyFlipperConnect()
+    setToolStatus(result.success ? result.message : `Reconnect failed: ${result.message}`)
+  }, [])
+
   const handleClearSerialLog = useCallback(() => {
     setDiyFlipperSerialLines([])
   }, [])
@@ -281,6 +287,7 @@ function App() {
         serialLines={diyFlipperSerialLines}
         onSendRawCommand={handleRawSerialCommand}
         onClearSerialLog={handleClearSerialLog}
+        onReconnect={handleReconnectHardware}
       />
     )
 

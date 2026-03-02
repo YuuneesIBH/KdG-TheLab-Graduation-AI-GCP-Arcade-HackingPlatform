@@ -442,27 +442,52 @@ function attachDiyFlipperPortListeners(port: SerialPort) {
   })
 }
 
-async function probeDiyFlipperHandshake(port: SerialPort, timeoutMs = 1600) {
+function hasDiyFlipperHandshakeMarker(buffer: string) {
+  return (
+    buffer.includes('DIYFLIPPER_READY')
+    || buffer.includes('PONG')
+    || buffer.includes('FW:esp32-bridge')
+    || buffer.includes('CAPS:')
+    || buffer.includes('HWLIB:')
+  )
+}
+
+async function probeDiyFlipperHandshake(port: SerialPort, timeoutMs = 4200) {
   return new Promise<boolean>((resolve) => {
     let buffer = ''
+    let settled = false
+
+    const pokeHandshake = () => {
+      if (!port.isOpen) {
+        finish(false)
+        return
+      }
+      port.write('HELLO\n')
+      port.write('PING\n')
+    }
 
     const finish = (ok: boolean) => {
+      if (settled) return
+      settled = true
       clearTimeout(timer)
+      clearInterval(pokeTimer)
       port.off('data', onData)
       resolve(ok)
     }
 
     const onData = (chunk: Buffer) => {
       buffer += chunk.toString('utf8')
-      if (buffer.includes('DIYFLIPPER_READY') || buffer.includes('PONG')) {
+      if (hasDiyFlipperHandshakeMarker(buffer)) {
         finish(true)
       }
     }
 
+    const pokeTimer = setInterval(() => {
+      pokeHandshake()
+    }, 350)
     const timer = setTimeout(() => finish(false), timeoutMs)
     port.on('data', onData)
-    port.write('HELLO\n')
-    port.write('PING\n')
+    pokeHandshake()
   })
 }
 
@@ -483,6 +508,9 @@ async function openDiyFlipperPort(portPath: string) {
   diyFlipperPort = port
   diyFlipperLineBuffer = ''
   attachDiyFlipperPortListeners(port)
+
+  // ESP32 USB serial often resets on open; give it a brief boot window.
+  await new Promise((resolve) => setTimeout(resolve, 320))
 
   const handshakeOk = await probeDiyFlipperHandshake(port)
   if (!handshakeOk) {

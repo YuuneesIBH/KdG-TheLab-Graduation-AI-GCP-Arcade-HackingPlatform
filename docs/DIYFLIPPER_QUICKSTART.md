@@ -112,10 +112,17 @@ The ESP32 firmware already forwards commands to Pico on these pins.
 
 Flash:
 - `firmware/esp32_diyflipper/esp32_diyflipper.ino`
+- Optional hardware isolation test: `firmware/esp32_diyflipper/pn532_hsu_probe/pn532_hsu_probe.ino`
 
 Requirements:
 - Arduino IDE + ESP32 board support
+- Arduino library: `IRremoteESP8266` (for IR transmit)
+- Arduino library: `PN532` (Seeed/Elechouse style, folder `PN532-Arduino`)
 - Serial monitor: `115200`
+
+PN532-Arduino interface flags:
+- Main sketch uses `firmware/esp32_diyflipper/build_opt.h` with `-DNFC_INTERFACE_I2C`.
+- HSU probe uses `firmware/esp32_diyflipper/pn532_hsu_probe/build_opt.h` with `-DNFC_INTERFACE_HSU`.
 
 On boot, the board prints:
 - `DIYFLIPPER_READY`
@@ -149,6 +156,7 @@ When you execute modules in the Flipper menu, app sends:
 Health checks:
 - app sends `HELLO`
 - app sends `PING`
+- You can manually send `I2C_SCAN` in Serial Monitor to debug PN532 wiring/address
 
 ## Notes
 

@@ -28,6 +28,7 @@ const games: GameCard[] = [
   { id: 'BlockStorm', title: 'BLOCK STORM', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arrange falling blocks to clear lines.', image: '../assets/blockstorm.png', accent: '#ffff00', executable: 'games/BlockStorm/main.py', difficulty: '★☆☆', players: '1P', year: '1984' },
   { id: 'retro-race-game', title: 'RETRO RACE', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Classic pseudo-3D race action in Java.', image: '../assets/retroracinggame.png', accent: '#44bbff', executable: 'games/RetroRaceGame/RetroRaceGame.jar', difficulty: '★★☆', players: '1P', year: '2024' },
   { id: 'AngryWalls', title: 'ANGRY WALLS', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Explore dungeons and hunt loot.', image: '../assets/angrywalls.png', accent: '#aa44ff', executable: 'games/AngryWalls/main.py', difficulty: '★★☆', players: '1P', year: '1996' },
+  { id: 'elemental-clash', title: 'ELEMENTAL CLASH', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arcane duel between warrior and wizard.', image: '../assets/elementalclash.png', accent: '#ff5500', executable: 'games/ElementalClash/src/main.py', difficulty: '★★★', players: '2P', year: '2025' },
   { id: 'PONG', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
 ]
 

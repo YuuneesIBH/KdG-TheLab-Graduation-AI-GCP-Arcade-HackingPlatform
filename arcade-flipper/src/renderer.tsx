@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BootScreen } from "./components/arcade/boot"
-import { MenuScreen } from "./components/arcade/GameMenu"
-import { ArcadeGame } from "./components/arcade/ArcadeGame"
-import HackerMenu from "./components/flipper/HackerMenu"
+import { BootScreen } from './components/arcade/boot'
+import { MenuScreen } from './components/arcade/GameMenu'
+import { ArcadeGame } from './components/arcade/ArcadeGame'
+import HackerMenu from './components/flipper/HackerMenu'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
 type DiyFlipperStatus = {
@@ -152,25 +152,40 @@ function App() {
   }, [isBootScreen])
 
   useEffect(() => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
+
+    let isMounted = true
 
     const readInitialStatus = async () => {
-      const status = await window.electron!.diyFlipperGetStatus()
-      setDiyFlipperStatus(status)
-      await window.electron!.diyFlipperConnect()
-      const irLoad = await window.electron!.diyFlipperLoadIrMiniDb()
-      if (irLoad.success) {
-        setIrDbEntries(irLoad.entries ?? [])
-      } else {
+      try {
+        const status = await api.diyFlipperGetStatus()
+        if (!isMounted) return
+        setDiyFlipperStatus(status)
+
+        await api.diyFlipperConnect()
+        const irLoad = await api.diyFlipperLoadIrMiniDb()
+        if (!isMounted) return
+
+        if (irLoad.success) {
+          setIrDbEntries(irLoad.entries ?? [])
+          return
+        }
+
         setToolStatus(`IR DB load failed: ${irLoad.message}`)
+      } catch (error) {
+        if (!isMounted) return
+        const message = error instanceof Error ? error.message : String(error)
+        setToolStatus(`Hardware init failed: ${message}`)
+        console.error('[DIYFLIPPER] Failed to initialize hardware state:', error)
       }
     }
 
-    const unsubscribeStatus = window.electron.onDiyFlipperStatus((status) => {
+    const unsubscribeStatus = api.onDiyFlipperStatus((status) => {
       setDiyFlipperStatus(status)
     })
 
-    const unsubscribeLine = window.electron.onDiyFlipperLine((line) => {
+    const unsubscribeLine = api.onDiyFlipperLine((line) => {
       setDiyFlipperLastLine(line)
       const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
       setDiyFlipperSerialLines((prev) => {
@@ -188,6 +203,7 @@ function App() {
     void readInitialStatus()
 
     return () => {
+      isMounted = false
       unsubscribeStatus()
       unsubscribeLine()
     }
@@ -223,7 +239,7 @@ function App() {
     }
     const result = await window.electron.diyFlipperSaveNfcCapture({
       uid: lastNfcUid,
-      label: `nfc_${lastNfcUid}`,
+      label: `nfcCapture-${lastNfcUid}`,
       rawLine: diyFlipperLastLine
     })
     setToolStatus(result.success ? `Saved NFC capture to ${result.message}` : `NFC save failed: ${result.message}`)
@@ -328,5 +344,10 @@ function App() {
   )
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root')!)
+const rootElement = document.getElementById('root')
+if (!rootElement) {
+  throw new Error('Renderer root element not found')
+}
+
+const root = ReactDOM.createRoot(rootElement)
 root.render(<App />)

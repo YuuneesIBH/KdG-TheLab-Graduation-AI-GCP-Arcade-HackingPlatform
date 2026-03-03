@@ -18,6 +18,7 @@ type LaunchRequest = {
 }
 
 type PortInfo = Awaited<ReturnType<typeof SerialPort.list>>[number]
+type PortInfoWithFriendlyName = PortInfo & { friendlyName?: string }
 
 type DiyFlipperStatus = {
   connected: boolean
@@ -369,7 +370,7 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
 }
 
 function portInfoText(port: PortInfo) {
-  const maybeFriendlyName = (port as unknown as { friendlyName?: string }).friendlyName ?? ''
+  const maybeFriendlyName = (port as PortInfoWithFriendlyName).friendlyName ?? ''
   return `${port.path} ${port.manufacturer ?? ''} ${port.pnpId ?? ''} ${maybeFriendlyName} ${port.vendorId ?? ''} ${port.productId ?? ''}`.toLowerCase()
 }
 
@@ -590,7 +591,7 @@ async function connectDiyFlipper(preferredPath?: string) {
 }
 
 async function disconnectDiyFlipper() {
-  diyFlipperStatus.autoConnect = false
+  setDiyFlipperStatus({ autoConnect: false })
 
   if (!diyFlipperPort) {
     setDiyFlipperStatus({
@@ -624,6 +625,11 @@ async function disconnectDiyFlipper() {
 }
 
 async function writeDiyFlipperCommand(command: string) {
+  const trimmedCommand = command.trim()
+  if (!trimmedCommand) {
+    return { success: false, message: 'Command cannot be empty' }
+  }
+
   if (!diyFlipperPort?.isOpen) {
     const reconnect = await connectDiyFlipper()
     if (!reconnect.success || !diyFlipperPort?.isOpen) {
@@ -632,7 +638,7 @@ async function writeDiyFlipperCommand(command: string) {
   }
 
   return new Promise<{ success: boolean; message: string }>((resolve) => {
-    diyFlipperPort!.write(`${command.trim()}\n`, (error) => {
+    diyFlipperPort!.write(`${trimmedCommand}\n`, (error) => {
       if (error) {
         setDiyFlipperStatus({ error: `Write failed: ${toErrorMessage(error)}` })
         resolve({ success: false, message: `Write failed: ${toErrorMessage(error)}` })
@@ -640,9 +646,9 @@ async function writeDiyFlipperCommand(command: string) {
       }
       setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('diyflipper-line', `TX ${command.trim()}`)
+        mainWindow.webContents.send('diyflipper-line', `TX ${trimmedCommand}`)
       }
-      resolve({ success: true, message: `Command sent: ${command}` })
+      resolve({ success: true, message: `Command sent: ${trimmedCommand}` })
     })
   })
 }
@@ -739,7 +745,7 @@ ipcMain.handle('diyflipper-get-status', async () => {
 })
 
 ipcMain.handle('diyflipper-connect', async (_event, preferredPath?: string) => {
-  diyFlipperStatus.autoConnect = true
+  setDiyFlipperStatus({ autoConnect: true })
   return connectDiyFlipper(preferredPath)
 })
 
@@ -748,7 +754,7 @@ ipcMain.handle('diyflipper-disconnect', async () => {
 })
 
 ipcMain.handle('diyflipper-send-command', async (_event, command: string) => {
-  if (!command || typeof command !== 'string') {
+  if (typeof command !== 'string' || !command.trim()) {
     return { success: false, message: 'Invalid command' }
   }
   return writeDiyFlipperCommand(command)
@@ -836,7 +842,8 @@ ipcMain.handle('diyflipper-send-ir-entry', async (_event, entry: IrDatabaseEntry
   const protocol = (entry.protocol ?? '').trim()
   const address = (entry.address ?? '').trim()
   const command = (entry.command ?? '').trim()
-  const carrierKhz = Number.isFinite(entry.carrierKhz) ? Math.round(entry.carrierKhz!) : 38
+  const parsedCarrierKhz = Number(entry.carrierKhz)
+  const carrierKhz = Number.isFinite(parsedCarrierKhz) ? Math.round(parsedCarrierKhz) : 38
   if (!protocol || !address || !command) {
     return { success: false, message: 'IR entry is missing protocol/address/command' }
   }

@@ -31,21 +31,25 @@ export type IrDatabaseEntry = {
   source?: string
 }
 
+type IpcSuccessResponse = { success: boolean }
+type IpcMessageResponse = { success: boolean; message: string }
+type IrDbResponse = IpcMessageResponse & { entries?: IrDatabaseEntry[] }
+
 export interface ElectronAPI {
-  setFullscreen: (fullscreen: boolean) => Promise<{success: boolean}>
-  launchGame: (request: string | LaunchRequest) => Promise<{success: boolean, message: string}>
-  stopGame: () => Promise<{success: boolean, message: string}>
-  killGame: () => Promise<{success: boolean, message: string}>
-  updateGameViewport: (viewport: LaunchViewport) => Promise<{success: boolean, message: string}>
-  resizeGame: (viewport: LaunchViewport) => Promise<{success: boolean, message: string}>
+  setFullscreen: (fullscreen: boolean) => Promise<IpcSuccessResponse>
+  launchGame: (request: string | LaunchRequest) => Promise<IpcMessageResponse>
+  stopGame: () => Promise<IpcMessageResponse>
+  killGame: () => Promise<IpcMessageResponse>
+  updateGameViewport: (viewport: LaunchViewport) => Promise<IpcMessageResponse>
+  resizeGame: (viewport: LaunchViewport) => Promise<IpcMessageResponse>
   diyFlipperGetStatus: () => Promise<DiyFlipperStatus>
-  diyFlipperConnect: (preferredPath?: string) => Promise<{success: boolean, message: string}>
-  diyFlipperDisconnect: () => Promise<{success: boolean, message: string}>
-  diyFlipperSendCommand: (command: string) => Promise<{success: boolean, message: string}>
-  diyFlipperRunModule: (moduleKey: string) => Promise<{success: boolean, message: string}>
-  diyFlipperSaveNfcCapture: (payload: { uid: string; label?: string; rawLine?: string }) => Promise<{success: boolean, message: string}>
-  diyFlipperLoadIrMiniDb: () => Promise<{success: boolean, message: string, entries: IrDatabaseEntry[]}>
-  diyFlipperSendIrEntry: (entry: IrDatabaseEntry) => Promise<{success: boolean, message: string}>
+  diyFlipperConnect: (preferredPath?: string) => Promise<IpcMessageResponse>
+  diyFlipperDisconnect: () => Promise<IpcMessageResponse>
+  diyFlipperSendCommand: (command: string) => Promise<IpcMessageResponse>
+  diyFlipperRunModule: (moduleKey: string) => Promise<IpcMessageResponse>
+  diyFlipperSaveNfcCapture: (payload: { uid: string; label?: string; rawLine?: string }) => Promise<IpcMessageResponse>
+  diyFlipperLoadIrMiniDb: () => Promise<IrDbResponse>
+  diyFlipperSendIrEntry: (entry: IrDatabaseEntry) => Promise<IpcMessageResponse>
   onDiyFlipperStatus: (callback: (status: DiyFlipperStatus) => void) => () => void
   onDiyFlipperLine: (callback: (line: string) => void) => () => void
   onGameExit: (callback: () => void) => () => void

@@ -141,7 +141,7 @@ function focusedControlStyle(active: boolean, color: string): React.CSSPropertie
   }
 }
 
-export default function Menu({
+export default function HackerMenu({
   onSelect,
   onBack,
   deviceStatus,
@@ -208,6 +208,106 @@ export default function Menu({
       return entries[nextIndex].id
     })
   }, [irDbEntries])
+
+  const sendRawCommand = useCallback(() => {
+    const trimmed = rawCommand.trim()
+    if (!trimmed) return
+    onSendRawCommand?.(trimmed)
+    setRawCommand('')
+  }, [onSendRawCommand, rawCommand])
+
+  const activateFocusedControl = useCallback(() => {
+    if (!focusedControl) return
+    if (focusedControl === 'header-reconnect') {
+      onReconnect?.()
+      return
+    }
+    if (focusedControl === 'header-exit') {
+      onBack?.()
+      return
+    }
+    if (focusedControl === 'tab-home') {
+      openView('home')
+      return
+    }
+    if (focusedControl === 'tab-nfc') {
+      openView('nfc')
+      return
+    }
+    if (focusedControl === 'tab-ir') {
+      openView('ir')
+      return
+    }
+    if (focusedControl === 'home-open-nfc') {
+      openView('nfc')
+      return
+    }
+    if (focusedControl === 'home-open-ir') {
+      openView('ir')
+      return
+    }
+    if (focusedControl.startsWith('home-module-')) {
+      const moduleKey = focusedControl.replace('home-module-', '')
+      onSelect?.(moduleKey)
+      return
+    }
+    if (focusedControl === 'nfc-run') {
+      onSelect?.('nfc')
+      return
+    }
+    if (focusedControl === 'nfc-read') {
+      onNfcRead?.()
+      return
+    }
+    if (focusedControl === 'nfc-save') {
+      if (!lastNfcUid) return
+      onNfcSave?.()
+      return
+    }
+    if (focusedControl === 'ir-run') {
+      onSelect?.('ir')
+      return
+    }
+    if (focusedControl === 'ir-reload') {
+      onIrReload?.()
+      return
+    }
+    if (focusedControl === 'ir-prev') {
+      stepIrEntry(-1)
+      return
+    }
+    if (focusedControl === 'ir-next') {
+      stepIrEntry(1)
+      return
+    }
+    if (focusedControl === 'ir-send') {
+      if (!selectedIrId) return
+      onIrSend?.(selectedIrId)
+      return
+    }
+    if (focusedControl === 'terminal-send') {
+      sendRawCommand()
+      return
+    }
+    if (focusedControl === 'terminal-clear') {
+      onClearSerialLog?.()
+    }
+  }, [
+    focusedControl,
+    lastNfcUid,
+    onBack,
+    onClearSerialLog,
+    onIrReload,
+    onIrSend,
+    onNfcRead,
+    onNfcSave,
+    onReconnect,
+    onSelect,
+    openView,
+    selectedIrId,
+    sendRawCommand,
+    stepIrEntry,
+  ])
 
   const focusableControls = useMemo(() => {
     const controls = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir']
@@ -349,7 +449,7 @@ export default function Menu({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedControl, moveFocus, onBack, openView, stepIrEntry])
+  }, [activateFocusedControl, focusedControl, moveFocus, onBack, openView, stepIrEntry])
 
   useEffect(() => {
     let raf = 0
@@ -402,7 +502,7 @@ export default function Menu({
 
     poll()
     return () => cancelAnimationFrame(raf)
-  }, [cycleView, focusedControl, moveFocus, onBack, stepIrEntry])
+  }, [activateFocusedControl, cycleView, focusedControl, moveFocus, onBack, stepIrEntry])
   const hardwareLabel = deviceStatus?.connected
     ? `HW::ONLINE ${deviceStatus.portPath ?? ''}`.trim()
     : deviceStatus?.connecting
@@ -414,106 +514,6 @@ export default function Menu({
     : deviceStatus?.connecting
       ? '#ffff00'
       : '#ff4444'
-
-  const sendRawCommand = useCallback(() => {
-    const trimmed = rawCommand.trim()
-    if (!trimmed) return
-    onSendRawCommand?.(trimmed)
-    setRawCommand('')
-  }, [onSendRawCommand, rawCommand])
-
-  const activateFocusedControl = useCallback(() => {
-    if (!focusedControl) return
-    if (focusedControl === 'header-reconnect') {
-      onReconnect?.()
-      return
-    }
-    if (focusedControl === 'header-exit') {
-      onBack?.()
-      return
-    }
-    if (focusedControl === 'tab-home') {
-      openView('home')
-      return
-    }
-    if (focusedControl === 'tab-nfc') {
-      openView('nfc')
-      return
-    }
-    if (focusedControl === 'tab-ir') {
-      openView('ir')
-      return
-    }
-    if (focusedControl === 'home-open-nfc') {
-      openView('nfc')
-      return
-    }
-    if (focusedControl === 'home-open-ir') {
-      openView('ir')
-      return
-    }
-    if (focusedControl.startsWith('home-module-')) {
-      const moduleKey = focusedControl.replace('home-module-', '')
-      onSelect?.(moduleKey)
-      return
-    }
-    if (focusedControl === 'nfc-run') {
-      onSelect?.('nfc')
-      return
-    }
-    if (focusedControl === 'nfc-read') {
-      onNfcRead?.()
-      return
-    }
-    if (focusedControl === 'nfc-save') {
-      if (!lastNfcUid) return
-      onNfcSave?.()
-      return
-    }
-    if (focusedControl === 'ir-run') {
-      onSelect?.('ir')
-      return
-    }
-    if (focusedControl === 'ir-reload') {
-      onIrReload?.()
-      return
-    }
-    if (focusedControl === 'ir-prev') {
-      stepIrEntry(-1)
-      return
-    }
-    if (focusedControl === 'ir-next') {
-      stepIrEntry(1)
-      return
-    }
-    if (focusedControl === 'ir-send') {
-      if (!selectedIrId) return
-      onIrSend?.(selectedIrId)
-      return
-    }
-    if (focusedControl === 'terminal-send') {
-      sendRawCommand()
-      return
-    }
-    if (focusedControl === 'terminal-clear') {
-      onClearSerialLog?.()
-    }
-  }, [
-    focusedControl,
-    lastNfcUid,
-    onBack,
-    onClearSerialLog,
-    onIrReload,
-    onIrSend,
-    onNfcRead,
-    onNfcSave,
-    onReconnect,
-    onSelect,
-    openView,
-    selectedIrId,
-    sendRawCommand,
-    stepIrEntry,
-  ])
 
   const nfcHealth = useMemo(() => {
     const lines = serialLines ?? []

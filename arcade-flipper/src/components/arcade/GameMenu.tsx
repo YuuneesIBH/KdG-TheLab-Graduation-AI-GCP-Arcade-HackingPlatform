@@ -23,13 +23,13 @@ const games: GameCard[] = [
   { id: 'space-invader', title: 'SPACE INVADER', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Defend Earth from the alien invasion!', image: '../assets/spaceinvaders.png', accent: '#00ff88', executable: 'games/spaceinvaders.py', difficulty: '★★☆', players: '1P', year: '1978' },
   { id: 'pac-man', title: 'PAC-MAN', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Eat all pellets and dodge the ghosts.', image: '../assets/TrollPacMan.png', accent: '#ffde00', executable: 'games/PacMan/pacman.py', difficulty: '★★☆', players: '1P', year: '1980' },
   { id: 'flappy-bird', title: 'RETRO BIRD', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Tap to flap and dodge the pipes!', image: '../assets/retrobird.png', accent: '#ff00aa', executable: 'games/RetroBird/main.py', difficulty: '★★★', players: '1P', year: '2013' },
-  { id: 'marioNES', title: 'Pixel Quest Adventure', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Spring door de klassieke levels en versla Bowser!', image: '../assets/pixelquest_adventure.png', accent: '#ff2e2e', executable: 'games/SuperMarioNES/Mario.jar', difficulty: '★★☆', players: '1P', year: '1985' },
+  { id: 'mario-nes', title: 'Pixel Quest Adventure', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Spring door de klassieke levels en versla Bowser!', image: '../assets/pixelquest_adventure.png', accent: '#ff2e2e', executable: 'games/SuperMarioNES/Mario.jar', difficulty: '★★☆', players: '1P', year: '1985' },
   { id: 'car-racing-extreme', title: 'EXTREME RACING', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Adrenaline at high speed!', image: '../assets/extremeracing.png', accent: '#ff6600', executable: 'games/CarRacingUltraMaxExtremeLevel1000/main.py', difficulty: '★★★', players: '1P', year: '1992' },
-  { id: 'BlockStorm', title: 'BLOCK STORM', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arrange falling blocks to clear lines.', image: '../assets/blockstorm.png', accent: '#ffff00', executable: 'games/BlockStorm/main.py', difficulty: '★☆☆', players: '1P', year: '1984' },
+  { id: 'block-storm', title: 'BLOCK STORM', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arrange falling blocks to clear lines.', image: '../assets/blockstorm.png', accent: '#ffff00', executable: 'games/BlockStorm/main.py', difficulty: '★☆☆', players: '1P', year: '1984' },
   { id: 'retro-race-game', title: 'RETRO RACE', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Classic pseudo-3D race action in Java.', image: '../assets/retroracinggame.png', accent: '#44bbff', executable: 'games/RetroRaceGame/RetroRaceGame.jar', difficulty: '★★☆', players: '1P', year: '2024' },
-  { id: 'AngryWalls', title: 'ANGRY WALLS', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Explore dungeons and hunt loot.', image: '../assets/angrywalls.png', accent: '#aa44ff', executable: 'games/AngryWalls/main.py', difficulty: '★★☆', players: '1P', year: '1996' },
+  { id: 'angry-walls', title: 'ANGRY WALLS', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Explore dungeons and hunt loot.', image: '../assets/angrywalls.png', accent: '#aa44ff', executable: 'games/AngryWalls/main.py', difficulty: '★★☆', players: '1P', year: '1996' },
   { id: 'elemental-clash', title: 'ELEMENTAL CLASH', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arcane duel between warrior and wizard.', image: '../assets/elementalclash.png', accent: '#ff5500', executable: 'games/ElementalClash/src/main.py', difficulty: '★★★', players: '2P', year: '2025' },
-  { id: 'PONG', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
+  { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
 ]
 
 export { games }
@@ -117,24 +117,24 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const itemSpacing = 140
   const iconSize = 132
 
-  const INFO_SCALE = 2.5
-  const titleFont = Math.round(34 * INFO_SCALE)
-  const taglineFont = Math.round(17 * INFO_SCALE)
-  const playFont = Math.round(15 * INFO_SCALE)
-  const hintFont = Math.round(13 * INFO_SCALE)
+  const infoScale = 2.5
+  const titleFont = Math.round(34 * infoScale)
+  const taglineFont = Math.round(17 * infoScale)
+  const playFont = Math.round(15 * infoScale)
+  const hintFont = Math.round(13 * infoScale)
 
-  const titleGlow = Math.round(18 * INFO_SCALE)
-  const titleOffset = Math.round(3 * INFO_SCALE)
-  const taglineGlow = Math.round(10 * INFO_SCALE)
+  const titleGlow = Math.round(18 * infoScale)
+  const titleOffset = Math.round(3 * infoScale)
+  const taglineGlow = Math.round(10 * infoScale)
 
-  const playPadY = Math.round(18 * INFO_SCALE)
-  const playPadX = Math.round(30 * INFO_SCALE)
-  const playBorder = Math.max(3, Math.round(3 * INFO_SCALE))
-  const playShadow = Math.round(28 * INFO_SCALE)
+  const playPadY = Math.round(18 * infoScale)
+  const playPadX = Math.round(30 * infoScale)
+  const playBorder = Math.max(3, Math.round(3 * infoScale))
+  const playShadow = Math.round(28 * infoScale)
 
-  const hintGlow = Math.round(10 * INFO_SCALE)
-  const barHeight = Math.round(6 * INFO_SCALE)
-  const barGlow = Math.round(26 * INFO_SCALE)
+  const hintGlow = Math.round(10 * infoScale)
+  const barHeight = Math.round(6 * infoScale)
+  const barGlow = Math.round(26 * infoScale)
 
   const circularOffset = React.useCallback((idx: number, sel: number, len: number) => {
     if (len <= 0) return 0
@@ -532,7 +532,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                         boxShadow: `0 0 ${playShadow}px ${accent}22`,
                         fontFamily: 'inherit',
                         flex: '0 0 auto',
-                        textShadow: `${Math.round(2 * INFO_SCALE)}px ${Math.round(2 * INFO_SCALE)}px 0 rgba(0,0,0,0.6)`,
+                        textShadow: `${Math.round(2 * infoScale)}px ${Math.round(2 * infoScale)}px 0 rgba(0,0,0,0.6)`,
                       }}
                     >
                       PLAY

@@ -25,6 +25,7 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+hs_err_pid*
 
 # OS files
 .DS_Store
@@ -51,6 +52,7 @@ Thumbs.db
 .tmp/
 __pycache__/
 *.pyc
+*.class
 
 # Java/Python game local build artifacts
 arcade-flipper/src/games/RetroRaceGame/.build/

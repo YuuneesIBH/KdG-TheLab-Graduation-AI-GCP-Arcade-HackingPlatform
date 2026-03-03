@@ -1,0 +1,17 @@
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.ttf binary
+*.otf binary
+*.jar binary
+*.dll binary
+*.so binary
+*.jnilib binary
+*.exe binary

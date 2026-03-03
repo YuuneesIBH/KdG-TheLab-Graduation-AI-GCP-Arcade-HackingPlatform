@@ -40,8 +40,6 @@ export interface ElectronAPI {
   launchGame: (request: string | LaunchRequest) => Promise<IpcMessageResponse>
   stopGame: () => Promise<IpcMessageResponse>
   killGame: () => Promise<IpcMessageResponse>
-  updateGameViewport: (viewport: LaunchViewport) => Promise<IpcMessageResponse>
-  resizeGame: (viewport: LaunchViewport) => Promise<IpcMessageResponse>
   diyFlipperGetStatus: () => Promise<DiyFlipperStatus>
   diyFlipperConnect: (preferredPath?: string) => Promise<IpcMessageResponse>
   diyFlipperDisconnect: () => Promise<IpcMessageResponse>

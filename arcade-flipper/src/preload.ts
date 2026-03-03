@@ -39,8 +39,6 @@ contextBridge.exposeInMainWorld('electron', {
   launchGame: (request: string | LaunchRequest) => ipcRenderer.invoke('launch-game', request),
   stopGame: () => ipcRenderer.invoke('stop-game'),
   killGame: () => ipcRenderer.invoke('kill-game'),
-  updateGameViewport: (viewport: LaunchViewport) => ipcRenderer.invoke('update-game-viewport', viewport),
-  resizeGame: (viewport: LaunchViewport) => ipcRenderer.invoke('resize-game', viewport),
   diyFlipperGetStatus: () => ipcRenderer.invoke('diyflipper-get-status'),
   diyFlipperConnect: (preferredPath?: string) => ipcRenderer.invoke('diyflipper-connect', preferredPath),
   diyFlipperDisconnect: () => ipcRenderer.invoke('diyflipper-disconnect'),

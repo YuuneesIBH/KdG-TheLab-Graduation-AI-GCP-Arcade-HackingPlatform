@@ -145,26 +145,6 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     return () => cleanup?.()
   }, [exit])
 
-  React.useEffect(() => {
-    if (status !== 'running') return
-    const api = window.electron
-    if (!api) return
-    const update = () => {
-      const v = getViewport()
-      if (!v) return
-      void api.updateGameViewport(v)
-      void api.resizeGame(v)
-    }
-    update()
-    window.addEventListener('resize', update)
-    let ro: ResizeObserver | null = null
-    if (typeof ResizeObserver !== 'undefined' && viewportRef.current) {
-      ro = new ResizeObserver(update)
-      ro.observe(viewportRef.current)
-    }
-    return () => { window.removeEventListener('resize', update); ro?.disconnect() }
-  }, [getViewport, status])
-
   // Visual FX
   React.useEffect(() => {
     const t = setInterval(() => {

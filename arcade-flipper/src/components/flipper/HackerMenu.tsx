@@ -350,17 +350,27 @@ export default function HackerMenu({
 
   useEffect(() => {
     let index = 0
+    let cancelled = false
+    let timeoutId: number | null = null
+
     const next = () => {
+      if (cancelled) return
       if (index >= bootSequence.length) {
         setBooted(true)
         return
       }
       setBootLines((prev) => [...prev, bootSequence[index]])
       index += 1
-      setTimeout(next, 110)
+      timeoutId = window.setTimeout(next, 110)
     }
-    const timeout = setTimeout(next, 300)
-    return () => clearTimeout(timeout)
+
+    timeoutId = window.setTimeout(next, 300)
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -374,11 +384,20 @@ export default function HackerMenu({
   }, [])
 
   useEffect(() => {
+    let glitchTimeoutId: number | null = null
     const iv = setInterval(() => {
       setGlitch(true)
-      setTimeout(() => setGlitch(false), 80)
+      if (glitchTimeoutId !== null) {
+        clearTimeout(glitchTimeoutId)
+      }
+      glitchTimeoutId = window.setTimeout(() => setGlitch(false), 80)
     }, 5000 + Math.random() * 4000)
-    return () => clearInterval(iv)
+    return () => {
+      clearInterval(iv)
+      if (glitchTimeoutId !== null) {
+        clearTimeout(glitchTimeoutId)
+      }
+    }
   }, [])
 
   const cycleView = useCallback((direction: 1 | -1) => {

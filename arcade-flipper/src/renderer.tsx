@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
@@ -51,7 +51,6 @@ function App() {
   const [crtFlicker, setCrtFlicker] = useState(false)
   const [scanlineOffset, setScanlineOffset] = useState(0)
   const [pixelShift, setPixelShift] = useState(0)
-  const [borderBlink, setBorderBlink] = useState(false)
   const [coinBlink, setCoinBlink] = useState(false)
   const [glitchLine, setGlitchLine] = useState(-1)
   const [logoShake, setLogoShake] = useState({ x: 0, y: 0 })
@@ -62,8 +61,6 @@ function App() {
     'Init Sound Blaster.....OK', 'Init Joystick..........OK', 'Init Coin Mech.........OK',
     'Loading game data......', '', 'Press COIN to continue...'
   ]
-  const marqueeText = '★ ARCADE ZONE ★ INSERT COIN ★ PLAY TO WIN ★ HIGH SCORES ★ '
-  const scrollingMarquee = (marqueeText + marqueeText + marqueeText).substring(Math.floor(scrollText / 3) % marqueeText.length)
   const bootLineCount = Math.min(bootLines.length, Math.floor(time / 7))
   const progress = Math.min(100, coins * 10)
 
@@ -87,7 +84,6 @@ function App() {
       if (Math.random() > 0.85) { setCrtFlicker(true); setTimeout(() => setCrtFlicker(false), 60) }
     }, 80)
 
-    const borderInterval = setInterval(() => setBorderBlink(b => !b), 400)
     const coinBlinkInterval = setInterval(() => setCoinBlink(b => !b), 250)
     const scanlineInterval = setInterval(() => setScanlineOffset(Math.random() * 2), 50)
 
@@ -143,7 +139,6 @@ function App() {
       clearInterval(flickerInterval)
       clearInterval(scanlineInterval)
       clearInterval(pixelInterval)
-      clearInterval(borderInterval)
       clearInterval(coinBlinkInterval)
       clearInterval(glitchInterval)
       clearInterval(particleInterval)
@@ -332,12 +327,11 @@ function App() {
   // boot (default)
   return (
     <BootScreen
-      coins={coins} time={time} highScore={highScore} scrollText={scrollText}
+      coins={coins} highScore={highScore} scrollText={scrollText}
       explosions={explosions} particles={particles} crtFlicker={crtFlicker}
-      scanlineOffset={scanlineOffset} pixelShift={pixelShift} borderBlink={borderBlink}
+      scanlineOffset={scanlineOffset} pixelShift={pixelShift}
       coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
       bootLines={bootLines} bootLineCount={bootLineCount} progress={progress}
-      scrollingMarquee={scrollingMarquee}
       onStart={() => setScreen('arcade-menu')}
       onGoToHacker={goToHackerMenu}
     />

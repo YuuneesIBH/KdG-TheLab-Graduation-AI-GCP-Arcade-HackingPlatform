@@ -1,9 +1,7 @@
-import React from 'react'
 import { HackButton, HackTransition } from '../flipper/HackTransition'
 
 type BootProps = {
   coins: number
-  time: number
   highScore: number
   scrollText: number
   explosions: Array<{x: number, y: number, id: number}>
@@ -11,21 +9,18 @@ type BootProps = {
   crtFlicker: boolean
   scanlineOffset: number
   pixelShift: number
-  borderBlink: boolean
   coinBlink: boolean
   glitchLine: number
   logoShake: {x: number, y: number}
   bootLines: string[]
   bootLineCount: number
   progress: number
-  scrollingMarquee: string
   onStart: () => void
   onGoToHacker: () => void
 }
 
 export function BootScreen({
   coins,
-  time,
   highScore,
   scrollText,
   explosions,
@@ -33,14 +28,12 @@ export function BootScreen({
   crtFlicker,
   scanlineOffset,
   pixelShift,
-  borderBlink,
   coinBlink,
   glitchLine,
   logoShake,
   bootLines,
   bootLineCount,
   progress,
-  scrollingMarquee,
   onStart,
   onGoToHacker
 }: BootProps) {

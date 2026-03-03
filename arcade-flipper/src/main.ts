@@ -858,14 +858,6 @@ ipcMain.handle('kill-game', async () => {
   return stopActiveGameProcess(true)
 })
 
-ipcMain.handle('update-game-viewport', async (_event, _viewport: LaunchViewport) => {
-  return { success: true, message: 'Viewport updated' }
-})
-
-ipcMain.handle('resize-game', async (_event, _viewport: LaunchViewport) => {
-  return { success: true, message: 'Resize updated' }
-})
-
 ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) => {
   try {
     const request: LaunchRequest = typeof payload === 'string'

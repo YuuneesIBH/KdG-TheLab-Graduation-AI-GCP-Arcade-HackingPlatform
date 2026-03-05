@@ -49,6 +49,13 @@ type IrDatabaseEntry = {
   source?: string
 }
 
+type WifiApProfile = {
+  ssid: string
+  password: string
+  channel: number
+  updatedAt: string
+}
+
 const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
   {
     id: 'tv_power_nec_20df10ef',
@@ -196,12 +203,15 @@ function applySuperMarioNesResolution(fullGamePath: string, targetBounds: Launch
 const DIY_FLIPPER_BAUD_RATE = 115200
 const DIY_FLIPPER_SCAN_INTERVAL_MS = 3000
 const DIY_NFC_CAPTURE_DIR = path.join(app.getPath('userData'), 'diyflipper', 'nfc-captures')
+const DIY_WIFI_AP_PROFILE_PATH = path.join(app.getPath('userData'), 'diyflipper', 'wifi-ap-profile.json')
 
 const DIY_MODULE_COMMANDS: Record<string, string> = {
   nfc: 'NFC_CLONE',
   badusb: 'BADUSB_INJECT',
   ir: 'IR_BLAST',
   gpio: 'GPIO_CTRL',
+  wifi: 'WIFI_AUDIT',
+  wifiap: 'WIFI_AP_START',
   terminal: 'SHELL'
 }
 
@@ -716,6 +726,66 @@ function sanitizeFilePart(value: string) {
     .slice(0, 48) || 'capture'
 }
 
+function sanitizeWifiApToken(value: string) {
+  return (value ?? '').trim().replace(/\s+/g, '_')
+}
+
+function normalizeWifiApProfileInput(
+  payload: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>
+): { ok: true; profile: WifiApProfile } | { ok: false; message: string } {
+  const ssid = sanitizeWifiApToken(payload.ssid ?? '')
+  const password = sanitizeWifiApToken(payload.password ?? '')
+  const channelRaw = Number.isFinite(Number(payload.channel)) ? Number(payload.channel) : 6
+  const channel = Math.min(Math.max(Math.round(channelRaw), 1), 13)
+
+  if (!ssid) {
+    return { ok: false, message: 'SSID is required' }
+  }
+  if (ssid.length > 32) {
+    return { ok: false, message: 'SSID must be 1-32 characters' }
+  }
+  if (/\s/.test(ssid)) {
+    return { ok: false, message: 'SSID cannot contain spaces' }
+  }
+  if (password.length > 0 && (password.length < 8 || password.length > 63)) {
+    return { ok: false, message: 'Password must be 8-63 chars, or empty for open AP' }
+  }
+  if (/\s/.test(password)) {
+    return { ok: false, message: 'Password cannot contain spaces' }
+  }
+
+  return {
+    ok: true,
+    profile: {
+      ssid,
+      password,
+      channel,
+      updatedAt: new Date().toISOString()
+    }
+  }
+}
+
+function loadWifiApProfile(): WifiApProfile | null {
+  try {
+    if (!fs.existsSync(DIY_WIFI_AP_PROFILE_PATH)) return null
+    const raw = fs.readFileSync(DIY_WIFI_AP_PROFILE_PATH, 'utf8')
+    const parsed = JSON.parse(raw) as Partial<WifiApProfile>
+    const normalized = normalizeWifiApProfileInput(parsed)
+    if (!normalized.ok) {
+      return null
+    }
+    return normalized.profile
+  } catch {
+    return null
+  }
+}
+
+function saveWifiApProfile(profile: WifiApProfile) {
+  const profileDir = path.dirname(DIY_WIFI_AP_PROFILE_PATH)
+  fs.mkdirSync(profileDir, { recursive: true })
+  fs.writeFileSync(DIY_WIFI_AP_PROFILE_PATH, JSON.stringify(profile, null, 2))
+}
+
 function resolveIrMiniDatabasePath() {
   const candidates = [
     path.resolve(__dirname, '../../docs/ir-mini-database.json'),
@@ -753,6 +823,66 @@ ipcMain.handle('diyflipper-send-command', async (_event, command: string) => {
   }
   return writeDiyFlipperCommand(command)
 })
+
+ipcMain.handle('diyflipper-load-wifi-ap-profile', async () => {
+  const profile = loadWifiApProfile()
+  if (!profile) {
+    return { success: true, message: 'No saved Wi-Fi AP profile', profile: null }
+  }
+  return { success: true, message: 'Wi-Fi AP profile loaded', profile }
+})
+
+ipcMain.handle(
+  'diyflipper-save-wifi-ap-profile',
+  async (_event, payload: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => {
+    const normalized = normalizeWifiApProfileInput(payload)
+    if (!normalized.ok) {
+      return { success: false, message: normalized.message, profile: null }
+    }
+
+    try {
+      saveWifiApProfile(normalized.profile)
+      return { success: true, message: 'Wi-Fi AP profile saved', profile: normalized.profile }
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: `Failed to save Wi-Fi AP profile: ${toErrorMessage(error)}`,
+        profile: null
+      }
+    }
+  }
+)
+
+ipcMain.handle(
+  'diyflipper-start-wifi-ap',
+  async (_event, payload: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => {
+    const normalized = normalizeWifiApProfileInput(payload)
+    if (!normalized.ok) {
+      return { success: false, message: normalized.message, profile: null }
+    }
+
+    const profile = normalized.profile
+    const command = profile.password
+      ? `WIFI_AP_START ${profile.ssid} ${profile.password} ${profile.channel}`
+      : `WIFI_AP_START ${profile.ssid} ${profile.channel}`
+
+    const result = await writeDiyFlipperCommand(command)
+    if (!result.success) {
+      return { success: false, message: result.message, profile: null }
+    }
+
+    try {
+      saveWifiApProfile(profile)
+      return { success: true, message: result.message, profile }
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: `AP started but profile save failed: ${toErrorMessage(error)}`,
+        profile
+      }
+    }
+  }
+)
 
 ipcMain.handle('diyflipper-run-module', async (_event, moduleKey: string) => {
   const command = DIY_MODULE_COMMANDS[moduleKey]

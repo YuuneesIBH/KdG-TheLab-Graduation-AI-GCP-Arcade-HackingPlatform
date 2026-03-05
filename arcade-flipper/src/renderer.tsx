@@ -25,6 +25,13 @@ type IrDatabaseEntry = {
   source?: string
 }
 
+type WifiApProfile = {
+  ssid: string
+  password: string
+  channel: number
+  updatedAt: string
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
@@ -40,6 +47,7 @@ function App() {
   const [toolStatus, setToolStatus] = useState<string>('Ready')
   const [lastNfcUid, setLastNfcUid] = useState<string>('')
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
+  const [wifiApProfile, setWifiApProfile] = useState<WifiApProfile | null>(null)
 
   // ── arcade boot state ─────────────────────────────────────────
   const [coins, setCoins] = useState(0)
@@ -164,6 +172,11 @@ function App() {
       } else {
         setToolStatus(`IR DB load failed: ${irLoad.message}`)
       }
+
+      const wifiProfileLoad = await window.electron!.diyFlipperLoadWifiApProfile()
+      if (wifiProfileLoad.success) {
+        setWifiApProfile(wifiProfileLoad.profile ?? null)
+      }
     }
 
     const unsubscribeStatus = window.electron.onDiyFlipperStatus((status) => {
@@ -208,6 +221,17 @@ function App() {
     setToolStatus(`Module sent (${key})`)
     console.log('[DIYFLIPPER] Module command sent:', key)
   }, [])
+
+  useEffect(() => {
+    if (!window.electron) return
+    if (!diyFlipperStatus.connected) return
+
+    void window.electron.diyFlipperLoadWifiApProfile().then((result) => {
+      if (result.success) {
+        setWifiApProfile(result.profile ?? null)
+      }
+    })
+  }, [diyFlipperStatus.connected])
 
   const handleNfcRead = useCallback(async () => {
     if (!window.electron) return
@@ -269,6 +293,45 @@ function App() {
     setDiyFlipperSerialLines([])
   }, [])
 
+  const handleWifiApSaveProfile = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
+    if (!window.electron) return
+    const result = await window.electron.diyFlipperSaveWifiApProfile(profile)
+    if (!result.success) {
+      setToolStatus(`Wi-Fi AP profile save failed: ${result.message}`)
+      return
+    }
+    setWifiApProfile(result.profile ?? null)
+    setToolStatus('Wi-Fi AP profile saved')
+  }, [])
+
+  const handleWifiApLoadProfile = useCallback(async () => {
+    if (!window.electron) return
+    const result = await window.electron.diyFlipperLoadWifiApProfile()
+    if (!result.success) {
+      setToolStatus(`Wi-Fi AP profile load failed: ${result.message}`)
+      return
+    }
+    setWifiApProfile(result.profile ?? null)
+    setToolStatus(result.profile ? 'Wi-Fi AP profile loaded' : 'No saved Wi-Fi AP profile')
+  }, [])
+
+  const handleWifiApStart = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
+    if (!window.electron) return
+    const result = await window.electron.diyFlipperStartWifiAp(profile)
+    if (!result.success) {
+      setToolStatus(`Wi-Fi AP start failed: ${result.message}`)
+      return
+    }
+    setWifiApProfile(result.profile ?? null)
+    setToolStatus(result.message || 'Wi-Fi AP start command sent')
+  }, [])
+
+  const handleWifiApStop = useCallback(async () => {
+    if (!window.electron) return
+    const result = await window.electron.diyFlipperSendCommand('WIFI_AP_STOP')
+    setToolStatus(result.success ? 'Wi-Fi AP stop command sent' : `Wi-Fi AP stop failed: ${result.message}`)
+  }, [])
+
   // ── render ────────────────────────────────────────────────────
   if (screen === 'hacker-menu')
     return (
@@ -288,6 +351,11 @@ function App() {
         onSendRawCommand={handleRawSerialCommand}
         onClearSerialLog={handleClearSerialLog}
         onReconnect={handleReconnectHardware}
+        wifiApProfile={wifiApProfile}
+        onWifiApSaveProfile={handleWifiApSaveProfile}
+        onWifiApLoadProfile={handleWifiApLoadProfile}
+        onWifiApStart={handleWifiApStart}
+        onWifiApStop={handleWifiApStop}
       />
     )
 

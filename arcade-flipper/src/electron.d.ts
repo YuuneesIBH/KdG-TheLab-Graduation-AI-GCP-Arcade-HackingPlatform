@@ -31,6 +31,13 @@ export type IrDatabaseEntry = {
   source?: string
 }
 
+export type WifiApProfile = {
+  ssid: string
+  password: string
+  channel: number
+  updatedAt: string
+}
+
 export interface ElectronAPI {
   setFullscreen: (fullscreen: boolean) => Promise<{success: boolean}>
   launchGame: (request: string | LaunchRequest) => Promise<{success: boolean, message: string}>
@@ -46,6 +53,9 @@ export interface ElectronAPI {
   diyFlipperSaveNfcCapture: (payload: { uid: string; label?: string; rawLine?: string }) => Promise<{success: boolean, message: string}>
   diyFlipperLoadIrMiniDb: () => Promise<{success: boolean, message: string, entries: IrDatabaseEntry[]}>
   diyFlipperSendIrEntry: (entry: IrDatabaseEntry) => Promise<{success: boolean, message: string}>
+  diyFlipperLoadWifiApProfile: () => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>
+  diyFlipperSaveWifiApProfile: (profile: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>
+  diyFlipperStartWifiAp: (profile: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>
   onDiyFlipperStatus: (callback: (status: DiyFlipperStatus) => void) => () => void
   onDiyFlipperLine: (callback: (line: string) => void) => () => void
   onGameExit: (callback: () => void) => () => void

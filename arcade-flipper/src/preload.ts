@@ -32,6 +32,13 @@ type IrDatabaseEntry = {
   source?: string
 }
 
+type WifiApProfile = {
+  ssid: string
+  password: string
+  channel: number
+  updatedAt: string
+}
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
@@ -50,6 +57,11 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('diyflipper-save-nfc-capture', payload),
   diyFlipperLoadIrMiniDb: () => ipcRenderer.invoke('diyflipper-load-ir-mini-db'),
   diyFlipperSendIrEntry: (entry: IrDatabaseEntry) => ipcRenderer.invoke('diyflipper-send-ir-entry', entry),
+  diyFlipperLoadWifiApProfile: () => ipcRenderer.invoke('diyflipper-load-wifi-ap-profile'),
+  diyFlipperSaveWifiApProfile: (profile: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) =>
+    ipcRenderer.invoke('diyflipper-save-wifi-ap-profile', profile),
+  diyFlipperStartWifiAp: (profile: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) =>
+    ipcRenderer.invoke('diyflipper-start-wifi-ap', profile),
   onDiyFlipperStatus: (callback: (status: DiyFlipperStatus) => void) => {
     const listener = (_event: unknown, status: DiyFlipperStatus) => callback(status)
     ipcRenderer.on('diyflipper-status', listener)

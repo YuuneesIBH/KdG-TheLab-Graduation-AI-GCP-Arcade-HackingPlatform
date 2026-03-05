@@ -151,12 +151,19 @@ When you execute modules in the Flipper menu, app sends:
 - `RUN BADUSB_INJECT`
 - `RUN IR_BLAST`
 - `RUN GPIO_CTRL`
+- `RUN WIFI_AUDIT`
+- `RUN WIFI_AP_START`
 - `RUN SHELL`
 
 Health checks:
 - app sends `HELLO`
 - app sends `PING`
 - You can manually send `I2C_SCAN` in Serial Monitor to debug PN532 wiring/address
+- You can manually send `WIFI_SCAN` for AP list (SSID/channel/RSSI/auth)
+- You can manually send `WIFI_AUDIT` for a quick security summary
+- You can manually send `WIFI_AP_START <SSID> [PASSWORD] [CHANNEL]` to start a local AP
+- You can manually send `WIFI_AP_STATUS` and `WIFI_AP_STOP` to inspect/stop the AP
+- The app stores last used Wi-Fi AP profile locally (`userData/diyflipper/wifi-ap-profile.json`) and reloads it on reconnect
 
 ## Notes
 

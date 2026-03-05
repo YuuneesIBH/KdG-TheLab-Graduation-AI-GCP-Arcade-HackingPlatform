@@ -5,6 +5,8 @@ const MENU_ITEMS = [
   { key: 'badusb', cmd: 'flipper run badusb_inject', desc: 'HID keystroke injection', color: '#ff4444', tag: '[USB]' },
   { key: 'ir', cmd: 'flipper run ir_blast', desc: 'Infrared signal transmitter', color: '#ff8800', tag: '[IR]' },
   { key: 'gpio', cmd: 'flipper run gpio_ctrl', desc: 'GPIO pin control & logic analyzer', color: '#ffff00', tag: '[GPIO]' },
+  { key: 'wifi', cmd: 'flipper run wifi_audit', desc: 'Legal Wi-Fi recon & security audit summary', color: '#66ddff', tag: '[WIFI]' },
+  { key: 'wifiap', cmd: 'flipper run wifi_ap_start', desc: 'Start local ESP32 SoftAP (lab network)', color: '#33bbff', tag: '[AP]' },
   { key: 'terminal', cmd: 'flipper shell --root', desc: 'Open interactive root shell', color: '#00ff88', tag: '[SH]' },
 ]
 
@@ -36,6 +38,13 @@ type IrDatabaseEntry = {
   source?: string
 }
 
+type WifiApProfile = {
+  ssid: string
+  password: string
+  channel: number
+  updatedAt: string
+}
+
 type HackerMenuProps = {
   onSelect?: (key: string) => void
   onBack?: () => void
@@ -52,6 +61,11 @@ type HackerMenuProps = {
   onSendRawCommand?: (command: string) => void
   onClearSerialLog?: () => void
   onReconnect?: () => void
+  wifiApProfile?: WifiApProfile | null
+  onWifiApSaveProfile?: (profile: { ssid: string; password: string; channel: number }) => void
+  onWifiApLoadProfile?: () => void
+  onWifiApStart?: (profile: { ssid: string; password: string; channel: number }) => void
+  onWifiApStop?: () => void
 }
 
 function MatrixBg() {
@@ -157,6 +171,11 @@ export default function Menu({
   onSendRawCommand,
   onClearSerialLog,
   onReconnect,
+  wifiApProfile,
+  onWifiApSaveProfile,
+  onWifiApLoadProfile,
+  onWifiApStart,
+  onWifiApStop,
 }: HackerMenuProps) {
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
   const [activeView, setActiveView] = useState<ViewKey>('home')
@@ -168,6 +187,9 @@ export default function Menu({
   const [blink, setBlink] = useState(true)
   const [booted, setBooted] = useState(false)
   const [bootLines, setBootLines] = useState<string[]>([])
+  const [wifiApSsidInput, setWifiApSsidInput] = useState('')
+  const [wifiApPasswordInput, setWifiApPasswordInput] = useState('')
+  const [wifiApChannelInput, setWifiApChannelInput] = useState('6')
 
   const serialLogRef = useRef<HTMLDivElement>(null)
   const isCompact = viewport.width < 1220 || viewport.height < 860
@@ -193,6 +215,13 @@ export default function Menu({
     if (!hasSelected) setSelectedIrId(firstId)
   }, [irDbEntries, selectedIrId])
 
+  useEffect(() => {
+    if (!wifiApProfile) return
+    setWifiApSsidInput(wifiApProfile.ssid ?? '')
+    setWifiApPasswordInput(wifiApProfile.password ?? '')
+    setWifiApChannelInput(String(wifiApProfile.channel ?? 6))
+  }, [wifiApProfile])
+
   const openView = useCallback((view: ViewKey) => {
     setActiveView(view)
     setFocusedControl(`tab-${view}`)
@@ -213,6 +242,7 @@ export default function Menu({
     const controls = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir']
     if (activeView === 'home') {
       controls.push('home-open-nfc', 'home-open-ir')
+      controls.push('wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
       controls.push(...HOME_MODULE_ITEMS.map((moduleItem) => `home-module-${moduleItem.key}`))
     } else if (activeView === 'nfc') {
       controls.push('nfc-run', 'nfc-read', 'nfc-save')
@@ -415,6 +445,18 @@ export default function Menu({
       ? '#ffff00'
       : '#ff4444'
 
+  const getWifiApPayload = useCallback(() => {
+    const channelRaw = Number.parseInt(wifiApChannelInput, 10)
+    const safeChannel = Number.isFinite(channelRaw)
+      ? Math.min(Math.max(channelRaw, 1), 13)
+      : 6
+    return {
+      ssid: wifiApSsidInput.trim(),
+      password: wifiApPasswordInput.trim(),
+      channel: safeChannel
+    }
+  }, [wifiApChannelInput, wifiApPasswordInput, wifiApSsidInput])
+
   const sendRawCommand = useCallback(() => {
     const trimmed = rawCommand.trim()
     if (!trimmed) return
@@ -450,6 +492,26 @@ export default function Menu({
     }
     if (focusedControl === 'home-open-ir') {
       openView('ir')
+      return
+    }
+    if (focusedControl === 'wifiap-start') {
+      const payload = getWifiApPayload()
+      if (!payload.ssid) return
+      onWifiApStart?.(payload)
+      return
+    }
+    if (focusedControl === 'wifiap-stop') {
+      onWifiApStop?.()
+      return
+    }
+    if (focusedControl === 'wifiap-save') {
+      const payload = getWifiApPayload()
+      if (!payload.ssid) return
+      onWifiApSaveProfile?.(payload)
+      return
+    }
+    if (focusedControl === 'wifiap-load') {
+      onWifiApLoadProfile?.()
       return
     }
     if (focusedControl.startsWith('home-module-')) {
@@ -509,7 +571,12 @@ export default function Menu({
     onNfcSave,
     onReconnect,
     onSelect,
+    onWifiApLoadProfile,
+    onWifiApSaveProfile,
+    onWifiApStart,
+    onWifiApStop,
     openView,
+    getWifiApPayload,
     selectedIrId,
     sendRawCommand,
     stepIrEntry,
@@ -716,6 +783,108 @@ export default function Menu({
                           >
                             OPEN IR PAGE
                           </button>
+                        </div>
+
+                        <div style={{ border: '1px solid #123346', background: 'rgba(5, 25, 40, 0.2)', padding: '10px', display: 'grid', gap: '8px' }}>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#93d7ff', letterSpacing: '1px' }}>
+                            WIFI AP PROFILE
+                          </div>
+                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5e94b2', lineHeight: '1.4' }}>
+                            Deze velden blijven lokaal bewaard en komen terug na reconnect/restart.
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(0,1fr) minmax(0,1fr) 110px', gap: '8px' }}>
+                            <input
+                              value={wifiApSsidInput}
+                              onChange={(e) => setWifiApSsidInput(e.target.value)}
+                              placeholder="SSID (zonder spaties)"
+                              style={{
+                                background: '#031019',
+                                border: '1px solid #2a5f80',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                            <input
+                              value={wifiApPasswordInput}
+                              onChange={(e) => setWifiApPasswordInput(e.target.value)}
+                              placeholder="Password (leeg = open)"
+                              style={{
+                                background: '#031019',
+                                border: '1px solid #2a5f80',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                            <input
+                              value={wifiApChannelInput}
+                              onChange={(e) => setWifiApChannelInput(e.target.value)}
+                              placeholder="Channel"
+                              inputMode="numeric"
+                              style={{
+                                background: '#031019',
+                                border: '1px solid #2a5f80',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                            <button
+                              onClick={() => {
+                                const payload = getWifiApPayload()
+                                if (!payload.ssid) return
+                                onWifiApStart?.(payload)
+                              }}
+                              style={{
+                                ...actionButtonStyle('#33bbff', isCompact),
+                                ...focusedControlStyle(focusedControl === 'wifiap-start', '#33bbff'),
+                              }}
+                            >
+                              START AP
+                            </button>
+                            <button
+                              onClick={() => onWifiApStop?.()}
+                              style={{
+                                ...actionButtonStyle('#33bbff', isCompact),
+                                ...focusedControlStyle(focusedControl === 'wifiap-stop', '#33bbff'),
+                              }}
+                            >
+                              STOP AP
+                            </button>
+                            <button
+                              onClick={() => {
+                                const payload = getWifiApPayload()
+                                if (!payload.ssid) return
+                                onWifiApSaveProfile?.(payload)
+                              }}
+                              style={{
+                                ...actionButtonStyle('#66ddff', isCompact),
+                                ...focusedControlStyle(focusedControl === 'wifiap-save', '#66ddff'),
+                              }}
+                            >
+                              SAVE PROFILE
+                            </button>
+                            <button
+                              onClick={() => onWifiApLoadProfile?.()}
+                              style={{
+                                ...actionButtonStyle('#66ddff', isCompact),
+                                ...focusedControlStyle(focusedControl === 'wifiap-load', '#66ddff'),
+                              }}
+                            >
+                              LOAD PROFILE
+                            </button>
+                          </div>
+                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4f87a7', wordBreak: 'break-word' }}>
+                            SAVED::{wifiApProfile
+                              ? `${wifiApProfile.ssid} / ch${wifiApProfile.channel} / ${wifiApProfile.password ? 'secured' : 'open'}`
+                              : 'none'}
+                          </div>
                         </div>
 
                         <div style={{ border: '1px solid #1a3a1a', background: 'rgba(0, 30, 0, 0.2)', padding: '10px', display: 'grid', gap: '6px' }}>

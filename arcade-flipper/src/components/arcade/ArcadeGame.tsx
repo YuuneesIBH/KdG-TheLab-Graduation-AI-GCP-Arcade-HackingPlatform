@@ -313,7 +313,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         position: 'fixed', inset: 0, zIndex: 0,
         background: '#000000',
         fontFamily: '"Courier New", monospace',
-        filter: crtFlicker ? 'brightness(0.78) contrast(1.28)' : 'brightness(1) contrast(1.08)',
+        filter: crtFlicker ? 'brightness(1.02) contrast(1.22)' : 'brightness(1.24) contrast(1.06)',
         transition: 'filter 0.06s',
         transform: `translateX(${pixelShift}px)`,
       }}>
@@ -334,7 +334,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           <div style={{
             position: 'absolute', inset: 0, zIndex: 5,
             display: 'grid', placeItems: 'center',
-            background: 'radial-gradient(circle at 50% 42%, rgba(151,80,28,0.26) 0%, rgba(18,8,4,0.93) 55%, rgba(8,3,1,0.99) 100%)',
+            background: 'radial-gradient(circle at 50% 42%, rgba(151,80,28,0.24) 0%, rgba(18,8,4,0.72) 55%, rgba(8,3,1,0.86) 100%)',
             color: '#ffeccc',
             fontFamily: '"Courier New", monospace',
           }}>
@@ -931,7 +931,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           position: 'absolute', inset: 0,
           backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px, transparent 1px, transparent 3px)',
           transform: `translateY(${scanlineOffset}px)`,
-          pointerEvents: 'none', zIndex: 20, opacity: 0.3,
+          pointerEvents: 'none', zIndex: 20, opacity: 0.12,
         }} />
 
         {/* Glitch line */}

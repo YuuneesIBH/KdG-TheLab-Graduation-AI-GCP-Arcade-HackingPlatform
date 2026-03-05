@@ -174,7 +174,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           position: 'relative',
           overflow: 'hidden',
           fontFamily: '"Courier New", "Press Start 2P", monospace',
-          filter: crtFlicker ? 'brightness(0.8) contrast(1.25)' : 'brightness(1) contrast(1.15)',
+          filter: crtFlicker ? 'brightness(1.02) contrast(1.2)' : 'brightness(1.22) contrast(1.1)',
           transition: 'filter 0.06s',
         }}
       >
@@ -194,7 +194,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px, 280px 280px',
             backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px',
             animation: 'starfield-drift 120s linear infinite',
-            opacity: 0.45,
+            opacity: 0.62,
             pointerEvents: 'none',
             zIndex: 1,
           }}
@@ -217,7 +217,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'radial-gradient(ellipse at center, transparent 0%, transparent 55%, rgba(0,0,0,0.5) 82%, rgba(0,0,0,0.92) 100%)',
+            background: 'radial-gradient(ellipse at center, transparent 0%, transparent 70%, rgba(0,0,0,0.28) 88%, rgba(0,0,0,0.62) 100%)',
             pointerEvents: 'none',
             zIndex: 50,
           }}
@@ -231,7 +231,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             pointerEvents: 'none',
             zIndex: 60,
             transform: `translateY(${scanlineOffset}px)`,
-            opacity: 0.55,
+            opacity: 0.28,
           }}
         />
 
@@ -392,7 +392,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                             : isSelected
                               ? `0 0 22px ${g.accent}18`
                               : 'none',
-                          filter: isFocus ? 'brightness(1.02) saturate(1.08)' : 'brightness(0.78) saturate(0.92)',
+                          filter: isFocus ? 'brightness(1.24) saturate(1.16)' : 'brightness(1.04) saturate(1)',
                           willChange: 'transform',
                         }}
                       >
@@ -470,10 +470,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       objectFit: 'cover',
                       display: 'block',
                       imageRendering: 'pixelated',
-                      filter: 'brightness(0.96) saturate(1.02)',
+                      filter: 'brightness(1.26) saturate(1.08)',
                     }}
                   />
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.10) 0%, transparent 35%, rgba(0,0,0,0.88) 100%)' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.04) 0%, transparent 48%, rgba(0,0,0,0.56) 100%)' }} />
                 </div>
 
                 <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12 }}>
@@ -499,7 +499,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       <div
                         style={{
                           marginTop: 10,
-                          color: 'rgba(200,230,255,0.78)',
+                          color: 'rgba(200,230,255,0.9)',
                           fontWeight: 800,
                           letterSpacing: 1.2,
                           fontSize: taglineFont,

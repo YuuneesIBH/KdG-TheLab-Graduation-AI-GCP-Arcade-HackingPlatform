@@ -54,8 +54,8 @@ export function BootScreen({
         position: 'relative',
         overflow: 'auto',
         filter: crtFlicker
-          ? 'brightness(0.7) contrast(1.3)'
-          : 'brightness(1) contrast(1.15)',
+          ? 'brightness(1) contrast(1.25)'
+          : 'brightness(1.22) contrast(1.1)',
         transition: 'filter 0.06s',
         transform: `translateX(${pixelShift}px)`
       }}>
@@ -76,7 +76,7 @@ export function BootScreen({
           backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px, 280px 280px',
           backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px',
           animation: 'starfield-drift 120s linear infinite',
-          opacity: 0.4,
+          opacity: 0.64,
           pointerEvents: 'none'
         }} />
 
@@ -95,7 +95,7 @@ export function BootScreen({
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(ellipse at center, transparent 0%, transparent 50%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.9) 100%)',
+          background: 'radial-gradient(ellipse at center, transparent 0%, transparent 64%, rgba(0,0,0,0.18) 84%, rgba(0,0,0,0.56) 100%)',
           pointerEvents: 'none',
           zIndex: 999
         }} />
@@ -190,7 +190,7 @@ export function BootScreen({
           pointerEvents: 'none',
           zIndex: 1000,
           transform: `translateY(${scanlineOffset}px)`,
-          opacity: 0.6
+          opacity: 0.3
         }} />
 
         {/* GLITCH LINE */}

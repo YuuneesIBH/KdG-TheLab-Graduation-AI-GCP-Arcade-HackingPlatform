@@ -4,37 +4,37 @@ import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
 import HackerMenu from './components/flipper/HackerMenu'
+import type { DiyFlipperStatus, IrDatabaseEntry } from './electron'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
-type DiyFlipperStatus = {
-  connected: boolean
-  connecting: boolean
-  autoConnect: boolean
-  portPath?: string
-  error?: string
-  lastSeenAt?: number
+
+const INITIAL_DIY_FLIPPER_STATUS: DiyFlipperStatus = {
+  connected: false,
+  connecting: false,
+  autoConnect: true,
 }
 
-type IrDatabaseEntry = {
-  id: string
-  name: string
-  protocol: string
-  address: string
-  command: string
-  carrierKhz?: number
-  source?: string
-}
+const BOOT_LINES = [
+  'ARCADE-TRONIX BIOS v2.41',
+  'Copyright (C) 1991-1996',
+  '',
+  'Testing RAM............OK',
+  'Testing ROM............OK',
+  'Testing VRAM...........OK',
+  'Init Sound Blaster.....OK',
+  'Init Joystick..........OK',
+  'Init Coin Mech.........OK',
+  'Loading game data......',
+  '',
+  'Press COIN to continue...',
+]
 
 function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const isBootScreen = screen === 'boot'
 
-  const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>({
-    connected: false,
-    connecting: false,
-    autoConnect: true
-  })
+  const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>(INITIAL_DIY_FLIPPER_STATUS)
   const [diyFlipperLastLine, setDiyFlipperLastLine] = useState<string>('')
   const [diyFlipperSerialLines, setDiyFlipperSerialLines] = useState<string[]>([])
   const [toolStatus, setToolStatus] = useState<string>('Ready')
@@ -55,13 +55,7 @@ function App() {
   const [glitchLine, setGlitchLine] = useState(-1)
   const [logoShake, setLogoShake] = useState({ x: 0, y: 0 })
 
-  const bootLines = [
-    'ARCADE-TRONIX BIOS v2.41', 'Copyright (C) 1991-1996', '',
-    'Testing RAM............OK', 'Testing ROM............OK', 'Testing VRAM...........OK',
-    'Init Sound Blaster.....OK', 'Init Joystick..........OK', 'Init Coin Mech.........OK',
-    'Loading game data......', '', 'Press COIN to continue...'
-  ]
-  const bootLineCount = Math.min(bootLines.length, Math.floor(time / 7))
+  const bootLineCount = Math.min(BOOT_LINES.length, Math.floor(time / 7))
   const progress = Math.min(100, coins * 10)
 
   useEffect(() => {
@@ -207,9 +201,10 @@ function App() {
   const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
 
   const handleModuleSelect = useCallback(async (key: string) => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
 
-    const result = await window.electron.diyFlipperRunModule(key)
+    const result = await api.diyFlipperRunModule(key)
     if (!result.success) {
       setToolStatus(`Module failed (${key}): ${result.message}`)
       console.warn('[DIYFLIPPER] Module launch failed:', result.message)
@@ -221,18 +216,20 @@ function App() {
   }, [])
 
   const handleNfcRead = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperSendCommand('NFC_READ')
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperSendCommand('NFC_READ')
     setToolStatus(result.success ? 'NFC read command sent' : `NFC read failed: ${result.message}`)
   }, [])
 
   const handleNfcSave = useCallback(async () => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
     if (!lastNfcUid) {
       setToolStatus('No NFC UID captured yet')
       return
     }
-    const result = await window.electron.diyFlipperSaveNfcCapture({
+    const result = await api.diyFlipperSaveNfcCapture({
       uid: lastNfcUid,
       label: `nfcCapture-${lastNfcUid}`,
       rawLine: diyFlipperLastLine
@@ -241,8 +238,9 @@ function App() {
   }, [lastNfcUid, diyFlipperLastLine])
 
   const handleIrReload = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperLoadIrMiniDb()
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperLoadIrMiniDb()
     if (!result.success) {
       setToolStatus(`IR DB load failed: ${result.message}`)
       return
@@ -252,27 +250,30 @@ function App() {
   }, [])
 
   const handleIrSend = useCallback(async (entryId: string) => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
     const entry = irDbEntries.find((candidate) => candidate.id === entryId)
     if (!entry) {
       setToolStatus('IR entry not found')
       return
     }
-    const result = await window.electron.diyFlipperSendIrEntry(entry)
+    const result = await api.diyFlipperSendIrEntry(entry)
     setToolStatus(result.success ? `IR sent: ${entry.name}` : `IR send failed: ${result.message}`)
   }, [irDbEntries])
 
   const handleRawSerialCommand = useCallback(async (command: string) => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
     const trimmed = command.trim()
     if (!trimmed) return
-    const result = await window.electron.diyFlipperSendCommand(trimmed)
+    const result = await api.diyFlipperSendCommand(trimmed)
     setToolStatus(result.success ? `Raw command sent: ${trimmed}` : `Raw command failed: ${result.message}`)
   }, [])
 
   const handleReconnectHardware = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperConnect()
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperConnect()
     setToolStatus(result.success ? result.message : `Reconnect failed: ${result.message}`)
   }, [])
 
@@ -331,7 +332,7 @@ function App() {
       explosions={explosions} particles={particles} crtFlicker={crtFlicker}
       scanlineOffset={scanlineOffset} pixelShift={pixelShift}
       coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
-      bootLines={bootLines} bootLineCount={bootLineCount} progress={progress}
+      bootLines={BOOT_LINES} bootLineCount={bootLineCount} progress={progress}
       onStart={() => setScreen('arcade-menu')}
       onGoToHacker={goToHackerMenu}
     />

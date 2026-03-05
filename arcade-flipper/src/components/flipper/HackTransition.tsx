@@ -13,8 +13,10 @@ function MatrixCanvas({ active }: { active: boolean }) {
 
   useEffect(() => {
     if (!active) return
-    const canvas = canvasRef.current!
-    const ctx    = canvas.getContext('2d')!
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
     const resize = () => {
       canvas.width  = window.innerWidth
@@ -28,7 +30,7 @@ function MatrixCanvas({ active }: { active: boolean }) {
     const drops  = Array.from({ length: cols }, () => Math.random() * -60)
     const speeds = Array.from({ length: cols }, () => 0.5 + Math.random() * 1.1)
 
-    let raf: number
+    let raf = 0
     const draw = () => {
       ctx.fillStyle = 'rgba(0,0,0,0.07)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -97,15 +99,21 @@ function GlitchLines({ active }: { active: boolean }) {
   useEffect(() => {
     if (!active) { setVisible([]); return }
     let i = 0
+    let addTimer = 0
+    let glitchTimer = 0
     const add = () => {
       if (i >= HACK_LINES.length) return
       setVisible(prev => [...prev, HACK_LINES[i]])
       setGlitchIdx(i)
-      setTimeout(() => setGlitchIdx(-1), 100)
+      glitchTimer = window.setTimeout(() => setGlitchIdx(-1), 100)
       i++
-      setTimeout(add, 130 + Math.random() * 100)
+      addTimer = window.setTimeout(add, 130 + Math.random() * 100)
     }
-    setTimeout(add, 300)
+    addTimer = window.setTimeout(add, 300)
+    return () => {
+      clearTimeout(addTimer)
+      clearTimeout(glitchTimer)
+    }
   }, [active])
 
   return (
@@ -193,7 +201,7 @@ function BreachSplash({ active }: { active: boolean }) {
       }}>
         FLIPPER ZERO TERMINAL — READY
       </div>
-      {/* PRESS ENTER prompt — dit ontbrak! */}
+      {/* PRESS ENTER prompt */}
       <div style={{
         fontFamily: '"Courier New", monospace',
         fontSize: 'clamp(11px, 1.2vw, 15px)',
@@ -286,17 +294,21 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     if (phase !== 'crt-roll') return
     let h = 0
+    let matrixTimer = 0
     const step = () => {
       h = Math.min(h + 3.5, 100)
       setRollHeight(h)
       if (h < 100) {
         rollRef.current = requestAnimationFrame(step)
       } else {
-        setTimeout(() => setPhase('matrix'), 80)
+        matrixTimer = window.setTimeout(() => setPhase('matrix'), 80)
       }
     }
     rollRef.current = requestAnimationFrame(step)
-    return () => { if (rollRef.current) cancelAnimationFrame(rollRef.current) }
+    return () => {
+      if (rollRef.current !== null) cancelAnimationFrame(rollRef.current)
+      clearTimeout(matrixTimer)
+    }
   }, [phase])
 
   // ── Phase 2: Matrix + hack lines ───────────────────────────
@@ -308,11 +320,11 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
     return () => { clearInterval(iv); clearTimeout(t) }
   }, [phase])
 
-  // Stabiele ref zodat onComplete nooit de listener reset bij een re-render
+  // Keep a stable ref so the keydown listener does not reset on re-renders.
   const onCompleteRef = useRef(onComplete)
   useEffect(() => { onCompleteRef.current = onComplete }, [onComplete])
 
-  // ── Phase 3: ACCESS GRANTED → wacht op Enter ───────────────
+  // ── Phase 3: ACCESS GRANTED -> wait for Enter ───────────────
   useEffect(() => {
     if (phase !== 'breach') return
     let active = true
@@ -321,7 +333,7 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
     const handleKey = (e: KeyboardEvent) => {
       if (!active || !armed) return
       if (e.key !== 'Enter' && e.code !== 'NumpadEnter') return
-      e.stopImmediatePropagation()   // blokkeer Menu's Enter-listener
+      e.stopImmediatePropagation() // prevent menu Enter handlers from running
       active = false
       window.removeEventListener('keydown', handleKey, true)
       clearTimeout(armTimer)
@@ -329,10 +341,10 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
       onCompleteRef.current()
     }
 
-    // capture:true → vuurt vóór bubbling listeners (zoals Menu)
+    // capture: true -> run before bubbling listeners (like the menu handler)
     window.addEventListener('keydown', handleKey, true)
 
-    // 500ms delay zodat de klik-Enter van HackButton niet meteen triggert
+    // 500ms delay so the click that opened the overlay is not reused immediately
     const armTimer = window.setTimeout(() => { armed = true }, 500)
 
     return () => {
@@ -340,9 +352,9 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
       clearTimeout(armTimer)
       window.removeEventListener('keydown', handleKey, true)
     }
-  }, [phase])   // ← geen onComplete meer in de deps!
+  }, [phase])
 
-  // Verwijder overlay na fade-out, anders plakt hij over het menu
+  // Remove overlay after fade-out so it never blocks the menu UI.
   const [removed, setRemoved] = useState(false)
   useEffect(() => {
     if (phase !== 'done') return

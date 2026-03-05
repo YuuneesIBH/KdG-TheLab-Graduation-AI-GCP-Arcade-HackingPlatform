@@ -14,18 +14,22 @@ const VIEW_ITEMS = [
   { key: 'home', label: 'HOME', color: '#00ff41' },
   { key: 'nfc', label: 'NFC', color: '#00ccff' },
   { key: 'ir', label: 'IR', color: '#ff8800' },
+  { key: 'wifi', label: 'WIFI', color: '#33bbff' },
 ] as const
-const HOME_MODULE_ITEMS = MENU_ITEMS.filter((moduleItem) => moduleItem.key !== 'nfc' && moduleItem.key !== 'ir')
+const HOME_MODULE_ITEMS = MENU_ITEMS.filter(
+  (moduleItem) => moduleItem.key !== 'nfc' && moduleItem.key !== 'ir' && moduleItem.key !== 'wifi' && moduleItem.key !== 'wifiap'
+)
 
 type ViewKey = (typeof VIEW_ITEMS)[number]['key']
 type ControlId = string
 
-const BASE_FOCUSABLE_CONTROLS: ControlId[] = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir']
+const BASE_FOCUSABLE_CONTROLS: ControlId[] = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir', 'tab-wifi']
 
 const TAB_CONTROL_BY_VIEW: Record<ViewKey, ControlId> = {
   home: 'tab-home',
   nfc: 'tab-nfc',
   ir: 'tab-ir',
+  wifi: 'tab-wifi',
 }
 
 const BOOT_SEQUENCE = [
@@ -298,6 +302,22 @@ export default function HackerMenu({
       case 'home-open-ir':
         openView('ir')
         return
+      case 'tab-wifi':
+      case 'home-open-wifi':
+        openView('wifi')
+        return
+      case 'wifi-run':
+        onSelect?.('wifi')
+        return
+      case 'wifi-scan':
+        onSendRawCommand?.('WIFI_SCAN')
+        return
+      case 'wifi-audit':
+        onSendRawCommand?.('WIFI_AUDIT')
+        return
+      case 'wifiap-status':
+        onSendRawCommand?.('WIFI_AP_STATUS')
+        return
       case 'wifiap-start': {
         const payload = getWifiApPayload()
         if (!payload.ssid) return
@@ -361,6 +381,7 @@ export default function HackerMenu({
     onNfcRead,
     onNfcSave,
     onReconnect,
+    onSendRawCommand,
     onSelect,
     onWifiApLoadProfile,
     onWifiApSaveProfile,
@@ -376,13 +397,14 @@ export default function HackerMenu({
   const focusableControls = useMemo<ControlId[]>(() => {
     const controls = [...BASE_FOCUSABLE_CONTROLS]
     if (activeView === 'home') {
-      controls.push('home-open-nfc', 'home-open-ir')
-      controls.push('wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
+      controls.push('home-open-nfc', 'home-open-ir', 'home-open-wifi')
       controls.push(...HOME_MODULE_ITEMS.map((moduleItem) => `home-module-${moduleItem.key}`))
     } else if (activeView === 'nfc') {
       controls.push('nfc-run', 'nfc-read', 'nfc-save')
-    } else {
+    } else if (activeView === 'ir') {
       controls.push('ir-run', 'ir-reload', 'ir-prev', 'ir-next', 'ir-send')
+    } else {
+      controls.push('wifi-run', 'wifi-scan', 'wifi-audit', 'wifiap-status', 'wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
     }
     controls.push('terminal-send', 'terminal-clear')
     return controls
@@ -516,6 +538,7 @@ export default function HackerMenu({
       if (e.key === '1') openView('home')
       if (e.key === '2') openView('nfc')
       if (e.key === '3') openView('ir')
+      if (e.key === '4') openView('wifi')
 
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
@@ -619,19 +642,31 @@ export default function HackerMenu({
     return 'No IR lines yet.'
   }, [serialLines])
 
+  const wifiLastLine = useMemo(() => {
+    const lines = serialLines ?? []
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      if (/WIFI_/i.test(lines[i])) return lines[i]
+    }
+    return 'No Wi-Fi lines yet.'
+  }, [serialLines])
+
   const selectedIrEntry = useMemo(() => irEntries.find((entry) => entry.id === selectedIrId), [irEntries, selectedIrId])
 
   const promptCommand = activeView === 'home'
     ? 'flipper status --overview'
     : activeView === 'nfc'
       ? 'flipper nfc --monitor'
-      : 'flipper ir --send'
+      : activeView === 'ir'
+        ? 'flipper ir --send'
+        : 'flipper wifi --audit'
 
   const promptColor = activeView === 'home'
     ? '#00ff41'
     : activeView === 'nfc'
       ? '#00ccff'
-      : '#ff8800'
+      : activeView === 'ir'
+        ? '#ff8800'
+        : '#33bbff'
 
   return (
     <div style={{
@@ -770,7 +805,7 @@ export default function HackerMenu({
                           CONTROL OVERVIEW
                         </div>
                         <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#4f744f', letterSpacing: '0.2px', lineHeight: '1.4' }}>
-                          Start here. Use NFC and IR pages for dedicated tools. Use quick actions below for the other modules.
+                          Start here. Gebruik dedicated pages voor NFC, IR en Wi-Fi. Quick actions hieronder blijven algemeen.
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
@@ -792,6 +827,138 @@ export default function HackerMenu({
                           >
                             OPEN IR PAGE
                           </button>
+                          <button
+                            onClick={() => openView('wifi')}
+                            style={{
+                              ...actionButtonStyle('#33bbff', isCompact),
+                              ...focusedControlStyle(focusedControl === 'home-open-wifi', '#33bbff'),
+                            }}
+                          >
+                            OPEN WIFI PAGE
+                          </button>
+                        </div>
+
+                        <div style={{ border: '1px solid #1a3a1a', background: 'rgba(0, 30, 0, 0.2)', padding: '10px', display: 'grid', gap: '6px' }}>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>HW::{hardwareLabel}</div>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>NFC_HW::{nfcHealth}</div>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>IR_DB::{irEntries.length} entries</div>
+                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5a855a', wordBreak: 'break-word' }}>LAST_RX::{lastDeviceLine || 'none'}</div>
+                        </div>
+
+                        <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8abf8a', letterSpacing: '0.8px' }}>
+                          OTHER MODULES
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                          {HOME_MODULE_ITEMS.map((moduleItem) => (
+                            <button
+                              key={moduleItem.key}
+                              onClick={() => onSelect?.(moduleItem.key)}
+                              style={{
+                                ...actionButtonStyle(moduleItem.color, isCompact),
+                                ...focusedControlStyle(focusedControl === `home-module-${moduleItem.key}`, moduleItem.color),
+                              }}
+                            >
+                              {moduleItem.tag} {moduleItem.cmd}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeView === 'nfc' && (
+                      <div style={{ display: 'grid', gap: isCompact ? '10px' : '10px' }}>
+                        <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#00ccff', letterSpacing: '1.2px', textShadow: '0 0 8px #00ccff' }}>
+                          NFC PAGE
+                        </div>
+                        <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#4b6f8a', letterSpacing: '0.2px', lineHeight: '1.4' }}>
+                          Dedicated controls for PN532 checks, card reading, and capture saving.
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                          <button
+                            onClick={() => onSelect?.('nfc')}
+                            style={{
+                              ...actionButtonStyle('#00ccff', isCompact),
+                              ...focusedControlStyle(focusedControl === 'nfc-run', '#00ccff'),
+                            }}
+                          >
+                            RUN NFC_CLONE
+                          </button>
+                          <button
+                            onClick={() => onNfcRead?.()}
+                            style={{
+                              ...actionButtonStyle('#00ccff', isCompact),
+                              ...focusedControlStyle(focusedControl === 'nfc-read', '#00ccff'),
+                            }}
+                          >
+                            NFC READ UID
+                          </button>
+                          <button
+                            onClick={() => onNfcSave?.()}
+                            disabled={!lastNfcUid}
+                            style={{
+                              ...actionButtonStyle('#00ff88', isCompact),
+                              color: lastNfcUid ? '#00ff88' : '#5c8a73',
+                              cursor: lastNfcUid ? 'pointer' : 'not-allowed',
+                              ...focusedControlStyle(focusedControl === 'nfc-save', '#00ff88'),
+                            }}
+                          >
+                            SAVE NFC FILE
+                          </button>
+                        </div>
+                        <div style={{ border: '1px solid #0f3045', background: 'rgba(0,35,55,0.22)', padding: '10px', display: 'grid', gap: '6px' }}>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>NFC_HW::{nfcHealth}</div>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>UID::{lastNfcUid || 'none'}</div>
+                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4c7f95', wordBreak: 'break-word' }}>LAST::{nfcLastLine}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeView === 'wifi' && (
+                      <div style={{ display: 'grid', gap: isCompact ? '10px' : '10px' }}>
+                        <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#33bbff', letterSpacing: '1.2px', textShadow: '0 0 8px #33bbff' }}>
+                          WIFI PAGE
+                        </div>
+                        <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#5e94b2', letterSpacing: '0.2px', lineHeight: '1.4' }}>
+                          Dedicated Wi-Fi controls: scan/audit and apart AP profile met save/load.
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                          <button
+                            onClick={() => onSelect?.('wifi')}
+                            style={{
+                              ...actionButtonStyle('#33bbff', isCompact),
+                              ...focusedControlStyle(focusedControl === 'wifi-run', '#33bbff'),
+                            }}
+                          >
+                            RUN WIFI_AUDIT
+                          </button>
+                          <button
+                            onClick={() => onSendRawCommand?.('WIFI_SCAN')}
+                            style={{
+                              ...actionButtonStyle('#66ddff', isCompact),
+                              ...focusedControlStyle(focusedControl === 'wifi-scan', '#66ddff'),
+                            }}
+                          >
+                            WIFI SCAN
+                          </button>
+                          <button
+                            onClick={() => onSendRawCommand?.('WIFI_AUDIT')}
+                            style={{
+                              ...actionButtonStyle('#66ddff', isCompact),
+                              ...focusedControlStyle(focusedControl === 'wifi-audit', '#66ddff'),
+                            }}
+                          >
+                            WIFI AUDIT
+                          </button>
+                          <button
+                            onClick={() => onSendRawCommand?.('WIFI_AP_STATUS')}
+                            style={{
+                              ...actionButtonStyle('#66ddff', isCompact),
+                              ...focusedControlStyle(focusedControl === 'wifiap-status', '#66ddff'),
+                            }}
+                          >
+                            AP STATUS
+                          </button>
                         </div>
 
                         <div style={{ border: '1px solid #123346', background: 'rgba(5, 25, 40, 0.2)', padding: '10px', display: 'grid', gap: '8px' }}>
@@ -799,7 +966,7 @@ export default function HackerMenu({
                             WIFI AP PROFILE
                           </div>
                           <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5e94b2', lineHeight: '1.4' }}>
-                            Deze velden blijven lokaal bewaard en komen terug na reconnect/restart.
+                            Dit profiel is apart en blijft lokaal bewaard na reconnect/restart.
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(0,1fr) minmax(0,1fr) 110px', gap: '8px' }}>
                             <input
@@ -894,79 +1061,9 @@ export default function HackerMenu({
                               ? `${wifiApProfile.ssid} / ch${wifiApProfile.channel} / ${wifiApProfile.password ? 'secured' : 'open'}`
                               : 'none'}
                           </div>
-                        </div>
-
-                        <div style={{ border: '1px solid #1a3a1a', background: 'rgba(0, 30, 0, 0.2)', padding: '10px', display: 'grid', gap: '6px' }}>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>HW::{hardwareLabel}</div>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>NFC_HW::{nfcHealth}</div>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>IR_DB::{irEntries.length} entries</div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5a855a', wordBreak: 'break-word' }}>LAST_RX::{lastDeviceLine || 'none'}</div>
-                        </div>
-
-                        <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8abf8a', letterSpacing: '0.8px' }}>
-                          OTHER MODULES
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
-                          {HOME_MODULE_ITEMS.map((moduleItem) => (
-                            <button
-                              key={moduleItem.key}
-                              onClick={() => onSelect?.(moduleItem.key)}
-                              style={{
-                                ...actionButtonStyle(moduleItem.color, isCompact),
-                                ...focusedControlStyle(focusedControl === `home-module-${moduleItem.key}`, moduleItem.color),
-                              }}
-                            >
-                              {moduleItem.tag} {moduleItem.cmd}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {activeView === 'nfc' && (
-                      <div style={{ display: 'grid', gap: isCompact ? '10px' : '10px' }}>
-                        <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#00ccff', letterSpacing: '1.2px', textShadow: '0 0 8px #00ccff' }}>
-                          NFC PAGE
-                        </div>
-                        <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#4b6f8a', letterSpacing: '0.2px', lineHeight: '1.4' }}>
-                          Dedicated controls for PN532 checks, card reading, and capture saving.
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                          <button
-                            onClick={() => onSelect?.('nfc')}
-                            style={{
-                              ...actionButtonStyle('#00ccff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'nfc-run', '#00ccff'),
-                            }}
-                          >
-                            RUN NFC_CLONE
-                          </button>
-                          <button
-                            onClick={() => onNfcRead?.()}
-                            style={{
-                              ...actionButtonStyle('#00ccff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'nfc-read', '#00ccff'),
-                            }}
-                          >
-                            NFC READ UID
-                          </button>
-                          <button
-                            onClick={() => onNfcSave?.()}
-                            disabled={!lastNfcUid}
-                            style={{
-                              ...actionButtonStyle('#00ff88', isCompact),
-                              color: lastNfcUid ? '#00ff88' : '#5c8a73',
-                              cursor: lastNfcUid ? 'pointer' : 'not-allowed',
-                              ...focusedControlStyle(focusedControl === 'nfc-save', '#00ff88'),
-                            }}
-                          >
-                            SAVE NFC FILE
-                          </button>
-                        </div>
-                        <div style={{ border: '1px solid #0f3045', background: 'rgba(0,35,55,0.22)', padding: '10px', display: 'grid', gap: '6px' }}>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>NFC_HW::{nfcHealth}</div>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>UID::{lastNfcUid || 'none'}</div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4c7f95', wordBreak: 'break-word' }}>LAST::{nfcLastLine}</div>
+                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4f87a7', wordBreak: 'break-word' }}>
+                            LAST::{wifiLastLine}
+                          </div>
                         </div>
                       </div>
                     )}

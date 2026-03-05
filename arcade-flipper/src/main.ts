@@ -509,8 +509,6 @@ async function openDiyFlipperPort(portPath: string) {
   diyFlipperPort = port
   diyFlipperLineBuffer = ''
   attachDiyFlipperPortListeners(port)
-
-  // ESP32 USB serial often resets on open; give it a brief boot window.
   await new Promise((resolve) => setTimeout(resolve, 320))
 
   const handshakeOk = await probeDiyFlipperHandshake(port)
@@ -701,8 +699,6 @@ function createWindow() {
   })
 
   mainWindow.webContents.on('did-finish-load', () => {
-    // On Windows is de OS-schaal vaak > 100%, waardoor alles te ingezoomd oogt.
-    // We compenseren dit door de Electron zoomfactor iets te verlagen.
     if (process.platform === 'win32') {
       mainWindow?.webContents.setZoomFactor(0.85)
     }

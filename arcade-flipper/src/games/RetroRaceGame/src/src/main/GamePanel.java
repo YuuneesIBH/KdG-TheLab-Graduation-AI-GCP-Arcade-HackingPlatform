@@ -1,11 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package main;
-
-//<editor-fold defaultstate="collapsed" desc="Imports">
 import Gui.InfoPanel;
 import Gui.MultiplayerInfoPanel;
 import Gui.MultiplayerResultInfoDialog;
@@ -46,12 +39,6 @@ import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
-//</editor-fold>
-
-/**
- *
- * @author txola
- */
 
 public class GamePanel extends JPanel implements Runnable {
     private final int RUMBLESTRIP_WIDTH = 400;
@@ -233,8 +220,6 @@ public class GamePanel extends JPanel implements Runnable {
             JOptionPane.showMessageDialog(null, "There is not a host connected in that ip!", "Hey!", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        
-        //<editor-fold defaultstate="collapsed" desc="singlePlayer loop">
         if (!network)
             sprites.add(player);
         while (!network && !Thread.interrupted()) {
@@ -261,10 +246,6 @@ public class GamePanel extends JPanel implements Runnable {
 
             }
         }
-        
-//</editor-fold>
-        
-        //<editor-fold defaultstate="collapsed" desc="multiplayer">
         if (!network) {
             return;
         }
@@ -408,12 +389,11 @@ public class GamePanel extends JPanel implements Runnable {
                 infoDialog.setVisible(true);
             }
         }
-//</editor-fold>
 
     }
     
     private void update(double dt) {
-        boolean network = this.network; //Just in case client joins while updating
+        boolean network = this.network;
         Segment playerSegment = circuit.getCurrentSegment(camera.getPosition().z + camera.getDistanceToPlayer());
         final float prop = (float) 1;
         final float prop2 = (float) 2.5;
@@ -489,8 +469,6 @@ public class GamePanel extends JPanel implements Runnable {
         }
         
         lastSegment = playerSegment;
-        
-        //<editor-fold defaultstate="collapsed" desc="GUI update">
         if (network && (opponentLastPosition - opponent.getMaxSpeed() > opponent.getPosition().z)) {
             opponentLap++;
         }
@@ -526,7 +504,6 @@ public class GamePanel extends JPanel implements Runnable {
             ((MultiplayerInfoPanel) infoPanel).updatePosition(ahead);
         }
         infoPanel.update();
-//</editor-fold>
     }
     
     private void initMultiplayer(String ip) {

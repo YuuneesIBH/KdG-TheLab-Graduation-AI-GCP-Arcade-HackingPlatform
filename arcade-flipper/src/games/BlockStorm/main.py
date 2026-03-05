@@ -40,14 +40,10 @@ PLAYFIELD_HEIGHT = ROWS * CELLSIZE
 clock = pygame.time.Clock()
 FPS = 24
 
-# COLORS *********************************************************************
-
 BLACK = (21, 24, 29)
 BLUE = (31, 25, 76)
 RED = (252, 91, 122)
 WHITE = (255, 255, 255)
-
-# Images ********************************************************************* 
 
 img1 = pygame.image.load('Assets/1.png')
 img2 = pygame.image.load('Assets/2.png')
@@ -61,20 +57,10 @@ Assets = {
 	4 : img4
 }
 
-# FONTS **********************************************************************
-
 font = pygame.font.Font('Fonts/Alternity-8w7J.ttf', 50)
 font2 = pygame.font.SysFont('cursive', 25)
 
-
-# OBJECTS ********************************************************************
-
 class Tetramino:
-	# matrix
-	# 0   1   2   3
-	# 4   5   6   7
-	# 8   9   10  11
-	# 12  13  14  15
 
 	FIGURES = {
 		'I' : [[1, 5, 9, 13], [4, 5, 6, 7]],
@@ -207,8 +193,6 @@ while running:
 		if counter % (FPS // (tetris.level * 2)) == 0 or move_down:
 			if not tetris.gameover:
 				tetris.go_down()
-
-	# EVENT HANDLING *********************************************************
 	for event in pygame.event.get():
 		if event.type == pygame.QUIT:
 			running = False
@@ -242,8 +226,6 @@ while running:
 		if event.type == pygame.KEYUP:
 			if event.key == pygame.K_DOWN:
 				move_down = False
-
-	# tetris.draw_grid()
 	for x in range(ROWS):
 		for y in range(COLS):
 			if tetris.board[x][y] > 0:
@@ -263,8 +245,6 @@ while running:
 					win.blit(img, (x, y))
 					pygame.draw.rect(win, WHITE, (x, y, CELLSIZE, CELLSIZE), 1)
 
-	# GAMEOVER ***************************************************************
-
 	if tetris.gameover:
 		rect = pygame.Rect((max(20, int(WIDTH * 0.16)), int(HEIGHT * 0.28), WIDTH - max(40, int(WIDTH * 0.32)), max(120, int(HEIGHT * 0.26))))
 		pygame.draw.rect(win, BLACK, rect)
@@ -277,8 +257,6 @@ while running:
 		win.blit(over, (rect.centerx-over.get_width()/2, rect.y + 20))
 		win.blit(msg1, (rect.centerx-msg1.get_width()/2, rect.y + 80))
 		win.blit(msg2, (rect.centerx-msg2.get_width()/2, rect.y + 110))
-
-	# HUD ********************************************************************
 
 	hud_top = HEIGHT - HUD_HEIGHT
 	pygame.draw.rect(win, BLUE, (0, hud_top, WIDTH, HUD_HEIGHT))

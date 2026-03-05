@@ -40,8 +40,6 @@ function App() {
   const [toolStatus, setToolStatus] = useState<string>('Ready')
   const [lastNfcUid, setLastNfcUid] = useState<string>('')
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
-
-  // ── arcade boot state ─────────────────────────────────────────
   const [coins, setCoins] = useState(0)
   const [time, setTime] = useState(0)
   const [highScore, setHighScore] = useState(999999)
@@ -280,8 +278,6 @@ function App() {
   const handleClearSerialLog = useCallback(() => {
     setDiyFlipperSerialLines([])
   }, [])
-
-  // ── render ────────────────────────────────────────────────────
   if (screen === 'hacker-menu')
     return (
       <HackerMenu
@@ -324,8 +320,6 @@ function App() {
         }}
       />
     )
-
-  // boot (default)
   return (
     <BootScreen
       coins={coins} highScore={highScore} scrollText={scrollText}

@@ -5,13 +5,9 @@ from pygame import mixer
 from pygame import font
 import os
 import sys
-
-# Ensure the src directory is on the path so fighter.py can be found
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fighter import Fighter
-
-# Configure embedded/windowed mode from launcher environment variables.
 def parse_window_size(raw_value):
     if not raw_value:
         return None
@@ -35,8 +31,6 @@ window_pos = os.environ.get("ARCADE_WINDOW_POS")
 
 if window_pos:
     os.environ["SDL_VIDEO_WINDOW_POS"] = window_pos
-
-# Helper Function for Bundled Assets
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -69,8 +63,6 @@ def build_blurred_background(image, width, height):
 
 mixer.init()
 pygame.init()
-
-# Constants
 if window_size:
     SCREEN_WIDTH, SCREEN_HEIGHT = window_size
 else:
@@ -84,8 +76,6 @@ FLOOR_DEPTH = max(90, SCREEN_HEIGHT // 8)
 GROUND_Y = SCREEN_HEIGHT - FLOOR_DEPTH
 HUD_HEIGHT = 96
 HEALTH_PANEL_H = 58
-
-# Arcade Color Palette
 RED = (255, 30, 30)
 YELLOW = (255, 230, 0)
 WHITE = (255, 255, 255)
@@ -97,31 +87,23 @@ NEON_CYAN = (0, 230, 255)
 NEON_ORANGE = (255, 140, 0)
 DARK_BG = (5, 5, 20)
 PURPLE = (160, 0, 255)
-
-# Initialize Game Window
 display_flags = pygame.NOFRAME | pygame.SCALED
 if not embedded_mode:
     display_flags |= pygame.FULLSCREEN
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), display_flags)
 pygame.display.set_caption("Street Fighter ARCADE")
 clock = pygame.time.Clock()
-
-# Load Assets
 bg_image = load_image_with_fallback("assets/images/bg1.jpg", alpha=False)
 bg_scaled, bg_blurred = build_blurred_background(bg_image, SCREEN_WIDTH, SCREEN_HEIGHT)
 victory_img = load_image_with_fallback("assets/images/victory.png", alpha=True)
 warrior_sheet = load_image_with_fallback("assets/images/warrior.png", alpha=True)
 wizard_sheet = load_image_with_fallback("assets/images/wizard.png", alpha=True)
-
-# Fonts
 menu_font = pygame.font.Font(resource_path("assets/fonts/turok.ttf"), 50)
 menu_font_title = pygame.font.Font(resource_path("assets/fonts/turok.ttf"), 100)
 count_font = pygame.font.Font(resource_path("assets/fonts/turok.ttf"), 80)
 score_font = pygame.font.Font(resource_path("assets/fonts/turok.ttf"), 30)
 combo_font = pygame.font.Font(resource_path("assets/fonts/turok.ttf"), 60)
 small_font = pygame.font.Font(resource_path("assets/fonts/turok.ttf"), 24)
-
-# Music and Sounds
 pygame.mixer.music.load(resource_path("assets/audio/music.mp3"))
 pygame.mixer.music.set_volume(0.5)
 pygame.mixer.music.play(-1, 0.0, 5000)
@@ -129,12 +111,8 @@ sword_fx = pygame.mixer.Sound(resource_path("assets/audio/sword.wav"))
 sword_fx.set_volume(0.5)
 magic_fx = pygame.mixer.Sound(resource_path("assets/audio/magic.wav"))
 magic_fx.set_volume(0.75)
-
-# Define Animation Steps
 WARRIOR_ANIMATION_STEPS = [10, 8, 1, 7, 7, 3, 7]
 WIZARD_ANIMATION_STEPS = [8, 8, 1, 8, 8, 3, 7]
-
-# Fighter Data
 WARRIOR_SIZE = 162
 WARRIOR_SCALE = 7
 WARRIOR_OFFSET = [72, 46]
@@ -166,11 +144,7 @@ warrior_victory_pose = extract_victory_pose(
 wizard_victory_pose = extract_victory_pose(
     wizard_sheet, WIZARD_SIZE, row=0, col=0, target_height=int(SCREEN_HEIGHT * 0.28)
 )
-
-# Game Variables
 score = [0, 0]
-
-# --- ARCADE SYSTEMS ---
 shake_duration = 0
 shake_intensity = 0
 particles = []
@@ -179,13 +153,9 @@ combo = [0, 0]
 combo_timer = [0, 0]
 COMBO_TIMEOUT = 120
 floating_texts = []
-
-# Pre-generate scanline overlay
 scanline_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
 for y in range(0, SCREEN_HEIGHT, 4):
     pygame.draw.line(scanline_surface, (0, 0, 0, 55), (0, y), (SCREEN_WIDTH, y))
-
-# Stars for menu
 stars = [(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), random.random()) for _ in range(200)]
 
 
@@ -281,7 +251,6 @@ def draw_bg(is_game_started=False):
 
 def draw_crt_overlay():
     screen.blit(scanline_surface, (0, 0))
-    # Vignette
     vignette = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
     cx, cy = SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2
     max_r = int(math.sqrt(cx**2 + cy**2))
@@ -776,8 +745,6 @@ def game_loop():
         sx, sy = get_shake_offset()
 
         draw_bg(is_game_started=True)
-
-        # Hit flash
         if hit_flash_timer > 0:
             flash_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             flash_surf.fill((255, 255, 255, min(90, hit_flash_timer * 6)))
@@ -793,8 +760,6 @@ def game_loop():
         right_panel_x = SCREEN_WIDTH - panel_margin - panel_w
         draw_health_bar(fighter_1.health, left_panel_x, 20, panel_w, "PLAYER 1", player=1)
         draw_health_bar(fighter_2.health, right_panel_x, 20, panel_w, "PLAYER 2", player=2)
-
-        # Timer + score center
         draw_timer(frame_count)
         score_text = f"{score[0]}  -  {score[1]}"
         sw = score_font.size(score_text)[0]
@@ -854,8 +819,6 @@ def game_loop():
                 round_over = True
                 winner_img = warrior_victory_pose
                 winner_label = "PLAYER 1"
-
-        # Draw fighters
         if sx != 0 or sy != 0:
             shake_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             fighter_1.draw(shake_surf)
@@ -895,9 +858,6 @@ def game_loop():
 
         pygame.display.update()
         clock.tick(FPS)
-
-
-# Main loop
 while True:
     menu_selection = main_menu()
     if menu_selection == "START":

@@ -1,4 +1,3 @@
-// Type definitions for Electron IPC exposed in window object
 export type LaunchViewport = {
   x: number
   y: number

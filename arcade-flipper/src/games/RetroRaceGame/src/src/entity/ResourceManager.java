@@ -4,11 +4,6 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import main.Utils;
-
-/**
- *
- * @author txola
- */
 public class ResourceManager {
     private static final ResourceManager instance = new ResourceManager();
     public static ResourceManager instance(){
@@ -19,7 +14,7 @@ public class ResourceManager {
     
     public ResourceManager() {
         images = new ArrayList<>();
-        images.add(new Image("car2.png", (float) 0.45, 1));//player
+        images.add(new Image("car2.png", (float) 0.45, 1));
         images.add(new Image("mercedes.png", 1, 1));
         images.add(new Image("subaruGris.png", (float) 2.3, 1));
         images.add(new Image("azul.png", (float) 0.65, 1));

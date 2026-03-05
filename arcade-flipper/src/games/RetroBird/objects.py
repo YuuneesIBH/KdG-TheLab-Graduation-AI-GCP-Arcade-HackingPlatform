@@ -22,8 +22,6 @@ SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE'))
 SCALE_X = WIDTH / 288
 SCALE_Y = HEIGHT / 512
 display_height = 0.80 * HEIGHT
-
-# RETRO COLORS
 NEON_GREEN = (0, 255, 0)
 NEON_BLUE = (0, 255, 255)
 NEON_PINK = (255, 0, 255)
@@ -39,22 +37,15 @@ class Grumpy:
 		self.reset()
 	
 	def draw_bird(self):
-		# Simple retro bird - just colored squares/circles
 		size = max(14, int(20 * min(SCALE_X, SCALE_Y)))
-		
-		# Body
 		pygame.draw.circle(self.win, self.color, 
 						 (self.rect.centerx, self.rect.centery), size)
 		pygame.draw.circle(self.win, BLACK, 
 						 (self.rect.centerx, self.rect.centery), size, 2)
-		
-		# Eye
 		eye_x = self.rect.centerx + max(6, int(8 * SCALE_X))
 		eye_y = self.rect.centery - max(3, int(5 * SCALE_Y))
 		pygame.draw.circle(self.win, WHITE, (eye_x, eye_y), max(3, int(5 * min(SCALE_X, SCALE_Y))))
 		pygame.draw.circle(self.win, BLACK, (eye_x, eye_y), max(2, int(3 * min(SCALE_X, SCALE_Y))))
-		
-		# Beak
 		beak_points = [
 			(self.rect.centerx + max(10, int(15 * SCALE_X)), self.rect.centery),
 			(self.rect.centerx + max(16, int(25 * SCALE_X)), self.rect.centery - max(2, int(3 * SCALE_Y))),
@@ -64,7 +55,6 @@ class Grumpy:
 		pygame.draw.polygon(self.win, BLACK, beak_points, 2)
 	
 	def update(self):
-		# gravity
 		self.vel += 0.3
 		if self.vel >= 8:
 			self.vel = 8
@@ -72,26 +62,20 @@ class Grumpy:
 			self.rect.y += int(self.vel)
 		
 		if self.alive:
-			# jump
 			if pygame.mouse.get_pressed()[0] == 1 and not self.jumped:
 				self.jumped = True
 				self.vel = -6
 			if pygame.mouse.get_pressed()[0] == 0:
 				self.jumped = False
-			
-			# Flap animation
 			self.counter += 1
 			if self.counter > 5:
 				self.counter = 0
-		
-		# Update rect for collision
 		self.rect.width = max(28, int(40 * SCALE_X))
 		self.rect.height = max(28, int(40 * SCALE_Y))
 		
 		self.draw_bird()
 	
 	def draw_flap(self):
-		# Floating animation on start screen
 		self.counter += 1
 		if self.counter > 5:
 			self.counter = 0
@@ -132,18 +116,10 @@ class Base:
 			self.x1 = WIDTH - 5
 		if self.x2 <= -WIDTH:
 			self.x2 = WIDTH - 5
-		
-		# Draw retro base
 		height = HEIGHT - self.y
-		
-		# Main base block
 		pygame.draw.rect(self.win, self.color, (self.x1, self.y, WIDTH, height))
 		pygame.draw.rect(self.win, self.color, (self.x2, self.y, WIDTH, height))
-		
-		# Border
 		pygame.draw.line(self.win, WHITE, (0, self.y), (WIDTH, self.y), 3)
-		
-		# Grid pattern on base
 		for x in range(int(self.x1), int(self.x1) + WIDTH, 20):
 			pygame.draw.line(self.win, BLACK, (x, self.y), (x, HEIGHT), 1)
 		for x in range(int(self.x2), int(self.x2) + WIDTH, 20):
@@ -161,11 +137,9 @@ class Pipe(pygame.sprite.Sprite):
 		x = WIDTH
 		
 		if position == 1:
-			# Top pipe
 			self.rect = pygame.Rect(x, y - pipe_gap - self.height, self.width, self.height)
 			self.is_top = True
 		elif position == -1:
-			# Bottom pipe
 			self.rect = pygame.Rect(x, y + pipe_gap, self.width, self.height)
 			self.is_top = False
 	
@@ -173,23 +147,14 @@ class Pipe(pygame.sprite.Sprite):
 		self.rect.x -= speed
 		if self.rect.right < 0:
 			self.kill()
-		
-		# Draw retro pipe
-		# Main body
 		pygame.draw.rect(self.win, self.color, self.rect)
 		pygame.draw.rect(self.win, BLACK, self.rect, 3)
-		
-		# Inner details
 		inner_rect = self.rect.inflate(-10, -10)
 		pygame.draw.rect(self.win, BLACK, inner_rect, 2)
-		
-		# Horizontal lines for texture
 		for y in range(self.rect.top, self.rect.bottom, 15):
 			pygame.draw.line(self.win, BLACK, 
 						   (self.rect.left, y), 
 						   (self.rect.right, y), 1)
-		
-		# Pipe cap
 		if self.is_top:
 			cap_rect = pygame.Rect(self.rect.x - 3, self.rect.bottom - 20, 
 								 self.width + 6, 20)
@@ -207,5 +172,4 @@ class Score:
 		self.win = win
 	
 	def update(self, score):
-		# Rendered in main.py with retro style
 		pass

@@ -1,19 +1,3 @@
-/*
-  PN532 HSU/UART probe for ESP32
-
-  Purpose:
-  - Verify whether your module responds to PN532 protocol over HSU (UART),
-    independent from the main DIY Flipper firmware.
-
-  Wiring (ESP32 <-> PN532):
-  - GPIO16 (RX2) <- PN532 TXD
-  - GPIO17 (TX2) -> PN532 RXD
-  - 5V -> VCC
-  - GND -> GND
-
-  Important:
-  - Set PN532 mode switches/jumpers to HSU/UART mode using your board silkscreen.
-*/
 
 #include <Arduino.h>
 #include <PN532_HSU.h>

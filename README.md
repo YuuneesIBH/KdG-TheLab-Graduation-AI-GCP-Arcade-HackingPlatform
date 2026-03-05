@@ -3,6 +3,17 @@
 Desktop launcher met retro arcade UI, gebouwd met Electron + React.
 De app combineert een fullscreen arcade flow met een Flipper-achtige hacker terminal flow en DIY hardware-integratie via serial.
 
+## AI Arcade Vision
+
+Doelrichting voor de volgende versie:
+- Multiplayer gameplay met real-time sessies en score-sync
+- Hybride AI-intelligentie via GCP + Ollama
+- Hardware + audio interactiviteit als gameplay input/output
+- Sandboxed offensive/defensive cyber challenges per sessie
+
+Architectuur blueprint:
+- [AI_ARCADE_PLATFORM_ARCHITECTURE.md](docs/AI_ARCADE_PLATFORM_ARCHITECTURE.md)
+
 ## Overzicht
 
 Dit project bevat:
@@ -51,6 +62,7 @@ Dit project bevat:
 ├── electron.vite.config.ts
 ├── tsconfig.json
 ├── docs/
+│   ├── AI_ARCADE_PLATFORM_ARCHITECTURE.md
 │   └── DIYFLIPPER_QUICKSTART.md
 ├── firmware/
 │   └── esp32_diyflipper/

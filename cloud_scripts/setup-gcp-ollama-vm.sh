@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
-
-# -----------------------------------------------------------------------------
-# Config (override via env vars, e.g. PROJECT_ID=... MODEL_NAME=... ./script.sh)
-# -----------------------------------------------------------------------------
 PROJECT_ID="${PROJECT_ID:-inbound-decker-475607-d6}"
 INSTANCE_NAME="${INSTANCE_NAME:-ollama-vm}"
 ZONE="${ZONE:-europe-west1-b}"
@@ -15,18 +11,10 @@ IMAGE_FAMILY="${IMAGE_FAMILY:-ubuntu-2204-lts}"
 IMAGE_PROJECT="${IMAGE_PROJECT:-ubuntu-os-cloud}"
 
 MODEL_NAME="${MODEL_NAME:-gemma2:27b}"
-
-# Security:
-# - Set ALLOWED_CIDR to your own public IP /32 for safer access.
-# - If ALLOWED_CIDR=auto, script tries to detect your public IP.
 ALLOWED_CIDR="${ALLOWED_CIDR:-auto}"
 FIREWALL_RULE="${FIREWALL_RULE:-allow-ollama-11434}"
 NETWORK_TAG="${NETWORK_TAG:-ollama-server}"
-
-# Cost:
-# SPOT=true makes a cheaper Spot VM.
 SPOT="${SPOT:-true}"
-# Optional Spot termination action (STOP or DELETE). Set empty to skip flag.
 SPOT_TERMINATION_ACTION="${SPOT_TERMINATION_ACTION:-STOP}"
 
 STARTUP_TMP="$(mktemp -t ollama-startup-XXXXXX.sh)"
@@ -91,8 +79,6 @@ EOC
 systemctl daemon-reload
 systemctl enable ollama
 systemctl restart ollama
-
-# Wait until Ollama HTTP endpoint is reachable
 for i in {1..90}; do
   if curl -fsS "http://127.0.0.1:11434/api/tags" >/dev/null; then
     break

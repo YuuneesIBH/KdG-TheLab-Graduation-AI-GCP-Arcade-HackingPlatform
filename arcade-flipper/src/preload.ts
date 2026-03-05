@@ -31,9 +31,6 @@ type IrDatabaseEntry = {
   carrierKhz?: number
   source?: string
 }
-
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
   setFullscreen: (fullscreen: boolean) => ipcRenderer.invoke('set-fullscreen', fullscreen),
   launchGame: (request: string | LaunchRequest) => ipcRenderer.invoke('launch-game', request),
@@ -59,7 +56,6 @@ contextBridge.exposeInMainWorld('electron', {
     return () => ipcRenderer.removeListener('diyflipper-line', listener)
   },
   onGameExit: (callback: () => void) => {
-    // Listen for game exit event from main process
     const listener = () => callback()
     ipcRenderer.on('game-exited', listener)
     return () => ipcRenderer.removeListener('game-exited', listener)

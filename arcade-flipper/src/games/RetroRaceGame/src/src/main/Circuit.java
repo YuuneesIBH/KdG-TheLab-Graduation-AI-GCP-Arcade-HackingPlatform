@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package main;
 
 import entity.Entity;
@@ -12,11 +7,6 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.util.List;
 import java.util.ArrayList;
-
-/**
- *
- * @author txola
- */
 public class Circuit {
     private int roadWidth;
     private int roadLength;
@@ -26,10 +16,10 @@ public class Circuit {
     private final int numberOfVisibleSegments;
     private List<Segment> roadSegments;
     final Color[] colors = {
-        new Color(90, 90, 100), //Road 1
-        new Color(80,80,90), //Road 2
-        new Color(0, 204, 0), //Grass 1
-        new Color(0, 183, 0)  // Grass 2
+        new Color(90, 90, 100),
+        new Color(80,80,90),
+        new Color(0, 204, 0),
+        new Color(0, 183, 0)
     };
 
 
@@ -42,8 +32,6 @@ public class Circuit {
         createRoadSegments();
         this.roadLength = numberOfSegments * segmentLenght;
     }
-
-//<editor-fold defaultstate="collapsed" desc="Getters and Setters">
     public int getRoadWidth() {
         return roadWidth;
     }
@@ -95,9 +83,6 @@ public class Circuit {
     public int getNumberOfVisibleSegments() {
         return numberOfVisibleSegments;
     }
-    
-    
-//</editor-fold>
     
     public void addSprites(List<Entity> sprites) {
         Image image = ResourceManager.instance().get(10);
@@ -166,10 +151,6 @@ public class Circuit {
         return roadSegments.isEmpty() ? 0 :
                 roadSegments.get(roadSegments.size() - 1).getPoint2().y;
     }
-    /*public float getPreviousSegmentCurve(Segment segment) {
-    int index = roadSegments.indexOf(segment);
-    return index > 0 ? roadSegments.get(index - 1).getCurve() : roadSegments.get(roadSegments.size() - 1).getCurve();
-    }*/
     
     public void renderCircuit(Graphics2D g2, Camera camera, int screenWidth, int screenHeight) {
         

@@ -1,14 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package main;
-
-/**
- *
- * @author txola
- */
 public class Camera {
     private Coordinate3D position;
     private float distanceToPlane;
@@ -63,8 +53,6 @@ public class Camera {
     public void restart() {
         position.z = -distanceToPlayer;
     }
-
-    //<editor-fold defaultstate="collapsed" desc="Getters and Setters">
     public Coordinate3D getPosition() {
         return position;
     }
@@ -88,5 +76,4 @@ public class Camera {
     public void setDistanceToPlayer(int distanceToPlayer) {
         this.distanceToPlayer = distanceToPlayer;
     }
-//</editor-fold>
 }

@@ -31,8 +31,6 @@ WIDTH, HEIGHT = screen.get_size()
 pygame.display.set_caption("PONG")
 clock = pygame.time.Clock()
 FPS = 60
-
-# Retro kleuren
 BLACK      = (0,   0,   0)
 GREEN      = (0,   255, 70)
 GREEN_DIM  = (0,   80,  25)
@@ -40,8 +38,6 @@ GREEN_DARK = (0,   20,  8)
 AMBER      = (255, 180, 0)
 AMBER_DIM  = (100, 60,  0)
 WHITE      = (255, 255, 255)
-
-# Fonts
 try:
     font_big   = pygame.font.SysFont("couriernew", 96, bold=True)
     font_med   = pygame.font.SysFont("couriernew", 42, bold=True)
@@ -50,16 +46,12 @@ except:
     font_big   = pygame.font.SysFont("monospace", 96, bold=True)
     font_med   = pygame.font.SysFont("monospace", 42, bold=True)
     font_small = pygame.font.SysFont("monospace", 22, bold=True)
-
-# Constanten
 PAD_W, PAD_H = 19, 185
 BALL_R       = 10
 PAD_SPEED    = 35
 INIT_SPEED   = 25
 WIN_SCORE    = 7
 MARGIN       = 50
-
-# ── Pre-render dure overlays EENMALIG ────────────────────────────────────────
 def make_scanlines():
     surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     for y in range(0, HEIGHT, 3):
@@ -82,10 +74,8 @@ def make_field_bg():
         pygame.draw.line(surf, GREEN_DARK, (gx, 0), (gx, HEIGHT))
     for gy in range(0, HEIGHT, 80):
         pygame.draw.line(surf, GREEN_DARK, (0, gy), (WIDTH, gy))
-    # Gestippelde middellijn
     for y in range(0, HEIGHT, 24):
         pygame.draw.rect(surf, GREEN_DIM, (WIDTH // 2 - 4, y, 8, 14))
-    # Randen
     pygame.draw.rect(surf, GREEN, (0, 0,        WIDTH, 8))
     pygame.draw.rect(surf, GREEN, (0, HEIGHT-8, WIDTH, 8))
     return surf
@@ -95,17 +85,12 @@ scanlines  = make_scanlines()
 vignette   = make_vignette()
 field_bg   = make_field_bg()
 print("Done.")
-
-# ── Tekst helper ──────────────────────────────────────────────────────────────
 def pixel_text(surf, text, font, colour, cx, cy, shadow=True):
     if shadow:
         s = font.render(text, False, GREEN_DARK)
         surf.blit(s, s.get_rect(center=(cx + 3, cy + 3)))
     s = font.render(text, False, colour)
     surf.blit(s, s.get_rect(center=(cx, cy)))
-
-
-# ── Paddle ────────────────────────────────────────────────────────────────────
 class Paddle:
     def __init__(self, x, colour):
         self.x = x
@@ -115,7 +100,6 @@ class Paddle:
         self._make_surf()
 
     def _make_surf(self):
-        # Paddle eenmalig renderen als surface
         self.surf = pygame.Surface((PAD_W + 8, PAD_H + 8), pygame.SRCALPHA)
         dim = tuple(int(c * 0.25) for c in self.colour)
         pygame.draw.rect(self.surf, dim,    (0, 0, PAD_W + 8, PAD_H + 8), border_radius=4)
@@ -144,9 +128,6 @@ class Paddle:
 
     def draw(self, surf):
         surf.blit(self.surf, (self.x - 4, int(self.y) - 4))
-
-
-# ── Bal ───────────────────────────────────────────────────────────────────────
 class Ball:
     def __init__(self):
         self.trail = []
@@ -202,19 +183,14 @@ class Ball:
         return None
 
     def draw(self, surf):
-        # Trail — gewone cirkels, snel
         for i, (tx, ty) in enumerate(self.trail):
             alpha = (i + 1) / max(len(self.trail), 1)
             g = int(120 * alpha)
             pygame.draw.circle(surf, (0, g, int(30 * alpha)), (tx, ty),
                                 max(3, int(BALL_R * alpha * 0.6)))
-        # Bal
         pygame.draw.circle(surf, GREEN_DIM, (int(self.x), int(self.y)), BALL_R + 4)
         pygame.draw.circle(surf, GREEN,     (int(self.x), int(self.y)), BALL_R)
         pygame.draw.circle(surf, WHITE,     (int(self.x) - 3, int(self.y) - 3), 3)
-
-
-# ── HUD ───────────────────────────────────────────────────────────────────────
 def draw_hud(surf, score_p, score_ai, paused):
     pixel_text(surf, str(score_p),  font_big, GREEN, WIDTH // 4,     70)
     pixel_text(surf, str(score_ai), font_big, AMBER, WIDTH * 3 // 4, 70)
@@ -236,9 +212,6 @@ def draw_hud(surf, score_p, score_ai, paused):
         pixel_text(surf, "** PAUZE **", font_med, GREEN, WIDTH // 2, HEIGHT // 2)
         pixel_text(surf, "DRUK  P  OM  VERDER  TE  GAAN", font_small, GREEN_DIM,
                    WIDTH // 2, HEIGHT // 2 + 60)
-
-
-# ── Win scherm ────────────────────────────────────────────────────────────────
 def win_screen(winner):
     colour = GREEN if winner == "SPELER" else AMBER
     t = 0
@@ -263,9 +236,6 @@ def win_screen(winner):
         screen.blit(scanlines, (0, 0))
         screen.blit(vignette,  (0, 0))
         pygame.display.flip()
-
-
-# ── Game loop ─────────────────────────────────────────────────────────────────
 def game():
     player = Paddle(MARGIN,                 GREEN)
     ai_pad = Paddle(WIDTH - MARGIN - PAD_W, AMBER)

@@ -47,7 +47,9 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
   const [aiText, setAiText]                   = React.useState('')
   const [aiCachedText, setAiCachedText]       = React.useState(prefetchedHint ?? '')
   const [aiPrefetching, setAiPrefetching]     = React.useState(false)
+  const [hintUnlocked, setHintUnlocked]       = React.useState(false)
   const aiPrefetchedOnce = React.useRef(false)
+  const autoHintShown = React.useRef(false)
 
   React.useEffect(() => {
     if (prefetchedHint) {
@@ -149,6 +151,7 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
 
   const toggleAiOverlay = React.useCallback(() => {
     if (status !== 'running') return
+    if (!hintUnlocked) return
     if (aiVisible) {
       setAiVisible(false)
       return
@@ -165,7 +168,7 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
       return
     }
     void requestAiHint()
-  }, [aiCachedText, aiVisible, requestAiHint, status])
+  }, [aiCachedText, aiVisible, hintUnlocked, requestAiHint, status])
 
   const launch = React.useCallback(async () => {
     if (!game) { setErrorMessage('Game not found'); setStatus('error'); return }
@@ -220,6 +223,12 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
     return () => cleanup?.()
   }, [exit])
   React.useEffect(() => {
+    if (status !== 'running') {
+      setHintUnlocked(false)
+      autoHintShown.current = false
+    }
+  }, [status])
+  React.useEffect(() => {
     if (status !== 'running') return
     if (aiPrefetchedOnce.current) return
     aiPrefetchedOnce.current = true
@@ -227,6 +236,30 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
       void requestAiHint({ silent: true })
     }
   }, [aiCachedText, requestAiHint, status])
+  React.useEffect(() => {
+    if (status !== 'running') return
+    const unlockTimer = window.setTimeout(() => setHintUnlocked(true), 20000)
+    return () => window.clearTimeout(unlockTimer)
+  }, [status])
+  React.useEffect(() => {
+    if (!hintUnlocked || status !== 'running' || autoHintShown.current) return
+    autoHintShown.current = true
+    // Auto-surface the hint once unlocked
+    if (aiCachedText) {
+      setAiVisible(true)
+      setAiStatus('thinking')
+      setAiText('AI is aan het denken…')
+      window.setTimeout(() => {
+        setAiStatus('ready')
+        setAiText(aiCachedText)
+      }, 800)
+      return
+    }
+    setAiVisible(true)
+    setAiStatus('thinking')
+    setAiText('AI is aan het denken…')
+    void requestAiHint()
+  }, [aiCachedText, hintUnlocked, requestAiHint, status])
   React.useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'y' || e.key === 'Y') {
@@ -497,7 +530,7 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
               whiteSpace: 'nowrap', fontSize: 11, letterSpacing: 4, color: '#8fe8ff',
               transform: `translateX(${-marqueePos}px)`, willChange: 'transform',
             }}>
-              {'★ THE ARCADERS ★ INSERT COIN ★ HIGH SCORE ★ PLAY NOW ★ 1UP ★ YALLA ★ KOMAAN ★ '.repeat(6)}
+              {'★ THE ARCADERS ★ INSERT COIN ★ HIGH SCORE ★ PLAY NOW ★ 1UP ★ READY ★ FIGHT ★ '.repeat(6)}
             </div>
           </div>
 <div style={{ position: 'absolute', left: 18, top: 14, display: 'flex', gap: 6 }}>
@@ -988,18 +1021,19 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
         {aiVisible && (
           <div style={{
             position: 'absolute',
-            top: 18,
-            right: 18,
-            width: 'min(420px, 34vw)',
-            padding: '12px 14px 11px',
+            bottom: 102,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'min(540px, 54vw)',
+            padding: '13px 18px 14px',
             borderRadius: 12,
-            border: `1px solid ${accent}55`,
-            background: 'rgba(0,14,32,0.92)',
-            boxShadow: `0 0 18px ${accent}44, 0 12px 28px rgba(0,0,0,0.65)`,
+            border: `1px solid ${accent}66`,
+            background: 'linear-gradient(180deg, rgba(0,20,46,0.95), rgba(0,12,30,0.9))',
+            boxShadow: `0 10px 30px rgba(0,0,0,0.55), 0 0 18px ${accent}33, inset 0 0 12px rgba(0,120,200,0.22)`,
             color: '#e6f7ff',
             pointerEvents: 'auto',
             zIndex: 32,
-            backdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(5px)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ fontSize: 11, letterSpacing: 1.8, fontWeight: 700, color: accent, textShadow: accentGlow }}>
@@ -1033,14 +1067,14 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
             </div>
           </div>
         )}
-        {!aiVisible && status === 'running' && (
+        {!aiVisible && status === 'running' && hintUnlocked && (
           <div style={{
             position: 'absolute',
-            top: 16,
-            right: 18,
-            padding: '5px 9px',
-            borderRadius: 8,
-            background: 'rgba(0,20,42,0.72)',
+            bottom: 94,
+            right: 120,
+            padding: '6px 11px',
+            borderRadius: 9,
+            background: 'rgba(0,20,42,0.78)',
             border: `1px solid ${accent}55`,
             color: '#bfe7ff',
             fontSize: 9,

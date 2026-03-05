@@ -2,7 +2,6 @@ import { HackButton, HackTransition } from '../flipper/HackTransition'
 
 type BootProps = {
   coins: number
-  highScore: number
   scrollText: number
   explosions: Array<{x: number, y: number, id: number}>
   particles: Array<{x: number, y: number, vx: number, vy: number, color: string, id: number}>
@@ -21,7 +20,6 @@ type BootProps = {
 
 export function BootScreen({
   coins,
-  highScore,
   scrollText,
   explosions,
   particles,
@@ -188,40 +186,22 @@ export function BootScreen({
             zIndex: 1001
           }} />
         )}
-<div style={{
+        <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          background: 'linear-gradient(180deg, #0066cc, #004499)',
+          padding: '6px 14px',
+          background: 'linear-gradient(180deg, #0066cc 0%, #004499 65%, #002a66 100%)',
           borderTop: '2px solid #00aaff',
           borderBottom: '4px solid #002266',
-          padding: '12px 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '18px',
-          fontWeight: 'bold',
-          letterSpacing: '3px',
           zIndex: 5,
-          boxShadow: '0 0 20px rgba(0,136,255,0.4), 0 6px 0 #001133'
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          boxShadow: '0 0 20px rgba(0,136,255,0.35), 0 6px 0 #001133'
         }}>
-          <div style={{
-            color: '#ffff00',
-            textShadow: '0 0 10px #ffff00, 2px 2px 0 #002244',
-            animation: 'pixel-pulse 1s ease-in-out infinite'
-          }}>
-            1UP {String(coins * 10000).padStart(8, '0')}
-          </div>
-
-          <div style={{
-            color: '#00ff88',
-            textShadow: '0 0 10px #00ff88, 2px 2px 0 #002244',
-            animation: 'pixel-pulse 1s ease-in-out infinite 0.5s'
-          }}>
-            HI {String(highScore).padStart(8, '0')}
-          </div>
-<HackButton onClick={() => window.__hackTransitionTrigger?.()} />
+          <HackButton onClick={() => window.__hackTransitionTrigger?.()} />
         </div>
 <div style={{
           position: 'absolute',

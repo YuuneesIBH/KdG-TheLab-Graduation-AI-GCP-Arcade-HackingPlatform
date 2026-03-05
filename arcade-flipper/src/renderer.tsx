@@ -43,7 +43,6 @@ function App() {
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
   const [coins, setCoins] = useState(0)
   const [time, setTime] = useState(0)
-  const [highScore, setHighScore] = useState(999999)
   const [scrollText, setScrollText] = useState(0)
   const [explosions, setExplosions] = useState<Array<{ x: number; y: number; id: number }>>([])
   const [particles, setParticles] = useState<Array<{ x: number; y: number; vx: number; vy: number; color: string; id: number }>>([])
@@ -376,7 +375,7 @@ function App() {
     )
   return (
     <BootScreen
-      coins={coins} highScore={highScore} scrollText={scrollText}
+      coins={coins} scrollText={scrollText}
       explosions={explosions} particles={particles} crtFlicker={crtFlicker}
       scanlineOffset={scanlineOffset} pixelShift={pixelShift}
       coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}

@@ -39,15 +39,32 @@ type WifiApProfile = {
   updatedAt: string
 }
 
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
+type WifiApProfile = {
+  ssid: string
+  password: string
+  channel: number
+  updatedAt: string
+}
+
+type AiExplainPayload = {
+  gameId: string
+  title: string
+  genre?: string
+  difficulty?: string
+  lastEvent?: string
+}
+
+type AiExplainResponse = {
+  success: boolean
+  message: string
+  content?: string
+}
 contextBridge.exposeInMainWorld('electron', {
   setFullscreen: (fullscreen: boolean) => ipcRenderer.invoke('set-fullscreen', fullscreen),
   launchGame: (request: string | LaunchRequest) => ipcRenderer.invoke('launch-game', request),
   stopGame: () => ipcRenderer.invoke('stop-game'),
   killGame: () => ipcRenderer.invoke('kill-game'),
-  updateGameViewport: (viewport: LaunchViewport) => ipcRenderer.invoke('update-game-viewport', viewport),
-  resizeGame: (viewport: LaunchViewport) => ipcRenderer.invoke('resize-game', viewport),
+  aiExplain: (payload: AiExplainPayload): Promise<AiExplainResponse> => ipcRenderer.invoke('ai-explain', payload),
   diyFlipperGetStatus: () => ipcRenderer.invoke('diyflipper-get-status'),
   diyFlipperConnect: (preferredPath?: string) => ipcRenderer.invoke('diyflipper-connect', preferredPath),
   diyFlipperDisconnect: () => ipcRenderer.invoke('diyflipper-disconnect'),
@@ -73,7 +90,6 @@ contextBridge.exposeInMainWorld('electron', {
     return () => ipcRenderer.removeListener('diyflipper-line', listener)
   },
   onGameExit: (callback: () => void) => {
-    // Listen for game exit event from main process
     const listener = () => callback()
     ipcRenderer.on('game-exited', listener)
     return () => ipcRenderer.removeListener('game-exited', listener)

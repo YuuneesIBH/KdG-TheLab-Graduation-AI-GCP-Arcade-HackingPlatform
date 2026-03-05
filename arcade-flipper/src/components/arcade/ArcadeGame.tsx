@@ -4,6 +4,8 @@ import { games } from './GameMenu'
 type ArcadeGameProps = {
   gameId: string
   onExit: () => void
+  prefetchedHint?: string
+  onHintReady?: (gameId: string, content: string) => void
 }
 
 function formatTitle(gameId: string) {
@@ -23,7 +25,7 @@ const GAME_SCREEN_INSET = { top: 150, left: 62, right: 62, bottom: 128 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
-export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
+export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: ArcadeGameProps) {
   const viewportRef = React.useRef<HTMLDivElement | null>(null)
 
   const [status, setStatus]             = React.useState<'launching' | 'running' | 'error'>('launching')
@@ -40,6 +42,21 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
   const [joystickAngle, setJoystickAngle]     = React.useState(0)
   const [coinBlink, setCoinBlink]             = React.useState(false)
   const [marqueePos, setMarqueePos]           = React.useState(0)
+  const [aiVisible, setAiVisible]             = React.useState(false)
+  const [aiStatus, setAiStatus]               = React.useState<'idle' | 'thinking' | 'ready' | 'error'>('idle')
+  const [aiText, setAiText]                   = React.useState('')
+  const [aiCachedText, setAiCachedText]       = React.useState(prefetchedHint ?? '')
+  const [aiPrefetching, setAiPrefetching]     = React.useState(false)
+  const [hintUnlocked, setHintUnlocked]       = React.useState(false)
+  const aiPrefetchedOnce = React.useRef(false)
+  const autoHintShown = React.useRef(false)
+
+  React.useEffect(() => {
+    if (prefetchedHint) {
+      setAiCachedText(prefetchedHint)
+      setAiStatus((s) => (s === 'idle' ? 'ready' : s))
+    }
+  }, [prefetchedHint])
 
   const game       = React.useMemo(() => games.find(g => g.id === gameId), [gameId])
   const title      = game?.title      ?? formatTitle(gameId)
@@ -56,8 +73,6 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     return bulbPalette[(idx + bulbPalette.length) % bulbPalette.length]
   }
   const neonOpacity = marqueeFlicker ? 0.62 : 0.95
-
-  // ── Electron helpers ──────────────────────────────────────────────
   const waitForLayoutCommit = React.useCallback(
     () => new Promise<void>(resolve => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
@@ -90,6 +105,71 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     onExit()
   }, [onExit, setFullscreen, stopGameIfPossible])
 
+  const requestAiHint = React.useCallback(async (opts?: { silent?: boolean }) => {
+    const api = window.electron
+    const silent = opts?.silent === true
+
+    if (!silent) {
+      setAiVisible(true)
+      setAiStatus('thinking')
+      setAiText('AI is aan het denken…')
+    } else {
+      setAiPrefetching(true)
+      setAiStatus((s) => (s === 'idle' ? 'thinking' : s))
+    }
+
+    if (!api?.aiExplain) {
+      setAiStatus('error')
+      setAiText('AI kanaal niet beschikbaar')
+      return
+    }
+
+    try {
+      const response = await api.aiExplain({
+        gameId,
+        title,
+        genre,
+        difficulty
+      })
+      if (!response?.success) {
+        setAiStatus('error')
+        setAiText(response?.message ?? 'AI-call mislukt')
+        return
+      }
+      setAiStatus('ready')
+      const content = response.content ?? response.message ?? 'Geen AI-tekst ontvangen'
+      setAiText(content)
+      setAiCachedText(content)
+      onHintReady?.(gameId, content)
+    } catch (error) {
+      setAiStatus('error')
+      setAiText(error instanceof Error ? error.message : String(error))
+    } finally {
+      if (silent) setAiPrefetching(false)
+    }
+  }, [difficulty, gameId, genre, onHintReady, title])
+
+  const toggleAiOverlay = React.useCallback(() => {
+    if (status !== 'running') return
+    if (!hintUnlocked) return
+    if (aiVisible) {
+      setAiVisible(false)
+      return
+    }
+    // If we already fetched, show instantly; otherwise fetch now.
+    if (aiCachedText) {
+      setAiVisible(true)
+      setAiStatus('thinking')
+      setAiText('AI is aan het denken…')
+      setTimeout(() => {
+        setAiStatus('ready')
+        setAiText(aiCachedText)
+      }, 1200)
+      return
+    }
+    void requestAiHint()
+  }, [aiCachedText, aiVisible, hintUnlocked, requestAiHint, status])
+
   const launch = React.useCallback(async () => {
     if (!game) { setErrorMessage('Game not found'); setStatus('error'); return }
     const api = window.electron
@@ -113,8 +193,6 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
       setStatus('error')
     }
   }, [game, getViewport, waitForLayoutCommit])
-
-  // ── Effects ──────────────────────────────────────────────────────
   React.useEffect(() => {
     setFullscreen(true)
     void launch()
@@ -144,28 +222,54 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     const cleanup = window.electron?.onGameExit?.(() => exit())
     return () => cleanup?.()
   }, [exit])
-
+  React.useEffect(() => {
+    if (status !== 'running') {
+      setHintUnlocked(false)
+      autoHintShown.current = false
+    }
+  }, [status])
   React.useEffect(() => {
     if (status !== 'running') return
-    const api = window.electron
-    if (!api) return
-    const update = () => {
-      const v = getViewport()
-      if (!v) return
-      void api.updateGameViewport(v)
-      void api.resizeGame(v)
+    if (aiPrefetchedOnce.current) return
+    aiPrefetchedOnce.current = true
+    if (!aiCachedText) {
+      void requestAiHint({ silent: true })
     }
-    update()
-    window.addEventListener('resize', update)
-    let ro: ResizeObserver | null = null
-    if (typeof ResizeObserver !== 'undefined' && viewportRef.current) {
-      ro = new ResizeObserver(update)
-      ro.observe(viewportRef.current)
+  }, [aiCachedText, requestAiHint, status])
+  React.useEffect(() => {
+    if (status !== 'running') return
+    const unlockTimer = window.setTimeout(() => setHintUnlocked(true), 20000)
+    return () => window.clearTimeout(unlockTimer)
+  }, [status])
+  React.useEffect(() => {
+    if (!hintUnlocked || status !== 'running' || autoHintShown.current) return
+    autoHintShown.current = true
+    // Auto-surface the hint once unlocked
+    if (aiCachedText) {
+      setAiVisible(true)
+      setAiStatus('thinking')
+      setAiText('AI is aan het denken…')
+      window.setTimeout(() => {
+        setAiStatus('ready')
+        setAiText(aiCachedText)
+      }, 800)
+      return
     }
-    return () => { window.removeEventListener('resize', update); ro?.disconnect() }
-  }, [getViewport, status])
-
-  // Visual FX
+    setAiVisible(true)
+    setAiStatus('thinking')
+    setAiText('AI is aan het denken…')
+    void requestAiHint()
+  }, [aiCachedText, hintUnlocked, requestAiHint, status])
+  React.useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'y' || e.key === 'Y') {
+        e.preventDefault()
+        toggleAiOverlay()
+      }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [toggleAiOverlay])
   React.useEffect(() => {
     const t = setInterval(() => {
       if (Math.random() < 0.02) {
@@ -212,8 +316,6 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     const t = setInterval(() => setMarqueePos(p => (p + 1) % 600), 22)
     return () => clearInterval(t)
   }, [])
-
-  // ── Shared sub-components ─────────────────────────────────────────
   const LedDot = ({ offset }: { offset: number }) => (
     <div style={{
       width: 9, height: 9, borderRadius: '50%',
@@ -237,20 +339,17 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
 
   const Joystick = ({ flip }: { flip?: boolean }) => (
     <div style={{ position: 'relative', width: 52, height: 52 }}>
-      {/* Base disc */}
-      <div style={{
+<div style={{
         position: 'absolute', inset: 0, borderRadius: '50%',
         background: 'radial-gradient(circle at 38% 32%, #3a2b24, #120804)',
         border: '2px solid #5a3412',
         boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.9), 0 3px 10px rgba(0,0,0,0.7)',
       }} />
-      {/* Gate */}
-      <div style={{
+<div style={{
         position: 'absolute', inset: '12px',
         background: '#0c0603', border: '1.5px solid #342112', transform: 'rotate(45deg)',
       }} />
-      {/* Shaft */}
-      <div style={{
+<div style={{
         position: 'absolute', left: '50%', top: '50%',
         width: 11, height: 30, marginLeft: -5.5, marginTop: -22,
         background: 'linear-gradient(180deg, #7b6a5a, #2a1e14)',
@@ -260,8 +359,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
         transformOrigin: 'bottom center', transition: 'transform 0.1s ease-out',
         boxShadow: '0 2px 6px rgba(0,0,0,0.8)',
       }}>
-        {/* Ball */}
-        <div style={{
+<div style={{
           position: 'absolute', top: -8, left: -4.5,
           width: 20, height: 20, borderRadius: '50%',
           background: flip
@@ -325,20 +423,15 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
 
   return (
     <>
-      {/* ==============================================================
-          LAYER 0 — GAME VIEWPORT (fills 100% of the screen)
-          The electron game window embeds here, covering everything.
-          ============================================================== */}
-      <div style={{
+<div style={{
         position: 'fixed', inset: 0, zIndex: 0,
         background: '#000000',
         fontFamily: '"Courier New", monospace',
-        filter: crtFlicker ? 'brightness(0.78) contrast(1.28)' : 'brightness(1) contrast(1.08)',
+        filter: crtFlicker ? 'brightness(1.02) contrast(1.22)' : 'brightness(1.24) contrast(1.06)',
         transition: 'filter 0.06s',
         transform: `translateX(${pixelShift}px)`,
       }}>
-        {/* ← Electron embeds the game process here */}
-        <div
+<div
           ref={viewportRef}
           style={{
             position: 'absolute',
@@ -348,13 +441,11 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             bottom: GAME_SCREEN_INSET.bottom,
           }}
         />
-
-        {/* Launching / Error overlay */}
-        {status !== 'running' && (
+{status !== 'running' && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 5,
             display: 'grid', placeItems: 'center',
-            background: 'radial-gradient(circle at 50% 42%, rgba(151,80,28,0.26) 0%, rgba(18,8,4,0.93) 55%, rgba(8,3,1,0.99) 100%)',
+            background: 'radial-gradient(circle at 50% 42%, rgba(151,80,28,0.24) 0%, rgba(18,8,4,0.72) 55%, rgba(8,3,1,0.86) 100%)',
             color: '#ffeccc',
             fontFamily: '"Courier New", monospace',
           }}>
@@ -367,8 +458,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
                   ? `Mounting ${title} into the cabinet…`
                   : (errorMessage || 'Unknown error')}
               </div>
-              {/* Progress bar */}
-              <div style={{
+<div style={{
                 height: 12, borderRadius: 999,
                 border: `1px solid ${accent}66`,
                 background: 'rgba(0,0,0,0.65)', overflow: 'hidden',
@@ -380,8 +470,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
                   boxShadow: accentGlow, transition: 'width 0.12s linear',
                 }} />
               </div>
-              {/* Segment dots */}
-              {status === 'launching' && (
+{status === 'launching' && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   {Array.from({ length: 10 }).map((_, i) => (
                     <div key={i} style={{
@@ -418,20 +507,12 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           </div>
         )}
       </div>
-
-      {/* ==============================================================
-          LAYER 1 — CABINET OVERLAY
-          Floats on top of the game. Center is transparent / cut out.
-          All cabinet chrome lives here.
-          ============================================================== */}
-      <div style={{
+<div style={{
         position: 'fixed', inset: 0, zIndex: 10,
         pointerEvents: 'none',
         fontFamily: '"Courier New", "Press Start 2P", monospace',
       }}>
-
-        {/* ── TOP MARQUEE ───────────────────────────────────────────── */}
-        <div style={{
+<div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 160,
           background: `
             linear-gradient(180deg, rgba(0,25,55,0.98) 0%, rgba(0,17,39,0.95) 60%, rgba(3,8,20,0.0) 100%),
@@ -444,19 +525,15 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           pointerEvents: 'auto',
         }}>
           <RgbStrip top />
-
-          {/* Scrolling background text */}
-          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', opacity: 0.055 }}>
+<div style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', opacity: 0.055 }}>
             <div style={{
               whiteSpace: 'nowrap', fontSize: 11, letterSpacing: 4, color: '#8fe8ff',
               transform: `translateX(${-marqueePos}px)`, willChange: 'transform',
             }}>
-              {'★ THE ARCADERS ★ INSERT COIN ★ HIGH SCORE ★ PLAY NOW ★ 1UP ★ YALLA ★ KOMAAN ★ '.repeat(6)}
+              {'★ THE ARCADERS ★ INSERT COIN ★ HIGH SCORE ★ PLAY NOW ★ 1UP ★ READY ★ FIGHT ★ '.repeat(6)}
             </div>
           </div>
-
-          {/* Service chips + tiny audio meter */}
-          <div style={{ position: 'absolute', left: 18, top: 14, display: 'flex', gap: 6 }}>
+<div style={{ position: 'absolute', left: 18, top: 14, display: 'flex', gap: 6 }}>
             <LabelChip text="CRT SAFE" />
             <LabelChip text={`MODE ${status === 'running' ? 'PLAY' : 'BOOT'}`} tone={status === 'running' ? '#9bffc9' : '#8fe8ff'} />
           </div>
@@ -464,16 +541,12 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             <LabelChip text="AUDIO BUS" />
             <MiniMeter bars={8} phase={20} />
           </div>
-
-          {/* Left info */}
-          <div style={{ position: 'absolute', left: 20, bottom: 18, display: 'grid', gap: 5 }}>
+<div style={{ position: 'absolute', left: 20, bottom: 18, display: 'grid', gap: 5 }}>
             <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.55)' }}>NOW PLAYING</div>
             <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(226,249,255,0.95)', textShadow: `0 0 8px rgba(114,203,255,0.45)` }}>{title}</div>
             <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.6)' }}>{genre} · {year}</div>
           </div>
-
-          {/* ═══ LOGO — centered above the gameplay viewport ═══ */}
-          <div style={{
+<div style={{
             position: 'absolute',
             top: 2,
             left: '50%',
@@ -482,8 +555,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             textAlign: 'center',
             pointerEvents: 'none',
           }}>
-            {/* Glow halo */}
-            <div style={{
+<div style={{
               position: 'absolute', inset: '-18px -110px',
               background: 'radial-gradient(ellipse at center, rgba(100,203,255,0.35) 0%, transparent 60%)',
               filter: 'blur(24px)', opacity: neonOpacity,
@@ -514,9 +586,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
               transition: 'color 0.07s',
             }}>◆ ARCADE SYSTEM ◆ EST. 1992 ◆</div>
           </div>
-
-          {/* Right info */}
-          <div style={{ position: 'absolute', right: 20, bottom: 18, display: 'grid', gap: 5, textAlign: 'right' }}>
+<div style={{ position: 'absolute', right: 20, bottom: 18, display: 'grid', gap: 5, textAlign: 'right' }}>
             <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.55)' }}>CABINET</div>
             <div style={{ fontSize: 10, letterSpacing: 2, color: accent, textShadow: accentGlow }}>{players} · DIFF {difficulty}</div>
             <div style={{ fontSize: 8, letterSpacing: 2, color: 'rgba(154,235,255,0.6)' }}>STEREO · 60HZ</div>
@@ -543,9 +613,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
               fontFamily: 'inherit',
             }}
           >EXIT</button>
-
-          {/* Corner bolts */}
-          {[{top:7,left:7},{top:7,right:7}].map((s,i) => (
+{[{top:7,left:7},{top:7,right:7}].map((s,i) => (
             <div key={i} style={{
               position: 'absolute', ...s,
               width: 10, height: 10, borderRadius: '50%',
@@ -553,13 +621,9 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
               border: '1.5px solid #0c3f67',
             }} />
           ))}
-
-          {/* Bottom fade strip (RGB) */}
-          <RgbStrip bottom flip />
+<RgbStrip bottom flip />
         </div>
-
-        {/* ── LEFT SIDE PANEL ───────────────────────────────────────── */}
-        <div style={{
+<div style={{
           position: 'absolute', top: 154, bottom: 132, left: 0, width: 68,
           background: 'linear-gradient(90deg, rgba(0,36,74,0.96) 0%, rgba(0,19,44,0.88) 65%, rgba(1,6,16,0.0) 100%)',
           borderRight: '1px solid rgba(0,136,255,0.32)',
@@ -586,8 +650,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
               boxShadow: '0 0 3px rgba(0,0,0,0.5)',
             }} />
           ))}
-          {/* Vertical neon stripe */}
-          <div style={{
+<div style={{
             position: 'absolute', top: 0, bottom: 0, left: 9, width: 2,
             background: 'linear-gradient(180deg, transparent, rgba(0,198,255,0.74), rgba(0,104,214,0.74), transparent)',
             opacity: 0.55,
@@ -648,15 +711,13 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
             {[0,60,120,180,240,300].map(o => <LedDot key={o} offset={o} />)}
           </div>
-          {/* Speaker grille */}
-          <div style={{ width: 46, display: 'flex', flexDirection: 'column', gap: 5, opacity: 0.38 }}>
+<div style={{ width: 46, display: 'flex', flexDirection: 'column', gap: 5, opacity: 0.38 }}>
             {Array.from({ length: 7 }).map((_, i) => (
               <div key={i} style={{ height: 3, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(114,203,255,0.65), transparent)' }} />
             ))}
             <div style={{ marginTop: 4, fontSize: 6, letterSpacing: 1, color: 'rgba(168,229,255,0.62)', textAlign: 'center', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>STEREO L</div>
           </div>
-          {/* 1UP */}
-          <div style={{
+<div style={{
             fontSize: 8, letterSpacing: 2,
             color: coinBlink ? '#8fe8ff' : 'rgba(143,232,255,0.26)',
             textShadow: coinBlink ? '0 0 8px #8fe8ff' : 'none',
@@ -666,9 +727,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             {[300,240,180,120,60,0].map(o => <LedDot key={o} offset={o} />)}
           </div>
         </div>
-
-        {/* ── RIGHT SIDE PANEL ──────────────────────────────────────── */}
-        <div style={{
+<div style={{
           position: 'absolute', top: 154, bottom: 132, right: 0, width: 68,
           background: 'linear-gradient(270deg, rgba(0,36,74,0.96) 0%, rgba(0,19,44,0.88) 65%, rgba(1,6,16,0.0) 100%)',
           borderLeft: '1px solid rgba(0,136,255,0.32)',
@@ -772,9 +831,6 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             {[0,60,120,180,240,300].map(o => <LedDot key={o} offset={o} />)}
           </div>
         </div>
-
-        {/* ── SCREEN BORDER GLOW ────────────────────────────────────── */}
-        {/* Thin neon frame that traces the game area */}
         <div style={{
           position: 'absolute',
           top: GAME_SCREEN_INSET.top,
@@ -789,9 +845,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           pointerEvents: 'none',
           transition: 'box-shadow 0.14s',
         }} />
-
-        {/* Frame brackets + edge markers */}
-        {[
+{[
           { top: GAME_SCREEN_INSET.top - 6, left: GAME_SCREEN_INSET.left - 6, borderTop: true, borderLeft: true },
           { top: GAME_SCREEN_INSET.top - 6, right: GAME_SCREEN_INSET.right - 6, borderTop: true, borderRight: true },
           { bottom: GAME_SCREEN_INSET.bottom - 6, left: GAME_SCREEN_INSET.left - 6, borderBottom: true, borderLeft: true },
@@ -834,9 +888,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           textShadow: '0 0 8px rgba(0,196,255,0.55)',
           pointerEvents: 'none',
         }}>◀◀</div>
-
-        {/* Neon side tubes */}
-        <div style={{
+<div style={{
           position: 'absolute', left: 56, top: 160, bottom: 140, width: 5,
           background: 'linear-gradient(180deg, transparent 0%, rgba(0,208,255,0.82) 24%, rgba(0,112,224,0.74) 56%, transparent 100%)',
           boxShadow: '0 0 10px rgba(0,184,255,0.48), 0 0 22px rgba(0,96,214,0.3)', opacity: 0.52, borderRadius: 999,
@@ -848,9 +900,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           boxShadow: '0 0 10px rgba(0,184,255,0.48), 0 0 22px rgba(0,96,214,0.3)', opacity: 0.52, borderRadius: 999,
           animation: 'neon-breathe 2.6s ease-in-out infinite',
         }} />
-
-        {/* ── CONTROL PANEL BOTTOM ──────────────────────────────────── */}
-        <div style={{
+<div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0, height: 132,
           background: `
             linear-gradient(0deg, rgba(0,14,30,0.98) 0%, rgba(0,29,58,0.96) 56%, rgba(3,9,20,0.0) 100%),
@@ -864,8 +914,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
           pointerEvents: 'auto',
           overflow: 'hidden',
         }}>
-          {/* Texture */}
-          <div style={{
+<div style={{
             position: 'absolute', inset: 0,
             backgroundImage: `
               repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0,0,0,0.07) 8px, rgba(0,0,0,0.07) 9px),
@@ -874,20 +923,15 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             pointerEvents: 'none',
           }} />
           <RgbStrip top />
-
-          {/* P1 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+<div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
             <Joystick />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
               <ArcadeBtn color="#d63b2f" /><ArcadeBtn color="#3975cc" />
               <ArcadeBtn color="#f0b837" /><ArcadeBtn color="#ed7f3a" />
             </div>
           </div>
-
-          {/* Center */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-            {/* Score */}
-            <div style={{
+<div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+<div style={{
               background: 'rgba(0,20,43,0.9)', border: '1.5px solid rgba(114,203,255,0.72)',
               borderRadius: 5, padding: '5px 16px', textAlign: 'center',
               boxShadow: 'inset 0 0 12px rgba(0,104,194,0.5)', minWidth: 150,
@@ -902,8 +946,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
               <LabelChip text="CAB LINK" tone="#9cdfff" />
               <MiniMeter bars={9} phase={160} color="#42beff" />
             </div>
-            {/* Coin insert */}
-            <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
+<div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
               <div style={{
                 width: 24, height: 24, borderRadius: '50%',
                 background: 'radial-gradient(circle at 35% 35%, #9ed9ff, #005c9f)',
@@ -921,8 +964,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
                 border: '1.5px solid #2b75b8', boxShadow: '0 0 7px rgba(0,169,255,0.5)',
               }} />
             </div>
-            {/* Exit */}
-            <button
+<button
               type="button"
               onClick={exit}
               onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); exit() }}
@@ -935,9 +977,7 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
               fontFamily: 'inherit',
             }}>■ EXIT</button>
           </div>
-
-          {/* P2 dimmed */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, flexDirection: 'row-reverse' }}>
+<div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, flexDirection: 'row-reverse' }}>
             <Joystick flip />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
               <ArcadeBtn color="#d63b2f" dim /><ArcadeBtn color="#3975cc" dim />
@@ -945,26 +985,20 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             </div>
           </div>
         </div>
-
-        {/* ── SCANLINES (full screen, very subtle) ──────────────────── */}
-        <div style={{
+<div style={{
           position: 'absolute', inset: 0,
           backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px, transparent 1px, transparent 3px)',
           transform: `translateY(${scanlineOffset}px)`,
-          pointerEvents: 'none', zIndex: 20, opacity: 0.3,
+          pointerEvents: 'none', zIndex: 20, opacity: 0.12,
         }} />
-
-        {/* Glitch line */}
-        {glitchLine >= 0 && (
+{glitchLine >= 0 && (
           <div style={{
             position: 'absolute', top: `${glitchLine * 5}%`, left: 0, right: 0, height: 2,
             background: 'rgba(0,204,255,0.8)', mixBlendMode: 'screen',
             pointerEvents: 'none', zIndex: 21,
           }} />
         )}
-
-        {/* ── RUNNING: P1 status badge (top-left of game area) ─────── */}
-        {status === 'running' && (
+{status === 'running' && (
           <div style={{
             position: 'absolute', top: 158, left: 76,
             display: 'flex', gap: 7, alignItems: 'center',
@@ -984,8 +1018,76 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
             }}>{players}</div>
           </div>
         )}
+        {aiVisible && (
+          <div style={{
+            position: 'absolute',
+            bottom: 102,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'min(540px, 54vw)',
+            padding: '13px 18px 14px',
+            borderRadius: 12,
+            border: `1px solid ${accent}66`,
+            background: 'linear-gradient(180deg, rgba(0,20,46,0.95), rgba(0,12,30,0.9))',
+            boxShadow: `0 10px 30px rgba(0,0,0,0.55), 0 0 18px ${accent}33, inset 0 0 12px rgba(0,120,200,0.22)`,
+            color: '#e6f7ff',
+            pointerEvents: 'auto',
+            zIndex: 32,
+            backdropFilter: 'blur(5px)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, letterSpacing: 1.8, fontWeight: 700, color: accent, textShadow: accentGlow }}>
+                AI ASSIST {aiPrefetching ? '· PREFETCH' : ''}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ fontSize: 10, color: '#8fd5ff', letterSpacing: 1.2 }}>
+                  {aiStatus === 'thinking' ? 'DENKEN…' : aiStatus === 'error' ? 'ERROR' : 'GEREED'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiVisible(false)}
+                  style={{
+                    background: 'rgba(0,40,80,0.8)',
+                    color: '#d7f1ff',
+                    border: `1px solid ${accent}55`,
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    fontSize: 11,
+                    letterSpacing: 1.4,
+                    cursor: 'pointer'
+                  }}
+                >✕</button>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.45, whiteSpace: 'pre-wrap', color: '#e6f7ff' }}>
+              {aiText}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 10, color: '#8bbde8', letterSpacing: 1 }}>
+              Tip: druk Y opnieuw om te sluiten.
+            </div>
+          </div>
+        )}
+        {!aiVisible && status === 'running' && hintUnlocked && (
+          <div style={{
+            position: 'absolute',
+            bottom: 94,
+            right: 120,
+            padding: '6px 11px',
+            borderRadius: 9,
+            background: 'rgba(0,20,42,0.78)',
+            border: `1px solid ${accent}55`,
+            color: '#bfe7ff',
+            fontSize: 9,
+            letterSpacing: 1.6,
+            textShadow: accentGlow,
+            pointerEvents: 'none',
+            zIndex: 28
+          }}>
+            Y = AI HINT
+          </div>
+        )}
 
-      </div>{/* end overlay layer */}
+      </div>
 
       <style>{`
         @keyframes neon-breathe {

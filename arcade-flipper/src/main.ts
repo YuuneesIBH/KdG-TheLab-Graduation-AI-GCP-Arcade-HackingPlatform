@@ -18,6 +18,7 @@ type LaunchRequest = {
 }
 
 type PortInfo = Awaited<ReturnType<typeof SerialPort.list>>[number]
+type PortInfoWithFriendlyName = PortInfo & { friendlyName?: string }
 
 type DiyFlipperStatus = {
   connected: boolean
@@ -54,6 +55,21 @@ type WifiApProfile = {
   password: string
   channel: number
   updatedAt: string
+}
+
+type AiExplainRequest = {
+  gameId: string
+  title: string
+  genre?: string
+  difficulty?: string
+  lastEvent?: string
+  language?: string
+}
+
+type AiExplainResult = {
+  success: boolean
+  message: string
+  content?: string
 }
 
 const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
@@ -95,6 +111,12 @@ const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
   }
 ]
 
+const OLLAMA_URL = (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/+$/, '')
+const OLLAMA_FALLBACK_URL = (process.env.OLLAMA_FALLBACK_URL ?? 'http://34.79.68.47:11434').replace(/\/+$/, '')
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma2:27b'
+const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS ?? 45000)
+const OLLAMA_KEEP_ALIVE_SEC = Number(process.env.OLLAMA_KEEP_ALIVE_SEC ?? 1800) // 30 minuten loaded houden
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
@@ -102,6 +124,113 @@ function clamp(value: number, min: number, max: number) {
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return String(error)
+}
+
+function buildAiMessages(payload: AiExplainRequest) {
+  const genre = payload.genre ?? 'ARCADE'
+  const difficulty = payload.difficulty ?? 'UNSET'
+  const recent = payload.lastEvent ?? 'n/a'
+  const language = payload.language ?? 'Dutch'
+
+  return [
+    {
+      role: 'system',
+      content: `You are an upbeat arcade explainer. Answer in ${language}. Keep it under 80 words, bullet-like sentences.`
+    },
+    {
+      role: 'user',
+      content: [
+        `Game: ${payload.title} (${genre}, difficulty ${difficulty})`,
+        'Task: explain briefly how to play, what to aim for, and one quick tip.',
+        `Recent event: ${recent}`
+      ].join('\n')
+    }
+  ]
+}
+
+async function checkOllamaReachable(targetUrl: string): Promise<{ ok: boolean; message?: string }> {
+  const url = `${targetUrl}/api/tags`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2500)
+  try {
+    const response = await fetch(url, { method: 'GET', signal: controller.signal })
+    if (!response.ok) {
+      return { ok: false, message: `Ollama HTTP ${response.status} bij /api/tags` }
+    }
+    return { ok: true }
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError'
+    return {
+      ok: false,
+      message: aborted
+        ? 'Timeout bij Ollama /api/tags (firewall of traag netwerk)'
+        : toErrorMessage(error)
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function callAiExplain(payload: AiExplainRequest): Promise<AiExplainResult> {
+  const reachPrimary = await checkOllamaReachable(OLLAMA_URL)
+  if (!reachPrimary.ok && OLLAMA_FALLBACK_URL !== OLLAMA_URL) {
+    const reachFallback = await checkOllamaReachable(OLLAMA_FALLBACK_URL)
+    if (reachFallback.ok) {
+      return callAiExplainWithUrl(payload, OLLAMA_FALLBACK_URL, 'fallback')
+    }
+    return {
+      success: false,
+      message: `Kan Ollama niet bereiken op ${OLLAMA_URL} (${reachPrimary.message ?? 'onbekend'}) en fallback ${OLLAMA_FALLBACK_URL} (${reachFallback.message ?? 'onbekend'})`
+    }
+  }
+  if (!reachPrimary.ok) {
+    return { success: false, message: `Kan Ollama niet bereiken op ${OLLAMA_URL}: ${reachPrimary.message ?? 'onbekende fout'}` }
+  }
+  return callAiExplainWithUrl(payload, OLLAMA_URL, 'primary')
+}
+
+async function callAiExplainWithUrl(payload: AiExplainRequest, baseUrl: string, source: 'primary' | 'fallback'): Promise<AiExplainResult> {
+  const url = `${baseUrl}/api/chat`
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        messages: buildAiMessages(payload),
+        keep_alive: Number.isFinite(OLLAMA_KEEP_ALIVE_SEC) ? OLLAMA_KEEP_ALIVE_SEC : undefined,
+        options: { temperature: 0.6 }
+      }),
+      signal: controller.signal
+    })
+
+    if (!response.ok) {
+      return { success: false, message: `AI HTTP ${response.status} via ${source}` }
+    }
+
+    const json = await response.json() as { message?: { content?: string } }
+    const content = json?.message?.content?.trim()
+    if (!content) {
+      return { success: false, message: `Lege AI-respons via ${source}` }
+    }
+
+    return { success: true, message: `ok (${source})`, content }
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError'
+    return {
+      success: false,
+      message: aborted
+        ? `AI timeout (${OLLAMA_TIMEOUT_MS}ms) bij ${baseUrl}. Update firewall/source-range of verhoog OLLAMA_TIMEOUT_MS.`
+        : `${toErrorMessage(error)} via ${source}`
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 function hasPygame(pythonCommand: string) {
@@ -379,7 +508,7 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
 }
 
 function portInfoText(port: PortInfo) {
-  const maybeFriendlyName = (port as unknown as { friendlyName?: string }).friendlyName ?? ''
+  const maybeFriendlyName = (port as PortInfoWithFriendlyName).friendlyName ?? ''
   return `${port.path} ${port.manufacturer ?? ''} ${port.pnpId ?? ''} ${maybeFriendlyName} ${port.vendorId ?? ''} ${port.productId ?? ''}`.toLowerCase()
 }
 
@@ -518,8 +647,6 @@ async function openDiyFlipperPort(portPath: string) {
   diyFlipperPort = port
   diyFlipperLineBuffer = ''
   attachDiyFlipperPortListeners(port)
-
-  // ESP32 USB serial often resets on open; give it a brief boot window.
   await new Promise((resolve) => setTimeout(resolve, 320))
 
   const handshakeOk = await probeDiyFlipperHandshake(port)
@@ -600,7 +727,7 @@ async function connectDiyFlipper(preferredPath?: string) {
 }
 
 async function disconnectDiyFlipper() {
-  diyFlipperStatus.autoConnect = false
+  setDiyFlipperStatus({ autoConnect: false })
 
   if (!diyFlipperPort) {
     setDiyFlipperStatus({
@@ -634,6 +761,11 @@ async function disconnectDiyFlipper() {
 }
 
 async function writeDiyFlipperCommand(command: string) {
+  const trimmedCommand = command.trim()
+  if (!trimmedCommand) {
+    return { success: false, message: 'Command cannot be empty' }
+  }
+
   if (!diyFlipperPort?.isOpen) {
     const reconnect = await connectDiyFlipper()
     if (!reconnect.success || !diyFlipperPort?.isOpen) {
@@ -642,7 +774,7 @@ async function writeDiyFlipperCommand(command: string) {
   }
 
   return new Promise<{ success: boolean; message: string }>((resolve) => {
-    diyFlipperPort!.write(`${command.trim()}\n`, (error) => {
+    diyFlipperPort!.write(`${trimmedCommand}\n`, (error) => {
       if (error) {
         setDiyFlipperStatus({ error: `Write failed: ${toErrorMessage(error)}` })
         resolve({ success: false, message: `Write failed: ${toErrorMessage(error)}` })
@@ -650,9 +782,9 @@ async function writeDiyFlipperCommand(command: string) {
       }
       setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('diyflipper-line', `TX ${command.trim()}`)
+        mainWindow.webContents.send('diyflipper-line', `TX ${trimmedCommand}`)
       }
-      resolve({ success: true, message: `Command sent: ${command}` })
+      resolve({ success: true, message: `Command sent: ${trimmedCommand}` })
     })
   })
 }
@@ -705,8 +837,6 @@ function createWindow() {
   })
 
   mainWindow.webContents.on('did-finish-load', () => {
-    // On Windows is de OS-schaal vaak > 100%, waardoor alles te ingezoomd oogt.
-    // We compenseren dit door de Electron zoomfactor iets te verlagen.
     if (process.platform === 'win32') {
       mainWindow?.webContents.setZoomFactor(0.85)
     }
@@ -804,12 +934,19 @@ ipcMain.handle('set-fullscreen', async (_event, fullscreen: boolean) => {
   return { success: false }
 })
 
+ipcMain.handle('ai-explain', async (_event, payload: AiExplainRequest): Promise<AiExplainResult> => {
+  if (!payload?.gameId || !payload?.title) {
+    return { success: false, message: 'Ontbrekende game info voor AI' }
+  }
+  return callAiExplain(payload)
+})
+
 ipcMain.handle('diyflipper-get-status', async () => {
   return diyFlipperStatus
 })
 
 ipcMain.handle('diyflipper-connect', async (_event, preferredPath?: string) => {
-  diyFlipperStatus.autoConnect = true
+  setDiyFlipperStatus({ autoConnect: true })
   return connectDiyFlipper(preferredPath)
 })
 
@@ -818,7 +955,7 @@ ipcMain.handle('diyflipper-disconnect', async () => {
 })
 
 ipcMain.handle('diyflipper-send-command', async (_event, command: string) => {
-  if (!command || typeof command !== 'string') {
+  if (typeof command !== 'string' || !command.trim()) {
     return { success: false, message: 'Invalid command' }
   }
   return writeDiyFlipperCommand(command)
@@ -966,7 +1103,8 @@ ipcMain.handle('diyflipper-send-ir-entry', async (_event, entry: IrDatabaseEntry
   const protocol = (entry.protocol ?? '').trim()
   const address = (entry.address ?? '').trim()
   const command = (entry.command ?? '').trim()
-  const carrierKhz = Number.isFinite(entry.carrierKhz) ? Math.round(entry.carrierKhz!) : 38
+  const parsedCarrierKhz = Number(entry.carrierKhz)
+  const carrierKhz = Number.isFinite(parsedCarrierKhz) ? Math.round(parsedCarrierKhz) : 38
   if (!protocol || !address || !command) {
     return { success: false, message: 'IR entry is missing protocol/address/command' }
   }
@@ -979,14 +1117,6 @@ ipcMain.handle('stop-game', async () => {
 
 ipcMain.handle('kill-game', async () => {
   return stopActiveGameProcess(true)
-})
-
-ipcMain.handle('update-game-viewport', async (_event, _viewport: LaunchViewport) => {
-  return { success: true, message: 'Viewport updated' }
-})
-
-ipcMain.handle('resize-game', async (_event, _viewport: LaunchViewport) => {
-  return { success: true, message: 'Resize updated' }
 })
 
 ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) => {

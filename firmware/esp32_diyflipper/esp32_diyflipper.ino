@@ -23,9 +23,6 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <stdio.h>
-
-// Force Arduino library resolver to include these dependencies in the build.
-// If one is truly missing, compile will fail clearly instead of silently falling back.
 #include <IRremoteESP8266.h>
 #include <IRsend.h>
 #include <PN532_I2C.h>
@@ -33,14 +30,10 @@
 
 #include "diy_ir_mini.h"
 #include "diy_nfca_reader.h"
-
-// Optional UART bridge to Pico WH.
-static const int PICO_RX_PIN = 16; // ESP32 RX from Pico TX
-static const int PICO_TX_PIN = 17; // ESP32 TX to Pico RX
+static const int PICO_RX_PIN = 16;
+static const int PICO_TX_PIN = 17;
 HardwareSerial PicoSerial(1);
-
-// Basic IO placeholders.
-static const int STATUS_LED_PIN = 2; // Built-in LED on many ESP32 dev boards
+static const int STATUS_LED_PIN = 2;
 static const int IR_TX_PIN = 4;
 static const int IR_RX_PIN = 34;
 static const int PN532_IRQ_PIN = 27;
@@ -570,7 +563,6 @@ bool runIrSend(const String& payload, const String& commandLabel) {
 }
 
 void runModule(const String& moduleName) {
-  // Forward command to Pico side if connected.
   PicoSerial.print("RUN ");
   PicoSerial.println(moduleName);
 
@@ -591,7 +583,6 @@ void runModule(const String& moduleName) {
   }
 
   if (moduleName == "BADUSB_INJECT") {
-    // Placeholder only. Keep local legal/ethical constraints in mind.
     sendOk("RUN BADUSB_INJECT");
     return;
   }

@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package main;
 
 import Gui.StartMenuPanel;
@@ -15,11 +10,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-
-/**
- *
- * @author txola
- */
 public class GameFrame extends JFrame{
     private static final int SCREEN_WIDTH = 1024;
     private static final int SCREEN_HEIGHT = 768;

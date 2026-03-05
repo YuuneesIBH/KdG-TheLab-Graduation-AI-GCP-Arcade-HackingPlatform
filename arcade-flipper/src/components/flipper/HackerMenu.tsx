@@ -18,6 +18,23 @@ const VIEW_ITEMS = [
 const HOME_MODULE_ITEMS = MENU_ITEMS.filter((moduleItem) => moduleItem.key !== 'nfc' && moduleItem.key !== 'ir')
 
 type ViewKey = (typeof VIEW_ITEMS)[number]['key']
+type ControlId = string
+
+const BASE_FOCUSABLE_CONTROLS: ControlId[] = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir']
+
+const TAB_CONTROL_BY_VIEW: Record<ViewKey, ControlId> = {
+  home: 'tab-home',
+  nfc: 'tab-nfc',
+  ir: 'tab-ir',
+}
+
+const BOOT_SEQUENCE = [
+  '> Flipper Zero OS v0.91.1 - ARM Cortex-M4 @ 64MHz',
+  '> Checking hardware... Flash: OK RAM: OK SD: MOUNTED',
+  '> Bridge online. Loading module selector...',
+  '> Routing terminal and tool pages...',
+  '',
+]
 
 type DeviceStatus = {
   connected: boolean
@@ -155,7 +172,7 @@ function focusedControlStyle(active: boolean, color: string): React.CSSPropertie
   }
 }
 
-export default function Menu({
+export default function HackerMenu({
   onSelect,
   onBack,
   deviceStatus,
@@ -193,6 +210,8 @@ export default function Menu({
 
   const serialLogRef = useRef<HTMLDivElement>(null)
   const isCompact = viewport.width < 1220 || viewport.height < 860
+  const irEntries = useMemo(() => irDbEntries ?? [], [irDbEntries])
+  const isIrStepControl = focusedControl === 'ir-prev' || focusedControl === 'ir-next'
 
   useEffect(() => {
     if (!serialLogRef.current) return
@@ -206,14 +225,14 @@ export default function Menu({
   }, [])
 
   useEffect(() => {
-    const firstId = irDbEntries?.[0]?.id ?? ''
+    const firstId = irEntries[0]?.id ?? ''
     if (!firstId) {
       if (selectedIrId) setSelectedIrId('')
       return
     }
-    const hasSelected = (irDbEntries ?? []).some((entry) => entry.id === selectedIrId)
+    const hasSelected = irEntries.some((entry) => entry.id === selectedIrId)
     if (!hasSelected) setSelectedIrId(firstId)
-  }, [irDbEntries, selectedIrId])
+  }, [irEntries, selectedIrId])
 
   useEffect(() => {
     if (!wifiApProfile) return
@@ -224,22 +243,105 @@ export default function Menu({
 
   const openView = useCallback((view: ViewKey) => {
     setActiveView(view)
-    setFocusedControl(`tab-${view}`)
+    setFocusedControl(TAB_CONTROL_BY_VIEW[view])
   }, [])
 
   const stepIrEntry = useCallback((direction: 1 | -1) => {
-    const entries = irDbEntries ?? []
-    if (entries.length === 0) return
+    if (irEntries.length === 0) return
     setSelectedIrId((current) => {
-      const currentIndex = entries.findIndex((entry) => entry.id === current)
+      const currentIndex = irEntries.findIndex((entry) => entry.id === current)
       const safeIndex = currentIndex >= 0 ? currentIndex : 0
-      const nextIndex = (safeIndex + direction + entries.length) % entries.length
-      return entries[nextIndex].id
+      const nextIndex = (safeIndex + direction + irEntries.length) % irEntries.length
+      return irEntries[nextIndex].id
     })
-  }, [irDbEntries])
+  }, [irEntries])
 
-  const focusableControls = useMemo(() => {
-    const controls = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir']
+  const sendRawCommand = useCallback(() => {
+    const trimmed = rawCommand.trim()
+    if (!trimmed) return
+    onSendRawCommand?.(trimmed)
+    setRawCommand('')
+  }, [onSendRawCommand, rawCommand])
+
+  const activateFocusedControl = useCallback(() => {
+    if (!focusedControl) return
+    if (focusedControl.startsWith('home-module-')) {
+      const moduleKey = focusedControl.replace('home-module-', '')
+      onSelect?.(moduleKey)
+      return
+    }
+    switch (focusedControl) {
+      case 'header-reconnect':
+        onReconnect?.()
+        return
+      case 'header-exit':
+        onBack?.()
+        return
+      case 'tab-home':
+        openView('home')
+        return
+      case 'tab-nfc':
+      case 'home-open-nfc':
+        openView('nfc')
+        return
+      case 'tab-ir':
+      case 'home-open-ir':
+        openView('ir')
+        return
+      case 'nfc-run':
+        onSelect?.('nfc')
+        return
+      case 'nfc-read':
+        onNfcRead?.()
+        return
+      case 'nfc-save':
+        if (!lastNfcUid) return
+        onNfcSave?.()
+        return
+      case 'ir-run':
+        onSelect?.('ir')
+        return
+      case 'ir-reload':
+        onIrReload?.()
+        return
+      case 'ir-prev':
+        stepIrEntry(-1)
+        return
+      case 'ir-next':
+        stepIrEntry(1)
+        return
+      case 'ir-send':
+        if (!selectedIrId) return
+        onIrSend?.(selectedIrId)
+        return
+      case 'terminal-send':
+        sendRawCommand()
+        return
+      case 'terminal-clear':
+        onClearSerialLog?.()
+        return
+      default:
+        return
+    }
+  }, [
+    focusedControl,
+    lastNfcUid,
+    onBack,
+    onClearSerialLog,
+    onIrReload,
+    onIrSend,
+    onNfcRead,
+    onNfcSave,
+    onReconnect,
+    onSelect,
+    openView,
+    selectedIrId,
+    sendRawCommand,
+    stepIrEntry,
+  ])
+
+  const focusableControls = useMemo<ControlId[]>(() => {
+    const controls = [...BASE_FOCUSABLE_CONTROLS]
     if (activeView === 'home') {
       controls.push('home-open-nfc', 'home-open-ir')
       controls.push('wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
@@ -270,27 +372,29 @@ export default function Menu({
     })
   }, [focusableControls])
 
-  const bootSequence = [
-    '> Flipper Zero OS v0.91.1 - ARM Cortex-M4 @ 64MHz',
-    '> Checking hardware... Flash: OK RAM: OK SD: MOUNTED',
-    '> Bridge online. Loading module selector...',
-    '> Routing terminal and tool pages...',
-    '',
-  ]
-
   useEffect(() => {
     let index = 0
+    let cancelled = false
+    let timeoutId: number | null = null
+
     const next = () => {
-      if (index >= bootSequence.length) {
+      if (cancelled) return
+      if (index >= BOOT_SEQUENCE.length) {
         setBooted(true)
         return
       }
-      setBootLines((prev) => [...prev, bootSequence[index]])
+      setBootLines((prev) => [...prev, BOOT_SEQUENCE[index]])
       index += 1
-      setTimeout(next, 110)
+      timeoutId = window.setTimeout(next, 110)
     }
-    const timeout = setTimeout(next, 300)
-    return () => clearTimeout(timeout)
+
+    timeoutId = window.setTimeout(next, 300)
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -304,11 +408,20 @@ export default function Menu({
   }, [])
 
   useEffect(() => {
+    let glitchTimeoutId: number | null = null
     const iv = setInterval(() => {
       setGlitch(true)
-      setTimeout(() => setGlitch(false), 80)
+      if (glitchTimeoutId !== null) {
+        clearTimeout(glitchTimeoutId)
+      }
+      glitchTimeoutId = window.setTimeout(() => setGlitch(false), 80)
     }, 5000 + Math.random() * 4000)
-    return () => clearInterval(iv)
+    return () => {
+      clearInterval(iv)
+      if (glitchTimeoutId !== null) {
+        clearTimeout(glitchTimeoutId)
+      }
+    }
   }, [])
 
   const cycleView = useCallback((direction: 1 | -1) => {
@@ -316,7 +429,7 @@ export default function Menu({
       const index = VIEW_ITEMS.findIndex((view) => view.key === prev)
       const next = (index + direction + VIEW_ITEMS.length) % VIEW_ITEMS.length
       const nextView = VIEW_ITEMS[next].key
-      setFocusedControl(`tab-${nextView}`)
+      setFocusedControl(TAB_CONTROL_BY_VIEW[nextView])
       return nextView
     })
   }, [])
@@ -349,7 +462,7 @@ export default function Menu({
 
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        if (focusedControl === 'ir-prev' || focusedControl === 'ir-next') {
+        if (isIrStepControl) {
           stepIrEntry(-1)
           return
         }
@@ -359,7 +472,7 @@ export default function Menu({
 
       if (e.key === 'ArrowRight') {
         e.preventDefault()
-        if (focusedControl === 'ir-prev' || focusedControl === 'ir-next') {
+        if (isIrStepControl) {
           stepIrEntry(1)
           return
         }
@@ -379,7 +492,7 @@ export default function Menu({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedControl, moveFocus, onBack, openView, stepIrEntry])
+  }, [activateFocusedControl, isIrStepControl, moveFocus, onBack, openView, stepIrEntry])
 
   useEffect(() => {
     let raf = 0
@@ -408,14 +521,14 @@ export default function Menu({
             moveFocus(1)
             cooldownUntil = now + 180
           } else if (axisX < -0.55 || gamepad.buttons[14]?.pressed) {
-            if (focusedControl === 'ir-prev' || focusedControl === 'ir-next') {
+            if (isIrStepControl) {
               stepIrEntry(-1)
             } else {
               moveFocus(-1)
             }
             cooldownUntil = now + 180
           } else if (axisX > 0.55 || gamepad.buttons[15]?.pressed) {
-            if (focusedControl === 'ir-prev' || focusedControl === 'ir-next') {
+            if (isIrStepControl) {
               stepIrEntry(1)
             } else {
               moveFocus(1)
@@ -432,7 +545,7 @@ export default function Menu({
 
     poll()
     return () => cancelAnimationFrame(raf)
-  }, [cycleView, focusedControl, moveFocus, onBack, stepIrEntry])
+  }, [activateFocusedControl, cycleView, isIrStepControl, moveFocus, onBack, stepIrEntry])
   const hardwareLabel = deviceStatus?.connected
     ? `HW::ONLINE ${deviceStatus.portPath ?? ''}`.trim()
     : deviceStatus?.connecting
@@ -444,18 +557,6 @@ export default function Menu({
     : deviceStatus?.connecting
       ? '#ffff00'
       : '#ff4444'
-
-  const getWifiApPayload = useCallback(() => {
-    const channelRaw = Number.parseInt(wifiApChannelInput, 10)
-    const safeChannel = Number.isFinite(channelRaw)
-      ? Math.min(Math.max(channelRaw, 1), 13)
-      : 6
-    return {
-      ssid: wifiApSsidInput.trim(),
-      password: wifiApPasswordInput.trim(),
-      channel: safeChannel
-    }
-  }, [wifiApChannelInput, wifiApPasswordInput, wifiApSsidInput])
 
   const sendRawCommand = useCallback(() => {
     const trimmed = rawCommand.trim()
@@ -492,26 +593,6 @@ export default function Menu({
     }
     if (focusedControl === 'home-open-ir') {
       openView('ir')
-      return
-    }
-    if (focusedControl === 'wifiap-start') {
-      const payload = getWifiApPayload()
-      if (!payload.ssid) return
-      onWifiApStart?.(payload)
-      return
-    }
-    if (focusedControl === 'wifiap-stop') {
-      onWifiApStop?.()
-      return
-    }
-    if (focusedControl === 'wifiap-save') {
-      const payload = getWifiApPayload()
-      if (!payload.ssid) return
-      onWifiApSaveProfile?.(payload)
-      return
-    }
-    if (focusedControl === 'wifiap-load') {
-      onWifiApLoadProfile?.()
       return
     }
     if (focusedControl.startsWith('home-module-')) {
@@ -571,12 +652,7 @@ export default function Menu({
     onNfcSave,
     onReconnect,
     onSelect,
-    onWifiApLoadProfile,
-    onWifiApSaveProfile,
-    onWifiApStart,
-    onWifiApStop,
     openView,
-    getWifiApPayload,
     selectedIrId,
     sendRawCommand,
     stepIrEntry,
@@ -610,7 +686,7 @@ export default function Menu({
     return 'No IR lines yet.'
   }, [serialLines])
 
-  const selectedIrEntry = useMemo(() => (irDbEntries ?? []).find((entry) => entry.id === selectedIrId), [irDbEntries, selectedIrId])
+  const selectedIrEntry = useMemo(() => irEntries.find((entry) => entry.id === selectedIrId), [irEntries, selectedIrId])
 
   const promptCommand = activeView === 'home'
     ? 'flipper status --overview'
@@ -666,7 +742,7 @@ export default function Menu({
           ))}
         </div>
         <span style={{ color: '#00ff41', fontSize: isCompact ? '12px' : '11px', letterSpacing: isCompact ? '2px' : '4px', textShadow: '0 0 10px #00ff41', fontWeight: 'bold' }}>
-          FLIPPER ZERO // CONTROL CONSOLE
+          FLIPPER ZERO - CONTROL CONSOLE
         </span>
         <div style={{ display: 'flex', gap: isCompact ? '8px' : '12px', alignItems: 'center', flexWrap: isCompact ? 'wrap' : 'nowrap', justifyContent: 'flex-end' }}>
           <span style={{ color: hardwareColor, fontSize: isCompact ? '11px' : '10px', letterSpacing: '2px', textShadow: `0 0 6px ${hardwareColor}` }}>
@@ -890,7 +966,7 @@ export default function Menu({
                         <div style={{ border: '1px solid #1a3a1a', background: 'rgba(0, 30, 0, 0.2)', padding: '10px', display: 'grid', gap: '6px' }}>
                           <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>HW::{hardwareLabel}</div>
                           <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>NFC_HW::{nfcHealth}</div>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>IR_DB::{(irDbEntries ?? []).length} entries</div>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>IR_DB::{irEntries.length} entries</div>
                           <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5a855a', wordBreak: 'break-word' }}>LAST_RX::{lastDeviceLine || 'none'}</div>
                         </div>
 
@@ -1012,9 +1088,9 @@ export default function Menu({
                               fontSize: isCompact ? '12px' : '11px',
                             }}
                           >
-                            {(irDbEntries ?? []).length === 0
+                            {irEntries.length === 0
                               ? <option value="">No IR entries loaded</option>
-                              : (irDbEntries ?? []).map((entry) => (
+                              : irEntries.map((entry) => (
                                   <option key={entry.id} value={entry.id}>
                                     {entry.name} [{entry.protocol}]
                                   </option>
@@ -1044,7 +1120,7 @@ export default function Menu({
                           </button>
                         </div>
                         <div style={{ border: '1px solid #3a2107', background: 'rgba(50,25,5,0.26)', padding: '10px', display: 'grid', gap: '6px' }}>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>IR_DB::{(irDbEntries ?? []).length} entries</div>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>IR_DB::{irEntries.length} entries</div>
                           <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>
                             SELECTED::{selectedIrEntry ? `${selectedIrEntry.name} (${selectedIrEntry.protocol})` : 'none'}
                           </div>
@@ -1196,7 +1272,7 @@ export default function Menu({
         padding: isCompact ? '6px 10px' : '4px 20px',
         display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: isCompact ? '6px' : '0px',
       }}>
-        {['SYS::ACTIVE', `VIEW::${activeView.toUpperCase()}`, `NFC::${nfcHealth}`, `IR_DB::${(irDbEntries ?? []).length}`, hardwareLabel].map((s) => (
+        {['SYS::ACTIVE', `VIEW::${activeView.toUpperCase()}`, `NFC::${nfcHealth}`, `IR_DB::${irEntries.length}`, hardwareLabel].map((s) => (
           <span key={s} style={{ color: '#0d1a0d', fontSize: isCompact ? '10px' : '9px', letterSpacing: isCompact ? '1px' : '2px' }}>{s}</span>
         ))}
       </div>

@@ -1,15 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package main;
-
-
-/**
- *
- * @author txola
- */
 public class Segment {
     private Coordinate3D point1;
     private Coordinate3D point2;
@@ -22,8 +11,6 @@ public class Segment {
         this.point2 = point2;
         this.curve = curve;
     }
-
-    //<editor-fold defaultstate="collapsed" desc="Getters and Setters">
     public Coordinate3D getPoint1() {
         return point1;
     }
@@ -39,8 +26,6 @@ public class Segment {
     public void setPoint2(Coordinate3D point2) {
         this.point2 = point2;
     }
-    
-//</editor-fold>
 
     public float getCurve() {
         return curve;

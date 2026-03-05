@@ -204,7 +204,6 @@ def generate_particles(p, particles, color, win):
 		particle[0][1] -= particle [1][1]
 		particle [2] -= 0.1
 		pygame.draw.circle(win, color, particle [0], int(particle [2]))
-		#pygame.draw.rect(win, color, (particle[0][0], particle [0][1], int(particle[2]), int(particle[2])))
 		if particle [2] <= 0:
 			particles.remove(particle)
 			

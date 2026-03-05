@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package entity;
 
 import java.awt.Color;
@@ -21,11 +16,6 @@ import main.Circuit;
 import main.Coordinate3D;
 import main.Point;
 import main.Segment;
-
-/**
- *
- * @author txola
- */
 public class Entity implements Serializable{
     Circuit circuit;
     private Coordinate3D position;
@@ -42,9 +32,6 @@ public class Entity implements Serializable{
         this.circuit = circuit;
         this.image = image;
     }
-
-
-    //<editor-fold defaultstate="collapsed" desc="Getters and Setters">
     public Coordinate3D getPosition() {
         return position;
     }
@@ -88,7 +75,6 @@ public class Entity implements Serializable{
     public void setPointX(int pointX) {
         this.pointX = pointX;
     }
-//</editor-fold>
     
     public void updateLooped(Float cameraPosition) {
         if (cameraPosition > position.z)
@@ -96,8 +82,6 @@ public class Entity implements Serializable{
         else
             looped = false;
     }
-
-    //Returns if the sprite is visible
     public boolean draw(Graphics2D g2, int screenWidth, int screenHeight, Camera camera) {
         if (camera.getPosition().z > position.z) {
             looped = true;

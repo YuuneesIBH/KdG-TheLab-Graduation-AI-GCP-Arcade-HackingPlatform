@@ -7,7 +7,6 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'arcade-flipper/src/main.ts'),
-        // Keep native modules out of the bundle so they load from node_modules.
         external: ['serialport']
       }
     }

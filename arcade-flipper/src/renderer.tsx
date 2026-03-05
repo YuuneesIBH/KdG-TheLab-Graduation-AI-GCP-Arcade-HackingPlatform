@@ -1,29 +1,34 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BootScreen } from "./components/arcade/boot"
-import { MenuScreen } from "./components/arcade/GameMenu"
-import { ArcadeGame } from "./components/arcade/ArcadeGame"
-import HackerMenu from "./components/flipper/HackerMenu"
+import { BootScreen } from './components/arcade/boot'
+import { MenuScreen } from './components/arcade/GameMenu'
+import { ArcadeGame } from './components/arcade/ArcadeGame'
+import HackerMenu from './components/flipper/HackerMenu'
+import { games } from './components/arcade/GameMenu'
+import type { DiyFlipperStatus, IrDatabaseEntry } from './electron'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
-type DiyFlipperStatus = {
-  connected: boolean
-  connecting: boolean
-  autoConnect: boolean
-  portPath?: string
-  error?: string
-  lastSeenAt?: number
+
+const INITIAL_DIY_FLIPPER_STATUS: DiyFlipperStatus = {
+  connected: false,
+  connecting: false,
+  autoConnect: true,
 }
 
-type IrDatabaseEntry = {
-  id: string
-  name: string
-  protocol: string
-  address: string
-  command: string
-  carrierKhz?: number
-  source?: string
-}
+const BOOT_LINES = [
+  'ARCADE-TRONIX BIOS v2.41',
+  'Copyright (C) 1991-1996',
+  '',
+  'Testing RAM............OK',
+  'Testing ROM............OK',
+  'Testing VRAM...........OK',
+  'Init Sound Blaster.....OK',
+  'Init Joystick..........OK',
+  'Init Coin Mech.........OK',
+  'Loading game data......',
+  '',
+  'Press COIN to continue...',
+]
 
 type WifiApProfile = {
   ssid: string
@@ -37,42 +42,28 @@ function App() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const isBootScreen = screen === 'boot'
 
-  const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>({
-    connected: false,
-    connecting: false,
-    autoConnect: true
-  })
+  const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>(INITIAL_DIY_FLIPPER_STATUS)
   const [diyFlipperLastLine, setDiyFlipperLastLine] = useState<string>('')
   const [diyFlipperSerialLines, setDiyFlipperSerialLines] = useState<string[]>([])
   const [toolStatus, setToolStatus] = useState<string>('Ready')
   const [lastNfcUid, setLastNfcUid] = useState<string>('')
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
-  const [wifiApProfile, setWifiApProfile] = useState<WifiApProfile | null>(null)
 
   // ── arcade boot state ─────────────────────────────────────────
   const [coins, setCoins] = useState(0)
   const [time, setTime] = useState(0)
-  const [highScore, setHighScore] = useState(999999)
   const [scrollText, setScrollText] = useState(0)
   const [explosions, setExplosions] = useState<Array<{ x: number; y: number; id: number }>>([])
   const [particles, setParticles] = useState<Array<{ x: number; y: number; vx: number; vy: number; color: string; id: number }>>([])
   const [crtFlicker, setCrtFlicker] = useState(false)
   const [scanlineOffset, setScanlineOffset] = useState(0)
   const [pixelShift, setPixelShift] = useState(0)
-  const [borderBlink, setBorderBlink] = useState(false)
   const [coinBlink, setCoinBlink] = useState(false)
   const [glitchLine, setGlitchLine] = useState(-1)
   const [logoShake, setLogoShake] = useState({ x: 0, y: 0 })
+  const [aiHints, setAiHints] = useState<Record<string, { status: 'idle' | 'loading' | 'ready' | 'error'; content?: string }>>({})
 
-  const bootLines = [
-    'ARCADE-TRONIX BIOS v2.41', 'Copyright (C) 1991-1996', '',
-    'Testing RAM............OK', 'Testing ROM............OK', 'Testing VRAM...........OK',
-    'Init Sound Blaster.....OK', 'Init Joystick..........OK', 'Init Coin Mech.........OK',
-    'Loading game data......', '', 'Press COIN to continue...'
-  ]
-  const marqueeText = '★ ARCADE ZONE ★ INSERT COIN ★ PLAY TO WIN ★ HIGH SCORES ★ '
-  const scrollingMarquee = (marqueeText + marqueeText + marqueeText).substring(Math.floor(scrollText / 3) % marqueeText.length)
-  const bootLineCount = Math.min(bootLines.length, Math.floor(time / 7))
+  const bootLineCount = Math.min(BOOT_LINES.length, Math.floor(time / 7))
   const progress = Math.min(100, coins * 10)
 
   useEffect(() => {
@@ -95,7 +86,6 @@ function App() {
       if (Math.random() > 0.85) { setCrtFlicker(true); setTimeout(() => setCrtFlicker(false), 60) }
     }, 80)
 
-    const borderInterval = setInterval(() => setBorderBlink(b => !b), 400)
     const coinBlinkInterval = setInterval(() => setCoinBlink(b => !b), 250)
     const scanlineInterval = setInterval(() => setScanlineOffset(Math.random() * 2), 50)
 
@@ -151,7 +141,6 @@ function App() {
       clearInterval(flickerInterval)
       clearInterval(scanlineInterval)
       clearInterval(pixelInterval)
-      clearInterval(borderInterval)
       clearInterval(coinBlinkInterval)
       clearInterval(glitchInterval)
       clearInterval(particleInterval)
@@ -159,18 +148,81 @@ function App() {
     }
   }, [isBootScreen])
 
+  // Prefetch AI hints for all games once at startup (sequential to avoid overload)
   useEffect(() => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api?.aiExplain) return
+    let cancelled = false
+
+    const fetchOne = async (idx: number) => {
+      if (cancelled) return
+      const game = games[idx]
+      if (!game) return
+
+      setAiHints((prev) => ({
+        ...prev,
+        [game.id]: prev[game.id]?.status === 'ready' ? prev[game.id] : { status: 'loading' }
+      }))
+
+      try {
+        const res = await api.aiExplain({
+          gameId: game.id,
+          title: game.title,
+          genre: game.genre,
+          difficulty: game.difficulty
+        })
+        if (cancelled) return
+        setAiHints((prev) => ({
+          ...prev,
+          [game.id]: res.success
+            ? { status: 'ready', content: res.content ?? res.message ?? '' }
+            : { status: 'error', content: res.message ?? 'AI error' }
+        }))
+      } catch (error) {
+        if (cancelled) return
+        setAiHints((prev) => ({
+          ...prev,
+          [game.id]: { status: 'error', content: error instanceof Error ? error.message : String(error) }
+        }))
+      } finally {
+        if (cancelled) return
+        if (idx + 1 < games.length) {
+          setTimeout(() => void fetchOne(idx + 1), 300)
+        }
+      }
+    }
+
+    void fetchOne(0)
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    const api = window.electron
+    if (!api) return
+
+    let isMounted = true
 
     const readInitialStatus = async () => {
-      const status = await window.electron!.diyFlipperGetStatus()
-      setDiyFlipperStatus(status)
-      await window.electron!.diyFlipperConnect()
-      const irLoad = await window.electron!.diyFlipperLoadIrMiniDb()
-      if (irLoad.success) {
-        setIrDbEntries(irLoad.entries ?? [])
-      } else {
+      try {
+        const status = await api.diyFlipperGetStatus()
+        if (!isMounted) return
+        setDiyFlipperStatus(status)
+
+        await api.diyFlipperConnect()
+        const irLoad = await api.diyFlipperLoadIrMiniDb()
+        if (!isMounted) return
+
+        if (irLoad.success) {
+          setIrDbEntries(irLoad.entries ?? [])
+          return
+        }
+
         setToolStatus(`IR DB load failed: ${irLoad.message}`)
+      } catch (error) {
+        if (!isMounted) return
+        const message = error instanceof Error ? error.message : String(error)
+        setToolStatus(`Hardware init failed: ${message}`)
+        console.error('[DIYFLIPPER] Failed to initialize hardware state:', error)
       }
 
       const wifiProfileLoad = await window.electron!.diyFlipperLoadWifiApProfile()
@@ -179,11 +231,11 @@ function App() {
       }
     }
 
-    const unsubscribeStatus = window.electron.onDiyFlipperStatus((status) => {
+    const unsubscribeStatus = api.onDiyFlipperStatus((status) => {
       setDiyFlipperStatus(status)
     })
 
-    const unsubscribeLine = window.electron.onDiyFlipperLine((line) => {
+    const unsubscribeLine = api.onDiyFlipperLine((line) => {
       setDiyFlipperLastLine(line)
       const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
       setDiyFlipperSerialLines((prev) => {
@@ -201,6 +253,7 @@ function App() {
     void readInitialStatus()
 
     return () => {
+      isMounted = false
       unsubscribeStatus()
       unsubscribeLine()
     }
@@ -209,9 +262,10 @@ function App() {
   const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
 
   const handleModuleSelect = useCallback(async (key: string) => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
 
-    const result = await window.electron.diyFlipperRunModule(key)
+    const result = await api.diyFlipperRunModule(key)
     if (!result.success) {
       setToolStatus(`Module failed (${key}): ${result.message}`)
       console.warn('[DIYFLIPPER] Module launch failed:', result.message)
@@ -234,28 +288,31 @@ function App() {
   }, [diyFlipperStatus.connected])
 
   const handleNfcRead = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperSendCommand('NFC_READ')
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperSendCommand('NFC_READ')
     setToolStatus(result.success ? 'NFC read command sent' : `NFC read failed: ${result.message}`)
   }, [])
 
   const handleNfcSave = useCallback(async () => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
     if (!lastNfcUid) {
       setToolStatus('No NFC UID captured yet')
       return
     }
-    const result = await window.electron.diyFlipperSaveNfcCapture({
+    const result = await api.diyFlipperSaveNfcCapture({
       uid: lastNfcUid,
-      label: `nfc_${lastNfcUid}`,
+      label: `nfcCapture-${lastNfcUid}`,
       rawLine: diyFlipperLastLine
     })
     setToolStatus(result.success ? `Saved NFC capture to ${result.message}` : `NFC save failed: ${result.message}`)
   }, [lastNfcUid, diyFlipperLastLine])
 
   const handleIrReload = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperLoadIrMiniDb()
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperLoadIrMiniDb()
     if (!result.success) {
       setToolStatus(`IR DB load failed: ${result.message}`)
       return
@@ -265,71 +322,35 @@ function App() {
   }, [])
 
   const handleIrSend = useCallback(async (entryId: string) => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
     const entry = irDbEntries.find((candidate) => candidate.id === entryId)
     if (!entry) {
       setToolStatus('IR entry not found')
       return
     }
-    const result = await window.electron.diyFlipperSendIrEntry(entry)
+    const result = await api.diyFlipperSendIrEntry(entry)
     setToolStatus(result.success ? `IR sent: ${entry.name}` : `IR send failed: ${result.message}`)
   }, [irDbEntries])
 
   const handleRawSerialCommand = useCallback(async (command: string) => {
-    if (!window.electron) return
+    const api = window.electron
+    if (!api) return
     const trimmed = command.trim()
     if (!trimmed) return
-    const result = await window.electron.diyFlipperSendCommand(trimmed)
+    const result = await api.diyFlipperSendCommand(trimmed)
     setToolStatus(result.success ? `Raw command sent: ${trimmed}` : `Raw command failed: ${result.message}`)
   }, [])
 
   const handleReconnectHardware = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperConnect()
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperConnect()
     setToolStatus(result.success ? result.message : `Reconnect failed: ${result.message}`)
   }, [])
 
   const handleClearSerialLog = useCallback(() => {
     setDiyFlipperSerialLines([])
-  }, [])
-
-  const handleWifiApSaveProfile = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperSaveWifiApProfile(profile)
-    if (!result.success) {
-      setToolStatus(`Wi-Fi AP profile save failed: ${result.message}`)
-      return
-    }
-    setWifiApProfile(result.profile ?? null)
-    setToolStatus('Wi-Fi AP profile saved')
-  }, [])
-
-  const handleWifiApLoadProfile = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperLoadWifiApProfile()
-    if (!result.success) {
-      setToolStatus(`Wi-Fi AP profile load failed: ${result.message}`)
-      return
-    }
-    setWifiApProfile(result.profile ?? null)
-    setToolStatus(result.profile ? 'Wi-Fi AP profile loaded' : 'No saved Wi-Fi AP profile')
-  }, [])
-
-  const handleWifiApStart = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperStartWifiAp(profile)
-    if (!result.success) {
-      setToolStatus(`Wi-Fi AP start failed: ${result.message}`)
-      return
-    }
-    setWifiApProfile(result.profile ?? null)
-    setToolStatus(result.message || 'Wi-Fi AP start command sent')
-  }, [])
-
-  const handleWifiApStop = useCallback(async () => {
-    if (!window.electron) return
-    const result = await window.electron.diyFlipperSendCommand('WIFI_AP_STOP')
-    setToolStatus(result.success ? 'Wi-Fi AP stop command sent' : `Wi-Fi AP stop failed: ${result.message}`)
   }, [])
 
   // ── render ────────────────────────────────────────────────────
@@ -363,6 +384,10 @@ function App() {
     return (
       <ArcadeGame
         gameId={selectedGame}
+        prefetchedHint={aiHints[selectedGame]?.content}
+        onHintReady={(gameId, content) => {
+          setAiHints(prev => ({ ...prev, [gameId]: { status: 'ready', content } }))
+        }}
         onExit={() => {
           setSelectedGame(null)
           setScreen('arcade-menu')
@@ -380,21 +405,23 @@ function App() {
         }}
       />
     )
-
-  // boot (default)
   return (
     <BootScreen
-      coins={coins} time={time} highScore={highScore} scrollText={scrollText}
+      coins={coins} scrollText={scrollText}
       explosions={explosions} particles={particles} crtFlicker={crtFlicker}
-      scanlineOffset={scanlineOffset} pixelShift={pixelShift} borderBlink={borderBlink}
+      scanlineOffset={scanlineOffset} pixelShift={pixelShift}
       coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
-      bootLines={bootLines} bootLineCount={bootLineCount} progress={progress}
-      scrollingMarquee={scrollingMarquee}
+      bootLines={BOOT_LINES} bootLineCount={bootLineCount} progress={progress}
       onStart={() => setScreen('arcade-menu')}
       onGoToHacker={goToHackerMenu}
     />
   )
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root')!)
+const rootElement = document.getElementById('root')
+if (!rootElement) {
+  throw new Error('Renderer root element not found')
+}
+
+const root = ReactDOM.createRoot(rootElement)
 root.render(<App />)

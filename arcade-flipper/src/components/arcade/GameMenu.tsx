@@ -23,12 +23,13 @@ const games: GameCard[] = [
   { id: 'space-invader', title: 'SPACE INVADER', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Defend Earth from the alien invasion!', image: '../assets/spaceinvaders.png', accent: '#00ff88', executable: 'games/spaceinvaders.py', difficulty: '★★☆', players: '1P', year: '1978' },
   { id: 'pac-man', title: 'PAC-MAN', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Eat all pellets and dodge the ghosts.', image: '../assets/TrollPacMan.png', accent: '#ffde00', executable: 'games/PacMan/pacman.py', difficulty: '★★☆', players: '1P', year: '1980' },
   { id: 'flappy-bird', title: 'RETRO BIRD', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Tap to flap and dodge the pipes!', image: '../assets/retrobird.png', accent: '#ff00aa', executable: 'games/RetroBird/main.py', difficulty: '★★★', players: '1P', year: '2013' },
-  { id: 'marioNES', title: 'Pixel Quest Adventure', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Spring door de klassieke levels en versla Bowser!', image: '../assets/pixelquest_adventure.png', accent: '#ff2e2e', executable: 'games/SuperMarioNES/Mario.jar', difficulty: '★★☆', players: '1P', year: '1985' },
+  { id: 'mario-nes', title: 'Pixel Quest Adventure', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Spring door de klassieke levels en versla Bowser!', image: '../assets/pixelquest_adventure.png', accent: '#ff2e2e', executable: 'games/SuperMarioNES/Mario.jar', difficulty: '★★☆', players: '1P', year: '1985' },
   { id: 'car-racing-extreme', title: 'EXTREME RACING', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Adrenaline at high speed!', image: '../assets/extremeracing.png', accent: '#ff6600', executable: 'games/CarRacingUltraMaxExtremeLevel1000/main.py', difficulty: '★★★', players: '1P', year: '1992' },
-  { id: 'BlockStorm', title: 'BLOCK STORM', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arrange falling blocks to clear lines.', image: '../assets/blockstorm.png', accent: '#ffff00', executable: 'games/BlockStorm/main.py', difficulty: '★☆☆', players: '1P', year: '1984' },
+  { id: 'block-storm', title: 'BLOCK STORM', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arrange falling blocks to clear lines.', image: '../assets/blockstorm.png', accent: '#ffff00', executable: 'games/BlockStorm/main.py', difficulty: '★☆☆', players: '1P', year: '1984' },
   { id: 'retro-race-game', title: 'RETRO RACE', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Classic pseudo-3D race action in Java.', image: '../assets/retroracinggame.png', accent: '#44bbff', executable: 'games/RetroRaceGame/RetroRaceGame.jar', difficulty: '★★☆', players: '1P', year: '2024' },
-  { id: 'AngryWalls', title: 'ANGRY WALLS', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Explore dungeons and hunt loot.', image: '../assets/angrywalls.png', accent: '#aa44ff', executable: 'games/AngryWalls/main.py', difficulty: '★★☆', players: '1P', year: '1996' },
-  { id: 'PONG', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
+  { id: 'angry-walls', title: 'ANGRY WALLS', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Explore dungeons and hunt loot.', image: '../assets/angrywalls.png', accent: '#aa44ff', executable: 'games/AngryWalls/main.py', difficulty: '★★☆', players: '1P', year: '1996' },
+  { id: 'elemental-clash', title: 'ELEMENTAL CLASH', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arcane duel between warrior and wizard.', image: '../assets/elementalclash.png', accent: '#ff5500', executable: 'games/ElementalClash/src/main.py', difficulty: '★★★', players: '2P', year: '2025' },
+  { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
 ]
 
 export { games }
@@ -116,24 +117,24 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const itemSpacing = 140
   const iconSize = 132
 
-  const INFO_SCALE = 2.5
-  const titleFont = Math.round(34 * INFO_SCALE)
-  const taglineFont = Math.round(17 * INFO_SCALE)
-  const playFont = Math.round(15 * INFO_SCALE)
-  const hintFont = Math.round(13 * INFO_SCALE)
+  const infoScale = 2.5
+  const titleFont = Math.round(34 * infoScale)
+  const taglineFont = Math.round(17 * infoScale)
+  const playFont = Math.round(15 * infoScale)
+  const hintFont = Math.round(13 * infoScale)
 
-  const titleGlow = Math.round(18 * INFO_SCALE)
-  const titleOffset = Math.round(3 * INFO_SCALE)
-  const taglineGlow = Math.round(10 * INFO_SCALE)
+  const titleGlow = Math.round(18 * infoScale)
+  const titleOffset = Math.round(3 * infoScale)
+  const taglineGlow = Math.round(10 * infoScale)
 
-  const playPadY = Math.round(18 * INFO_SCALE)
-  const playPadX = Math.round(30 * INFO_SCALE)
-  const playBorder = Math.max(3, Math.round(3 * INFO_SCALE))
-  const playShadow = Math.round(28 * INFO_SCALE)
+  const playPadY = Math.round(18 * infoScale)
+  const playPadX = Math.round(30 * infoScale)
+  const playBorder = Math.max(3, Math.round(3 * infoScale))
+  const playShadow = Math.round(28 * infoScale)
 
-  const hintGlow = Math.round(10 * INFO_SCALE)
-  const barHeight = Math.round(6 * INFO_SCALE)
-  const barGlow = Math.round(26 * INFO_SCALE)
+  const hintGlow = Math.round(10 * infoScale)
+  const barHeight = Math.round(6 * infoScale)
+  const barGlow = Math.round(26 * infoScale)
 
   const circularOffset = React.useCallback((idx: number, sel: number, len: number) => {
     if (len <= 0) return 0
@@ -173,7 +174,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           position: 'relative',
           overflow: 'hidden',
           fontFamily: '"Courier New", "Press Start 2P", monospace',
-          filter: crtFlicker ? 'brightness(0.8) contrast(1.25)' : 'brightness(1) contrast(1.15)',
+          filter: crtFlicker ? 'brightness(1.02) contrast(1.2)' : 'brightness(1.22) contrast(1.1)',
           transition: 'filter 0.06s',
         }}
       >
@@ -193,7 +194,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px, 280px 280px',
             backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px',
             animation: 'starfield-drift 120s linear infinite',
-            opacity: 0.45,
+            opacity: 0.62,
             pointerEvents: 'none',
             zIndex: 1,
           }}
@@ -216,7 +217,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'radial-gradient(ellipse at center, transparent 0%, transparent 55%, rgba(0,0,0,0.5) 82%, rgba(0,0,0,0.92) 100%)',
+            background: 'radial-gradient(ellipse at center, transparent 0%, transparent 70%, rgba(0,0,0,0.28) 88%, rgba(0,0,0,0.62) 100%)',
             pointerEvents: 'none',
             zIndex: 50,
           }}
@@ -230,7 +231,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             pointerEvents: 'none',
             zIndex: 60,
             transform: `translateY(${scanlineOffset}px)`,
-            opacity: 0.55,
+            opacity: 0.28,
           }}
         />
 
@@ -391,7 +392,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                             : isSelected
                               ? `0 0 22px ${g.accent}18`
                               : 'none',
-                          filter: isFocus ? 'brightness(1.02) saturate(1.08)' : 'brightness(0.78) saturate(0.92)',
+                          filter: isFocus ? 'brightness(1.24) saturate(1.16)' : 'brightness(1.04) saturate(1)',
                           willChange: 'transform',
                         }}
                       >
@@ -469,10 +470,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       objectFit: 'cover',
                       display: 'block',
                       imageRendering: 'pixelated',
-                      filter: 'brightness(0.96) saturate(1.02)',
+                      filter: 'brightness(1.26) saturate(1.08)',
                     }}
                   />
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.10) 0%, transparent 35%, rgba(0,0,0,0.88) 100%)' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.04) 0%, transparent 48%, rgba(0,0,0,0.56) 100%)' }} />
                 </div>
 
                 <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12 }}>
@@ -498,7 +499,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       <div
                         style={{
                           marginTop: 10,
-                          color: 'rgba(200,230,255,0.78)',
+                          color: 'rgba(200,230,255,0.9)',
                           fontWeight: 800,
                           letterSpacing: 1.2,
                           fontSize: taglineFont,
@@ -531,7 +532,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                         boxShadow: `0 0 ${playShadow}px ${accent}22`,
                         fontFamily: 'inherit',
                         flex: '0 0 auto',
-                        textShadow: `${Math.round(2 * INFO_SCALE)}px ${Math.round(2 * INFO_SCALE)}px 0 rgba(0,0,0,0.6)`,
+                        textShadow: `${Math.round(2 * infoScale)}px ${Math.round(2 * infoScale)}px 0 rgba(0,0,0,0.6)`,
                       }}
                     >
                       PLAY

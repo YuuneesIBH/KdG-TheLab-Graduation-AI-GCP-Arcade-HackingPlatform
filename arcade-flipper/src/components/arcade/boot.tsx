@@ -1,46 +1,37 @@
-import React from 'react'
 import { HackButton, HackTransition } from '../flipper/HackTransition'
 
 type BootProps = {
   coins: number
-  time: number
-  highScore: number
   scrollText: number
   explosions: Array<{x: number, y: number, id: number}>
   particles: Array<{x: number, y: number, vx: number, vy: number, color: string, id: number}>
   crtFlicker: boolean
   scanlineOffset: number
   pixelShift: number
-  borderBlink: boolean
   coinBlink: boolean
   glitchLine: number
   logoShake: {x: number, y: number}
   bootLines: string[]
   bootLineCount: number
   progress: number
-  scrollingMarquee: string
   onStart: () => void
   onGoToHacker: () => void
 }
 
 export function BootScreen({
   coins,
-  time,
-  highScore,
   scrollText,
   explosions,
   particles,
   crtFlicker,
   scanlineOffset,
   pixelShift,
-  borderBlink,
   coinBlink,
   glitchLine,
   logoShake,
   bootLines,
   bootLineCount,
   progress,
-  scrollingMarquee,
   onStart,
   onGoToHacker
 }: BootProps) {
@@ -61,14 +52,12 @@ export function BootScreen({
         position: 'relative',
         overflow: 'auto',
         filter: crtFlicker
-          ? 'brightness(0.7) contrast(1.3)'
-          : 'brightness(1) contrast(1.15)',
+          ? 'brightness(1) contrast(1.25)'
+          : 'brightness(1.22) contrast(1.1)',
         transition: 'filter 0.06s',
         transform: `translateX(${pixelShift}px)`
       }}>
-
-        {/* STARFIELD */}
-        <div style={{
+<div style={{
           position: 'absolute',
           inset: 0,
           backgroundImage: `
@@ -83,12 +72,10 @@ export function BootScreen({
           backgroundSize: '200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px, 220px 220px, 280px 280px',
           backgroundPosition: '0 0, 40px 60px, 130px 270px, 70px 100px, 150px 50px, 200px 180px, 90px 220px',
           animation: 'starfield-drift 120s linear infinite',
-          opacity: 0.4,
+          opacity: 0.64,
           pointerEvents: 'none'
         }} />
-
-        {/* PIXEL GRID BACKGROUND */}
-        <div style={{
+<div style={{
           position: 'absolute',
           inset: 0,
           backgroundImage: `
@@ -97,18 +84,14 @@ export function BootScreen({
           `,
           pointerEvents: 'none'
         }} />
-
-        {/* CRT VIGNETTE */}
-        <div style={{
+<div style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(ellipse at center, transparent 0%, transparent 50%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.9) 100%)',
+          background: 'radial-gradient(ellipse at center, transparent 0%, transparent 64%, rgba(0,0,0,0.18) 84%, rgba(0,0,0,0.56) 100%)',
           pointerEvents: 'none',
           zIndex: 999
         }} />
-
-        {/* RETRO GRID FLOOR */}
-        <div style={{
+<div style={{
           position: 'absolute',
           bottom: '-20%',
           left: '-30%',
@@ -135,9 +118,7 @@ export function BootScreen({
           boxShadow: '0 -40px 100px rgba(0,136,255,0.4), 0 -80px 150px rgba(0,102,255,0.3)',
           animation: 'grid-pulse 3s ease-in-out infinite'
         }} />
-
-        {/* HORIZON LINE */}
-        <div style={{
+<div style={{
           position: 'absolute',
           top: '46%',
           left: '-5%',
@@ -148,9 +129,7 @@ export function BootScreen({
           opacity: 0.85,
           animation: 'horizon-glow 2.5s ease-in-out infinite'
         }} />
-
-        {/* PARTICLES */}
-        {particles.map(p => (
+{particles.map(p => (
           <div key={p.id} style={{
             position: 'absolute',
             left: p.x,
@@ -162,9 +141,7 @@ export function BootScreen({
             pointerEvents: 'none'
           }} />
         ))}
-
-        {/* EXPLOSIONS */}
-        {explosions.map(exp => (
+{explosions.map(exp => (
           <div key={exp.id} style={{
             position: 'absolute',
             left: exp.x - 40,
@@ -188,20 +165,16 @@ export function BootScreen({
             }} />
           </div>
         ))}
-
-        {/* SCANLINES */}
-        <div style={{
+<div style={{
           position: 'absolute',
           inset: 0,
           backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 2px, transparent 2px, transparent 4px)',
           pointerEvents: 'none',
           zIndex: 1000,
           transform: `translateY(${scanlineOffset}px)`,
-          opacity: 0.6
+          opacity: 0.3
         }} />
-
-        {/* GLITCH LINE */}
-        {glitchLine >= 0 && (
+{glitchLine >= 0 && (
           <div style={{
             position: 'absolute',
             top: `${glitchLine * 5}%`,
@@ -213,48 +186,24 @@ export function BootScreen({
             zIndex: 1001
           }} />
         )}
-
-        {/* RETRO STATUS BAR */}
         <div style={{
           position: 'absolute',
-          top: '20px',
+          top: 0,
           left: 0,
           right: 0,
-          background: 'linear-gradient(180deg, #0066cc, #004499)',
+          padding: '6px 14px',
+          background: 'linear-gradient(180deg, #0066cc 0%, #004499 65%, #002a66 100%)',
           borderTop: '2px solid #00aaff',
           borderBottom: '4px solid #002266',
-          padding: '12px 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '18px',
-          fontWeight: 'bold',
-          letterSpacing: '3px',
           zIndex: 5,
-          boxShadow: '0 0 20px rgba(0,136,255,0.4), 0 6px 0 #001133'
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          boxShadow: '0 0 20px rgba(0,136,255,0.35), 0 6px 0 #001133'
         }}>
-          <div style={{
-            color: '#ffff00',
-            textShadow: '0 0 10px #ffff00, 2px 2px 0 #002244',
-            animation: 'pixel-pulse 1s ease-in-out infinite'
-          }}>
-            1UP {String(coins * 10000).padStart(8, '0')}
-          </div>
-
-          <div style={{
-            color: '#00ff88',
-            textShadow: '0 0 10px #00ff88, 2px 2px 0 #002244',
-            animation: 'pixel-pulse 1s ease-in-out infinite 0.5s'
-          }}>
-            HI {String(highScore).padStart(8, '0')}
-          </div>
-
-          {/* HACK TERMINAL BUTTON */}
           <HackButton onClick={() => window.__hackTransitionTrigger?.()} />
         </div>
-
-        {/* LOGO + BOOT PANEL WRAPPER */}
-        <div style={{
+<div style={{
           position: 'absolute',
           left: '50%',
           top: '50%',
@@ -265,8 +214,7 @@ export function BootScreen({
           width: 'min(850px, 88vw)',
           display: 'block'
         }}>
-          {/* LOGO */}
-          <div style={{
+<div style={{
             position: 'absolute',
             left: '50%',
             top: '-980px',
@@ -296,17 +244,13 @@ export function BootScreen({
               />
             </div>
           </div>
-
-          {/* MAIN BOOT PANEL */}
-          <div style={{
+<div style={{
             position: 'relative',
             zIndex: 10,
             width: '100%',
             marginTop: 0
           }}>
-
-            {/* OUTER BORDER */}
-            <div style={{
+<div style={{
               border: '6px solid #0088ff',
               background: '#000814',
               boxShadow: `
@@ -316,16 +260,12 @@ export function BootScreen({
               `,
               padding: '6px'
             }}>
-
-              {/* INNER BORDER */}
-              <div style={{
+<div style={{
                 border: '4px solid #004488',
                 background: 'linear-gradient(180deg, #001122, #000a14)',
                 boxShadow: 'inset 0 0 30px rgba(0,68,136,0.3)'
               }}>
-
-                {/* TITLE BAR */}
-                <div style={{
+<div style={{
                   background: 'linear-gradient(180deg, #0088ff, #0066cc)',
                   borderBottom: '3px solid #00aaff',
                   padding: '14px 20px',
@@ -387,9 +327,7 @@ export function BootScreen({
                     START
                   </button>
                 </div>
-
-                {/* CONTENT */}
-                <div style={{
+<div style={{
                   background: '#000000',
                   padding: '24px',
                   minHeight: '380px',
@@ -397,8 +335,7 @@ export function BootScreen({
                   gridTemplateColumns: '1.2fr 0.8fr',
                   gap: '20px'
                 }}>
-                  {/* LEFT: BOOT LOG */}
-                  <div style={{
+<div style={{
                     fontSize: '16px',
                     lineHeight: '1.6',
                     color: '#00ccff',
@@ -441,12 +378,8 @@ export function BootScreen({
                       }} />
                     )}
                   </div>
-
-                  {/* RIGHT: CART SLOT & STATS */}
-                  <div style={{ display: 'grid', gap: '14px', alignContent: 'start' }}>
-
-                    {/* CARTRIDGE SLOT */}
-                    <div style={{
+<div style={{ display: 'grid', gap: '14px', alignContent: 'start' }}>
+<div style={{
                       border: '4px solid #0088ff',
                       background: 'linear-gradient(180deg, #001a2a, #000a14)',
                       padding: '14px',
@@ -481,9 +414,7 @@ export function BootScreen({
                         }} />
                       </div>
                     </div>
-
-                    {/* COIN COUNTER */}
-                    <div style={{
+<div style={{
                       background: 'linear-gradient(180deg, #0088ff, #0066cc)',
                       border: '5px solid #00aaff',
                       padding: '16px',
@@ -508,9 +439,7 @@ export function BootScreen({
                         {String(coins).padStart(2, '0')}
                       </div>
                     </div>
-
-                    {/* LOADING BAR */}
-                    <div style={{
+<div style={{
                       background: '#000814', border: '4px solid #0088ff',
                       padding: '8px', boxShadow: '0 0 20px rgba(0,136,255,0.3)'
                     }}>
@@ -545,9 +474,7 @@ export function BootScreen({
                     </div>
                   </div>
                 </div>
-
-                {/* BOTTOM STATUS */}
-                <div
+<div
                   style={{
                     background: progress < 100
                       ? 'linear-gradient(180deg, #0088ff, #0066cc)'
@@ -602,9 +529,7 @@ export function BootScreen({
             </div>
           </div>
         </div>
-
-        {/* FOOTER */}
-        <div style={{
+<div style={{
           position: 'absolute', bottom: '20px', left: 0, right: 0,
           textAlign: 'center', fontSize: '13px', color: '#0088ff',
           letterSpacing: '2px', textShadow: '0 0 10px #0088ff', zIndex: 100
@@ -659,9 +584,7 @@ export function BootScreen({
           }
         `}</style>
       </div>
-
-      {/* HACK TRANSITION OVERLAY — renders on top, triggered by HackButton */}
-      <HackTransition onComplete={onGoToHacker} />
+<HackTransition onComplete={onGoToHacker} />
     </>
   )
 }

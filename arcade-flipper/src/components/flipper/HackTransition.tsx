@@ -1,20 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react'
-
-// ─────────────────────────────────────────────────────────────────
-//  TYPES
-// ─────────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState } from 'react'
 type Phase = 'idle' | 'crt-roll' | 'matrix' | 'breach' | 'done'
-
-// ─────────────────────────────────────────────────────────────────
-//  MATRIX RAIN CANVAS
-// ─────────────────────────────────────────────────────────────────
 function MatrixCanvas({ active }: { active: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     if (!active) return
-    const canvas = canvasRef.current!
-    const ctx    = canvas.getContext('2d')!
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
     const resize = () => {
       canvas.width  = window.innerWidth
@@ -28,7 +22,7 @@ function MatrixCanvas({ active }: { active: boolean }) {
     const drops  = Array.from({ length: cols }, () => Math.random() * -60)
     const speeds = Array.from({ length: cols }, () => 0.5 + Math.random() * 1.1)
 
-    let raf: number
+    let raf = 0
     const draw = () => {
       ctx.fillStyle = 'rgba(0,0,0,0.07)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -72,10 +66,6 @@ function MatrixCanvas({ active }: { active: boolean }) {
     />
   )
 }
-
-// ─────────────────────────────────────────────────────────────────
-//  GLITCH HACK LINES
-// ─────────────────────────────────────────────────────────────────
 const HACK_LINES = [
   'INITIALIZING EXPLOIT CHAIN...',
   'BYPASSING FIREWALL LAYER 1... [OK]',
@@ -97,15 +87,21 @@ function GlitchLines({ active }: { active: boolean }) {
   useEffect(() => {
     if (!active) { setVisible([]); return }
     let i = 0
+    let addTimer = 0
+    let glitchTimer = 0
     const add = () => {
       if (i >= HACK_LINES.length) return
       setVisible(prev => [...prev, HACK_LINES[i]])
       setGlitchIdx(i)
-      setTimeout(() => setGlitchIdx(-1), 100)
+      glitchTimer = window.setTimeout(() => setGlitchIdx(-1), 100)
       i++
-      setTimeout(add, 130 + Math.random() * 100)
+      addTimer = window.setTimeout(add, 130 + Math.random() * 100)
     }
-    setTimeout(add, 300)
+    addTimer = window.setTimeout(add, 300)
+    return () => {
+      clearTimeout(addTimer)
+      clearTimeout(glitchTimer)
+    }
   }, [active])
 
   return (
@@ -151,10 +147,6 @@ function GlitchLines({ active }: { active: boolean }) {
     </div>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────
-//  ACCESS GRANTED SPLASH
-// ─────────────────────────────────────────────────────────────────
 function BreachSplash({ active }: { active: boolean }) {
   return (
     <div style={{
@@ -193,8 +185,7 @@ function BreachSplash({ active }: { active: boolean }) {
       }}>
         FLIPPER ZERO TERMINAL — READY
       </div>
-      {/* PRESS ENTER prompt — dit ontbrak! */}
-      <div style={{
+<div style={{
         fontFamily: '"Courier New", monospace',
         fontSize: 'clamp(11px, 1.2vw, 15px)',
         color: '#00ff88',
@@ -211,11 +202,6 @@ function BreachSplash({ active }: { active: boolean }) {
     </div>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────
-//  HACK BUTTON
-//  Drop into the top-right of your arcade boot screen.
-// ─────────────────────────────────────────────────────────────────
 export function HackButton({ onClick }: { onClick: () => void }) {
   const [hover, setHover] = useState(false)
 
@@ -256,13 +242,6 @@ export function HackButton({ onClick }: { onClick: () => void }) {
     </button>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────
-//  MAIN TRANSITION OVERLAY
-//
-//  Mount this alongside your current screen. It renders nothing
-//  until triggered through `window.__hackTransitionTrigger`.
-// ─────────────────────────────────────────────────────────────────
 export function HackTransition({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase]           = useState<Phase>('idle')
   const [rollHeight, setRollHeight] = useState(0)
@@ -270,8 +249,6 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
   const rollRef                     = useRef<number | null>(null)
   const phaseRef                    = useRef(phase)
   phaseRef.current = phase
-
-  // ── Expose trigger globally ─────────────────────────────────
   const trigger = () => {
     if (phaseRef.current !== 'idle') return
     setPhase('crt-roll')
@@ -281,25 +258,25 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
     window.__hackTransitionTrigger = trigger
     return () => { delete window.__hackTransitionTrigger }
   }, [])
-
-  // ── Phase 1: CRT rolls down ─────────────────────────────────
   useEffect(() => {
     if (phase !== 'crt-roll') return
     let h = 0
+    let matrixTimer = 0
     const step = () => {
       h = Math.min(h + 3.5, 100)
       setRollHeight(h)
       if (h < 100) {
         rollRef.current = requestAnimationFrame(step)
       } else {
-        setTimeout(() => setPhase('matrix'), 80)
+        matrixTimer = window.setTimeout(() => setPhase('matrix'), 80)
       }
     }
     rollRef.current = requestAnimationFrame(step)
-    return () => { if (rollRef.current) cancelAnimationFrame(rollRef.current) }
+    return () => {
+      if (rollRef.current !== null) cancelAnimationFrame(rollRef.current)
+      clearTimeout(matrixTimer)
+    }
   }, [phase])
-
-  // ── Phase 2: Matrix + hack lines ───────────────────────────
   useEffect(() => {
     if (phase !== 'matrix') return
     let y = 0
@@ -307,12 +284,8 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
     const t  = setTimeout(() => setPhase('breach'), 2800)
     return () => { clearInterval(iv); clearTimeout(t) }
   }, [phase])
-
-  // Stabiele ref zodat onComplete nooit de listener reset bij een re-render
   const onCompleteRef = useRef(onComplete)
   useEffect(() => { onCompleteRef.current = onComplete }, [onComplete])
-
-  // ── Phase 3: ACCESS GRANTED → wacht op Enter ───────────────
   useEffect(() => {
     if (phase !== 'breach') return
     let active = true
@@ -321,18 +294,14 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
     const handleKey = (e: KeyboardEvent) => {
       if (!active || !armed) return
       if (e.key !== 'Enter' && e.code !== 'NumpadEnter') return
-      e.stopImmediatePropagation()   // blokkeer Menu's Enter-listener
+      e.stopImmediatePropagation()
       active = false
       window.removeEventListener('keydown', handleKey, true)
       clearTimeout(armTimer)
       setPhase('done')
       onCompleteRef.current()
     }
-
-    // capture:true → vuurt vóór bubbling listeners (zoals Menu)
     window.addEventListener('keydown', handleKey, true)
-
-    // 500ms delay zodat de klik-Enter van HackButton niet meteen triggert
     const armTimer = window.setTimeout(() => { armed = true }, 500)
 
     return () => {
@@ -340,9 +309,7 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
       clearTimeout(armTimer)
       window.removeEventListener('keydown', handleKey, true)
     }
-  }, [phase])   // ← geen onComplete meer in de deps!
-
-  // Verwijder overlay na fade-out, anders plakt hij over het menu
+  }, [phase])
   const [removed, setRemoved] = useState(false)
   useEffect(() => {
     if (phase !== 'done') return
@@ -397,9 +364,7 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
           100% { top:80%; width:40%; }
         }
       `}</style>
-
-      {/* ── CRT PANEL ── */}
-      <div style={{
+<div style={{
         position: 'fixed',
         top: 0, left: 0, right: 0,
         height: phase === 'crt-roll' ? `${rollHeight}vh` : '100vh',
@@ -410,24 +375,16 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
         transition: isDone ? 'opacity 0.4s ease-out' : 'none',
         pointerEvents: isDone ? 'none' : 'auto',
       }}>
-        {/* CRT body */}
-        <div style={{
+<div style={{
           position: 'absolute',
           inset: 0,
           background: '#000000',
           animation: showMatrix ? 'htFlicker 3.5s infinite' : 'none',
         }}>
-          {/* Matrix rain */}
-          <MatrixCanvas active={showMatrix} />
-
-          {/* Hack log */}
-          <GlitchLines active={showMatrix && !showBreach} />
-
-          {/* ACCESS GRANTED */}
-          <BreachSplash active={showBreach} />
-
-          {/* Glitch bars */}
-          {showMatrix && (
+<MatrixCanvas active={showMatrix} />
+<GlitchLines active={showMatrix && !showBreach} />
+<BreachSplash active={showBreach} />
+{showMatrix && (
             <>
               <div style={{
                 position: 'absolute', left: 0, height: '2px',
@@ -445,26 +402,20 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
               }} />
             </>
           )}
-
-          {/* Scanlines */}
-          <div style={{
+<div style={{
             position: 'absolute', inset: 0,
             backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0px, rgba(0,0,0,0.35) 2px, transparent 2px, transparent 4px)',
             transform: `translateY(${scanlines}px)`,
             pointerEvents: 'none',
             zIndex: 20, opacity: 0.65,
           }} />
-
-          {/* CRT vignette */}
-          <div style={{
+<div style={{
             position: 'absolute', inset: 0,
             background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 80%, rgba(0,0,0,0.92) 100%)',
             pointerEvents: 'none', zIndex: 21,
           }} />
         </div>
-
-        {/* Phosphor glow at roll edge */}
-        {phase === 'crt-roll' && (
+{phase === 'crt-roll' && (
           <div style={{
             position: 'absolute', bottom: 0, left: 0, right: 0, height: '6px',
             background: 'linear-gradient(180deg, rgba(0,255,136,0.9) 0%, rgba(0,200,100,0.4) 60%, transparent 100%)',

@@ -40,26 +40,18 @@ win = pygame.display.set_mode(SCREEN, display_flags)
 clock = pygame.time.Clock()
 FPS = 45
 
-# COLORS
-
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (54, 69, 79)
 c_list = [RED, BLACK, WHITE]
 
-# Fonts
-
 pygame.font.init()
 score_font = pygame.font.Font('Fonts/BubblegumSans-Regular.ttf', 50)
-
-# Sounds
 
 coin_fx = pygame.mixer.Sound('Sounds/coin.mp3')
 death_fx = pygame.mixer.Sound('Sounds/death.mp3')
 move_fx = pygame.mixer.Sound('Sounds/move.mp3')
-
-# backgrounds
 
 bg_list = []
 for i in range(1,5):
@@ -74,8 +66,6 @@ for i in range(1,5):
 home_bg = pygame.image.load(f"Assets/Backgrounds/home.jpeg")
 
 bg = home_bg
-
-# objects
 bar_group = pygame.sprite.Group()
 ball_group = pygame.sprite.Group()
 block_group = pygame.sprite.Group()
@@ -87,8 +77,6 @@ particles = []
 
 p = Player(win)
 score_card = ScoreCard(WIDTH // 2, max(36, int(40 * scale_y)), win)
-
-# Functions
 
 def destroy_bird():
 	x, y = p.rect.center
@@ -102,8 +90,6 @@ def win_particles():
 		for i in range(10):
 			particle = Particle (x,y, 2, WHITE, win)
 			win_particle_group.add(particle)
-
-# Messages
 title_font = "Fonts/Robus-BWqOd.otf"
 dodgy = Message(WIDTH // 2 - max(10, int(10 * scale_x)), int(90 * scale_y), int(100 * scale_y), "Angry",title_font, WHITE, win)
 walls = Message(WIDTH // 2 + max(20, int(20 * scale_x)), int(145 * scale_y), int(80 * scale_y), "Walls",title_font, WHITE, win)
@@ -111,8 +97,6 @@ walls = Message(WIDTH // 2 + max(20, int(20 * scale_x)), int(145 * scale_y), int
 tap_to_play_font = "Fonts/DebugFreeTrial-MVdYB.otf"
 tap_to_play = Message(WIDTH // 2, int(400 * scale_y), int(32 * scale_y), "TAP TO PLAY",tap_to_play_font, WHITE, win)
 tap_to_replay = Message(WIDTH // 2, int(400 * scale_y), int(30 * scale_y), "Tap to Replay",tap_to_play_font, WHITE, win)
-
-# Variables
 
 bar_width_list = sorted(set(max(35, int(i * scale_x)) for i in range(40, 150, 10)))
 bar_frequency = 1200

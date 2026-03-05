@@ -1,4 +1,3 @@
-// Type definitions for Electron IPC exposed in window object
 export type LaunchViewport = {
   x: number
   y: number
@@ -38,13 +37,30 @@ export type WifiApProfile = {
   updatedAt: string
 }
 
+export type AiExplainPayload = {
+  gameId: string
+  title: string
+  genre?: string
+  difficulty?: string
+  lastEvent?: string
+}
+
+export type AiExplainResponse = {
+  success: boolean
+  message: string
+  content?: string
+}
+
+type IpcSuccessResponse = { success: boolean }
+type IpcMessageResponse = { success: boolean; message: string }
+type IrDbResponse = IpcMessageResponse & { entries?: IrDatabaseEntry[] }
+
 export interface ElectronAPI {
-  setFullscreen: (fullscreen: boolean) => Promise<{success: boolean}>
-  launchGame: (request: string | LaunchRequest) => Promise<{success: boolean, message: string}>
-  stopGame: () => Promise<{success: boolean, message: string}>
-  killGame: () => Promise<{success: boolean, message: string}>
-  updateGameViewport: (viewport: LaunchViewport) => Promise<{success: boolean, message: string}>
-  resizeGame: (viewport: LaunchViewport) => Promise<{success: boolean, message: string}>
+  setFullscreen: (fullscreen: boolean) => Promise<IpcSuccessResponse>
+  launchGame: (request: string | LaunchRequest) => Promise<IpcMessageResponse>
+  stopGame: () => Promise<IpcMessageResponse>
+  killGame: () => Promise<IpcMessageResponse>
+  aiExplain: (payload: AiExplainPayload) => Promise<AiExplainResponse>
   diyFlipperGetStatus: () => Promise<DiyFlipperStatus>
   diyFlipperConnect: (preferredPath?: string) => Promise<{success: boolean, message: string}>
   diyFlipperDisconnect: () => Promise<{success: boolean, message: string}>
@@ -53,9 +69,6 @@ export interface ElectronAPI {
   diyFlipperSaveNfcCapture: (payload: { uid: string; label?: string; rawLine?: string }) => Promise<{success: boolean, message: string}>
   diyFlipperLoadIrMiniDb: () => Promise<{success: boolean, message: string, entries: IrDatabaseEntry[]}>
   diyFlipperSendIrEntry: (entry: IrDatabaseEntry) => Promise<{success: boolean, message: string}>
-  diyFlipperLoadWifiApProfile: () => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>
-  diyFlipperSaveWifiApProfile: (profile: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>
-  diyFlipperStartWifiAp: (profile: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>
   onDiyFlipperStatus: (callback: (status: DiyFlipperStatus) => void) => () => void
   onDiyFlipperLine: (callback: (line: string) => void) => () => void
   onGameExit: (callback: () => void) => () => void

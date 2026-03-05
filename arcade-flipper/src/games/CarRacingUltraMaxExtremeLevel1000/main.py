@@ -40,21 +40,15 @@ scale_x = WIDTH / 288
 scale_y = HEIGHT / 512
 lane_pos = [int(v * scale_x) for v in [50, 95, 142, 190]]
 
-# COLORS **********************************************************************
-
 WHITE = (255, 255, 255)
 BLUE = (30, 144,255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLACK = (0, 0, 20)
 
-# FONTS ***********************************************************************
-
 font = pygame.font.SysFont('cursive', 32)
 
 select_car = font.render('Select Car', True, WHITE)
-
-# IMAGES **********************************************************************
 
 bg = pygame.image.load('Assets/bg.png')
 
@@ -89,12 +83,8 @@ for i in range(6):
 	img = pygame.transform.flip(img, False, True)
 	img = pygame.transform.scale(img, (18, 36))
 	nitro_frames.append(img)
-
-# FUNCTIONS *******************************************************************
 def center(image):
 	return (WIDTH // 2) - image.get_width() // 2
-
-# BUTTONS *********************************************************************
 play_btn = Button(play_img, (100, 34), center(play_img)+10, HEIGHT-80)
 la_btn = Button(left_arrow, (32, 42), int(40 * scale_x), int(180 * scale_y))
 ra_btn = Button(right_arrow, (32, 42), WIDTH - int(60 * scale_x), int(180 * scale_y))
@@ -102,8 +92,6 @@ ra_btn = Button(right_arrow, (32, 42), WIDTH - int(60 * scale_x), int(180 * scal
 home_btn = Button(home_btn_img, (24, 24), WIDTH // 4 - 18, HEIGHT - 80)
 replay_btn = Button(replay_img, (36,36), WIDTH // 2  - 18, HEIGHT - 86)
 sound_btn = Button(sound_on_img, (24, 24), WIDTH - WIDTH // 4 - 18, HEIGHT - 80)
-
-# SOUNDS **********************************************************************
 
 click_fx = pygame.mixer.Sound('Sounds/click.mp3')
 fuel_fx = pygame.mixer.Sound('Sounds/fuel.wav')
@@ -114,8 +102,6 @@ coin_fx = pygame.mixer.Sound('Sounds/coin.mp3')
 pygame.mixer.music.load('Sounds/mixkit-tech-house-vibes-130.mp3')
 pygame.mixer.music.play(loops=-1)
 pygame.mixer.music.set_volume(0.6)
-
-# OBJECTS *********************************************************************
 road = Road()
 nitro = Nitro(WIDTH-80, HEIGHT-80)
 p = Player(int(100 * scale_x), HEIGHT - int(120 * scale_y), car_type)
@@ -124,8 +110,6 @@ tree_group = pygame.sprite.Group()
 coin_group = pygame.sprite.Group()
 fuel_group = pygame.sprite.Group()
 obstacle_group = pygame.sprite.Group()
-
-# VARIABLES *******************************************************************
 home_page = True
 car_page = False
 game_page = False
@@ -345,8 +329,6 @@ while running:
 			pygame.draw.rect(win, GREEN, (20, 20, cfuel, 15), border_radius=5)
 		pygame.draw.rect(win, WHITE, (20, 20, 100, 15), 2, border_radius=5)
 		cfuel -= 0.05
-
-		# COLLISION DETECTION & KILLS
 		for obstacle in obstacle_group:
 			if obstacle.rect.y >= HEIGHT:
 				if obstacle.type == 1:

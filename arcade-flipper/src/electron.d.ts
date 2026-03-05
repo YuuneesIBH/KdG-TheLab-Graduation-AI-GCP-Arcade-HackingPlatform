@@ -30,6 +30,20 @@ export type IrDatabaseEntry = {
   source?: string
 }
 
+export type AiExplainPayload = {
+  gameId: string
+  title: string
+  genre?: string
+  difficulty?: string
+  lastEvent?: string
+}
+
+export type AiExplainResponse = {
+  success: boolean
+  message: string
+  content?: string
+}
+
 type IpcSuccessResponse = { success: boolean }
 type IpcMessageResponse = { success: boolean; message: string }
 type IrDbResponse = IpcMessageResponse & { entries?: IrDatabaseEntry[] }
@@ -39,6 +53,7 @@ export interface ElectronAPI {
   launchGame: (request: string | LaunchRequest) => Promise<IpcMessageResponse>
   stopGame: () => Promise<IpcMessageResponse>
   killGame: () => Promise<IpcMessageResponse>
+  aiExplain: (payload: AiExplainPayload) => Promise<AiExplainResponse>
   diyFlipperGetStatus: () => Promise<DiyFlipperStatus>
   diyFlipperConnect: (preferredPath?: string) => Promise<IpcMessageResponse>
   diyFlipperDisconnect: () => Promise<IpcMessageResponse>

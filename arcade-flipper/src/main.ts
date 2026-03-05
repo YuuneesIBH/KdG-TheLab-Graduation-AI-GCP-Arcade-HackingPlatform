@@ -50,6 +50,21 @@ type IrDatabaseEntry = {
   source?: string
 }
 
+type AiExplainRequest = {
+  gameId: string
+  title: string
+  genre?: string
+  difficulty?: string
+  lastEvent?: string
+  language?: string
+}
+
+type AiExplainResult = {
+  success: boolean
+  message: string
+  content?: string
+}
+
 const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
   {
     id: 'tv_power_nec_20df10ef',
@@ -89,6 +104,12 @@ const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
   }
 ]
 
+const OLLAMA_URL = (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/+$/, '')
+const OLLAMA_FALLBACK_URL = (process.env.OLLAMA_FALLBACK_URL ?? 'http://34.79.68.47:11434').replace(/\/+$/, '')
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma2:27b'
+const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS ?? 45000)
+const OLLAMA_KEEP_ALIVE_SEC = Number(process.env.OLLAMA_KEEP_ALIVE_SEC ?? 1800) // 30 minuten loaded houden
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
@@ -96,6 +117,113 @@ function clamp(value: number, min: number, max: number) {
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return String(error)
+}
+
+function buildAiMessages(payload: AiExplainRequest) {
+  const genre = payload.genre ?? 'ARCADE'
+  const difficulty = payload.difficulty ?? 'UNSET'
+  const recent = payload.lastEvent ?? 'n/a'
+  const language = payload.language ?? 'Dutch'
+
+  return [
+    {
+      role: 'system',
+      content: `You are an upbeat arcade explainer. Answer in ${language}. Keep it under 80 words, bullet-like sentences.`
+    },
+    {
+      role: 'user',
+      content: [
+        `Game: ${payload.title} (${genre}, difficulty ${difficulty})`,
+        'Task: explain briefly how to play, what to aim for, and one quick tip.',
+        `Recent event: ${recent}`
+      ].join('\n')
+    }
+  ]
+}
+
+async function checkOllamaReachable(targetUrl: string): Promise<{ ok: boolean; message?: string }> {
+  const url = `${targetUrl}/api/tags`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2500)
+  try {
+    const response = await fetch(url, { method: 'GET', signal: controller.signal })
+    if (!response.ok) {
+      return { ok: false, message: `Ollama HTTP ${response.status} bij /api/tags` }
+    }
+    return { ok: true }
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError'
+    return {
+      ok: false,
+      message: aborted
+        ? 'Timeout bij Ollama /api/tags (firewall of traag netwerk)'
+        : toErrorMessage(error)
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function callAiExplain(payload: AiExplainRequest): Promise<AiExplainResult> {
+  const reachPrimary = await checkOllamaReachable(OLLAMA_URL)
+  if (!reachPrimary.ok && OLLAMA_FALLBACK_URL !== OLLAMA_URL) {
+    const reachFallback = await checkOllamaReachable(OLLAMA_FALLBACK_URL)
+    if (reachFallback.ok) {
+      return callAiExplainWithUrl(payload, OLLAMA_FALLBACK_URL, 'fallback')
+    }
+    return {
+      success: false,
+      message: `Kan Ollama niet bereiken op ${OLLAMA_URL} (${reachPrimary.message ?? 'onbekend'}) en fallback ${OLLAMA_FALLBACK_URL} (${reachFallback.message ?? 'onbekend'})`
+    }
+  }
+  if (!reachPrimary.ok) {
+    return { success: false, message: `Kan Ollama niet bereiken op ${OLLAMA_URL}: ${reachPrimary.message ?? 'onbekende fout'}` }
+  }
+  return callAiExplainWithUrl(payload, OLLAMA_URL, 'primary')
+}
+
+async function callAiExplainWithUrl(payload: AiExplainRequest, baseUrl: string, source: 'primary' | 'fallback'): Promise<AiExplainResult> {
+  const url = `${baseUrl}/api/chat`
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        messages: buildAiMessages(payload),
+        keep_alive: Number.isFinite(OLLAMA_KEEP_ALIVE_SEC) ? OLLAMA_KEEP_ALIVE_SEC : undefined,
+        options: { temperature: 0.6 }
+      }),
+      signal: controller.signal
+    })
+
+    if (!response.ok) {
+      return { success: false, message: `AI HTTP ${response.status} via ${source}` }
+    }
+
+    const json = await response.json() as { message?: { content?: string } }
+    const content = json?.message?.content?.trim()
+    if (!content) {
+      return { success: false, message: `Lege AI-respons via ${source}` }
+    }
+
+    return { success: true, message: `ok (${source})`, content }
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError'
+    return {
+      success: false,
+      message: aborted
+        ? `AI timeout (${OLLAMA_TIMEOUT_MS}ms) bij ${baseUrl}. Update firewall/source-range of verhoog OLLAMA_TIMEOUT_MS.`
+        : `${toErrorMessage(error)} via ${source}`
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 function hasPygame(pythonCommand: string) {
@@ -734,6 +862,13 @@ ipcMain.handle('set-fullscreen', async (_event, fullscreen: boolean) => {
     return { success: true }
   }
   return { success: false }
+})
+
+ipcMain.handle('ai-explain', async (_event, payload: AiExplainRequest): Promise<AiExplainResult> => {
+  if (!payload?.gameId || !payload?.title) {
+    return { success: false, message: 'Ontbrekende game info voor AI' }
+  }
+  return callAiExplain(payload)
 })
 
 ipcMain.handle('diyflipper-get-status', async () => {

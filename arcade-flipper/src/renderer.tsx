@@ -4,6 +4,7 @@ import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
 import HackerMenu from './components/flipper/HackerMenu'
+import { games } from './components/arcade/GameMenu'
 import type { DiyFlipperStatus, IrDatabaseEntry } from './electron'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
@@ -52,6 +53,7 @@ function App() {
   const [coinBlink, setCoinBlink] = useState(false)
   const [glitchLine, setGlitchLine] = useState(-1)
   const [logoShake, setLogoShake] = useState({ x: 0, y: 0 })
+  const [aiHints, setAiHints] = useState<Record<string, { status: 'idle' | 'loading' | 'ready' | 'error'; content?: string }>>({})
 
   const bootLineCount = Math.min(BOOT_LINES.length, Math.floor(time / 7))
   const progress = Math.min(100, coins * 10)
@@ -137,6 +139,54 @@ function App() {
       clearInterval(logoShakeInterval)
     }
   }, [isBootScreen])
+
+  // Prefetch AI hints for all games once at startup (sequential to avoid overload)
+  useEffect(() => {
+    const api = window.electron
+    if (!api?.aiExplain) return
+    let cancelled = false
+
+    const fetchOne = async (idx: number) => {
+      if (cancelled) return
+      const game = games[idx]
+      if (!game) return
+
+      setAiHints((prev) => ({
+        ...prev,
+        [game.id]: prev[game.id]?.status === 'ready' ? prev[game.id] : { status: 'loading' }
+      }))
+
+      try {
+        const res = await api.aiExplain({
+          gameId: game.id,
+          title: game.title,
+          genre: game.genre,
+          difficulty: game.difficulty
+        })
+        if (cancelled) return
+        setAiHints((prev) => ({
+          ...prev,
+          [game.id]: res.success
+            ? { status: 'ready', content: res.content ?? res.message ?? '' }
+            : { status: 'error', content: res.message ?? 'AI error' }
+        }))
+      } catch (error) {
+        if (cancelled) return
+        setAiHints((prev) => ({
+          ...prev,
+          [game.id]: { status: 'error', content: error instanceof Error ? error.message : String(error) }
+        }))
+      } finally {
+        if (cancelled) return
+        if (idx + 1 < games.length) {
+          setTimeout(() => void fetchOne(idx + 1), 300)
+        }
+      }
+    }
+
+    void fetchOne(0)
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const api = window.electron
@@ -303,6 +353,10 @@ function App() {
     return (
       <ArcadeGame
         gameId={selectedGame}
+        prefetchedHint={aiHints[selectedGame]?.content}
+        onHintReady={(gameId, content) => {
+          setAiHints(prev => ({ ...prev, [gameId]: { status: 'ready', content } }))
+        }}
         onExit={() => {
           setSelectedGame(null)
           setScreen('arcade-menu')

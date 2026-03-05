@@ -31,11 +31,26 @@ type IrDatabaseEntry = {
   carrierKhz?: number
   source?: string
 }
+
+type AiExplainPayload = {
+  gameId: string
+  title: string
+  genre?: string
+  difficulty?: string
+  lastEvent?: string
+}
+
+type AiExplainResponse = {
+  success: boolean
+  message: string
+  content?: string
+}
 contextBridge.exposeInMainWorld('electron', {
   setFullscreen: (fullscreen: boolean) => ipcRenderer.invoke('set-fullscreen', fullscreen),
   launchGame: (request: string | LaunchRequest) => ipcRenderer.invoke('launch-game', request),
   stopGame: () => ipcRenderer.invoke('stop-game'),
   killGame: () => ipcRenderer.invoke('kill-game'),
+  aiExplain: (payload: AiExplainPayload): Promise<AiExplainResponse> => ipcRenderer.invoke('ai-explain', payload),
   diyFlipperGetStatus: () => ipcRenderer.invoke('diyflipper-get-status'),
   diyFlipperConnect: (preferredPath?: string) => ipcRenderer.invoke('diyflipper-connect', preferredPath),
   diyFlipperDisconnect: () => ipcRenderer.invoke('diyflipper-disconnect'),

@@ -190,7 +190,7 @@ export function BootScreen({
         )}
 <div style={{
           position: 'absolute',
-          top: '20px',
+          top: 0,
           left: 0,
           right: 0,
           background: 'linear-gradient(180deg, #0066cc, #004499)',

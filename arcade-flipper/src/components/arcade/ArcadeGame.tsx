@@ -4,6 +4,8 @@ import { games } from './GameMenu'
 type ArcadeGameProps = {
   gameId: string
   onExit: () => void
+  prefetchedHint?: string
+  onHintReady?: (gameId: string, content: string) => void
 }
 
 function formatTitle(gameId: string) {
@@ -23,7 +25,7 @@ const GAME_SCREEN_INSET = { top: 150, left: 62, right: 62, bottom: 128 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
-export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
+export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: ArcadeGameProps) {
   const viewportRef = React.useRef<HTMLDivElement | null>(null)
 
   const [status, setStatus]             = React.useState<'launching' | 'running' | 'error'>('launching')
@@ -40,6 +42,19 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
   const [joystickAngle, setJoystickAngle]     = React.useState(0)
   const [coinBlink, setCoinBlink]             = React.useState(false)
   const [marqueePos, setMarqueePos]           = React.useState(0)
+  const [aiVisible, setAiVisible]             = React.useState(false)
+  const [aiStatus, setAiStatus]               = React.useState<'idle' | 'thinking' | 'ready' | 'error'>('idle')
+  const [aiText, setAiText]                   = React.useState('')
+  const [aiCachedText, setAiCachedText]       = React.useState(prefetchedHint ?? '')
+  const [aiPrefetching, setAiPrefetching]     = React.useState(false)
+  const aiPrefetchedOnce = React.useRef(false)
+
+  React.useEffect(() => {
+    if (prefetchedHint) {
+      setAiCachedText(prefetchedHint)
+      setAiStatus((s) => (s === 'idle' ? 'ready' : s))
+    }
+  }, [prefetchedHint])
 
   const game       = React.useMemo(() => games.find(g => g.id === gameId), [gameId])
   const title      = game?.title      ?? formatTitle(gameId)
@@ -87,6 +102,70 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     setFullscreen(true)
     onExit()
   }, [onExit, setFullscreen, stopGameIfPossible])
+
+  const requestAiHint = React.useCallback(async (opts?: { silent?: boolean }) => {
+    const api = window.electron
+    const silent = opts?.silent === true
+
+    if (!silent) {
+      setAiVisible(true)
+      setAiStatus('thinking')
+      setAiText('AI is aan het denken…')
+    } else {
+      setAiPrefetching(true)
+      setAiStatus((s) => (s === 'idle' ? 'thinking' : s))
+    }
+
+    if (!api?.aiExplain) {
+      setAiStatus('error')
+      setAiText('AI kanaal niet beschikbaar')
+      return
+    }
+
+    try {
+      const response = await api.aiExplain({
+        gameId,
+        title,
+        genre,
+        difficulty
+      })
+      if (!response?.success) {
+        setAiStatus('error')
+        setAiText(response?.message ?? 'AI-call mislukt')
+        return
+      }
+      setAiStatus('ready')
+      const content = response.content ?? response.message ?? 'Geen AI-tekst ontvangen'
+      setAiText(content)
+      setAiCachedText(content)
+      onHintReady?.(gameId, content)
+    } catch (error) {
+      setAiStatus('error')
+      setAiText(error instanceof Error ? error.message : String(error))
+    } finally {
+      if (silent) setAiPrefetching(false)
+    }
+  }, [difficulty, gameId, genre, onHintReady, title])
+
+  const toggleAiOverlay = React.useCallback(() => {
+    if (status !== 'running') return
+    if (aiVisible) {
+      setAiVisible(false)
+      return
+    }
+    // If we already fetched, show instantly; otherwise fetch now.
+    if (aiCachedText) {
+      setAiVisible(true)
+      setAiStatus('thinking')
+      setAiText('AI is aan het denken…')
+      setTimeout(() => {
+        setAiStatus('ready')
+        setAiText(aiCachedText)
+      }, 1200)
+      return
+    }
+    void requestAiHint()
+  }, [aiCachedText, aiVisible, requestAiHint, status])
 
   const launch = React.useCallback(async () => {
     if (!game) { setErrorMessage('Game not found'); setStatus('error'); return }
@@ -140,6 +219,24 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
     const cleanup = window.electron?.onGameExit?.(() => exit())
     return () => cleanup?.()
   }, [exit])
+  React.useEffect(() => {
+    if (status !== 'running') return
+    if (aiPrefetchedOnce.current) return
+    aiPrefetchedOnce.current = true
+    if (!aiCachedText) {
+      void requestAiHint({ silent: true })
+    }
+  }, [aiCachedText, requestAiHint, status])
+  React.useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'y' || e.key === 'Y') {
+        e.preventDefault()
+        toggleAiOverlay()
+      }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [toggleAiOverlay])
   React.useEffect(() => {
     const t = setInterval(() => {
       if (Math.random() < 0.02) {
@@ -886,6 +983,73 @@ export function ArcadeGame({ gameId, onExit }: ArcadeGameProps) {
               color: 'rgba(168,229,255,0.84)', fontSize: 9, letterSpacing: 2,
               background: 'rgba(0,17,36,0.52)',
             }}>{players}</div>
+          </div>
+        )}
+        {aiVisible && (
+          <div style={{
+            position: 'absolute',
+            top: 18,
+            right: 18,
+            width: 'min(420px, 34vw)',
+            padding: '12px 14px 11px',
+            borderRadius: 12,
+            border: `1px solid ${accent}55`,
+            background: 'rgba(0,14,32,0.92)',
+            boxShadow: `0 0 18px ${accent}44, 0 12px 28px rgba(0,0,0,0.65)`,
+            color: '#e6f7ff',
+            pointerEvents: 'auto',
+            zIndex: 32,
+            backdropFilter: 'blur(4px)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, letterSpacing: 1.8, fontWeight: 700, color: accent, textShadow: accentGlow }}>
+                AI ASSIST {aiPrefetching ? '· PREFETCH' : ''}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ fontSize: 10, color: '#8fd5ff', letterSpacing: 1.2 }}>
+                  {aiStatus === 'thinking' ? 'DENKEN…' : aiStatus === 'error' ? 'ERROR' : 'GEREED'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiVisible(false)}
+                  style={{
+                    background: 'rgba(0,40,80,0.8)',
+                    color: '#d7f1ff',
+                    border: `1px solid ${accent}55`,
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    fontSize: 11,
+                    letterSpacing: 1.4,
+                    cursor: 'pointer'
+                  }}
+                >✕</button>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.45, whiteSpace: 'pre-wrap', color: '#e6f7ff' }}>
+              {aiText}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 10, color: '#8bbde8', letterSpacing: 1 }}>
+              Tip: druk Y opnieuw om te sluiten.
+            </div>
+          </div>
+        )}
+        {!aiVisible && status === 'running' && (
+          <div style={{
+            position: 'absolute',
+            top: 16,
+            right: 18,
+            padding: '5px 9px',
+            borderRadius: 8,
+            background: 'rgba(0,20,42,0.72)',
+            border: `1px solid ${accent}55`,
+            color: '#bfe7ff',
+            fontSize: 9,
+            letterSpacing: 1.6,
+            textShadow: accentGlow,
+            pointerEvents: 'none',
+            zIndex: 28
+          }}>
+            Y = AI HINT
           </div>
         )}
 

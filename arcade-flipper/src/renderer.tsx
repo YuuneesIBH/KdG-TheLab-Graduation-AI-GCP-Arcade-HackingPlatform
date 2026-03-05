@@ -48,6 +48,7 @@ function App() {
   const [toolStatus, setToolStatus] = useState<string>('Ready')
   const [lastNfcUid, setLastNfcUid] = useState<string>('')
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
+  const [wifiApProfile, setWifiApProfile] = useState<WifiApProfile | null>(null)
 
   // ── arcade boot state ─────────────────────────────────────────
   const [coins, setCoins] = useState(0)
@@ -131,7 +132,6 @@ function App() {
 
     const timeInterval = setInterval(() => {
       setTime(t => t + 1)
-      setHighScore(h => Math.max(0, h - 5))
       setScrollText(s => s + 1)
     }, 50)
 
@@ -351,6 +351,49 @@ function App() {
 
   const handleClearSerialLog = useCallback(() => {
     setDiyFlipperSerialLines([])
+  }, [])
+
+  const handleWifiApSaveProfile = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperSaveWifiApProfile(profile)
+    if (!result.success) {
+      setToolStatus(`Wi-Fi AP profile save failed: ${result.message}`)
+      return
+    }
+    setWifiApProfile(result.profile ?? null)
+    setToolStatus('Wi-Fi AP profile saved')
+  }, [])
+
+  const handleWifiApLoadProfile = useCallback(async () => {
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperLoadWifiApProfile()
+    if (!result.success) {
+      setToolStatus(`Wi-Fi AP profile load failed: ${result.message}`)
+      return
+    }
+    setWifiApProfile(result.profile ?? null)
+    setToolStatus(result.profile ? 'Wi-Fi AP profile loaded' : 'No saved Wi-Fi AP profile')
+  }, [])
+
+  const handleWifiApStart = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperStartWifiAp(profile)
+    if (!result.success) {
+      setToolStatus(`Wi-Fi AP start failed: ${result.message}`)
+      return
+    }
+    setWifiApProfile(result.profile ?? null)
+    setToolStatus(result.message || 'Wi-Fi AP start command sent')
+  }, [])
+
+  const handleWifiApStop = useCallback(async () => {
+    const api = window.electron
+    if (!api) return
+    const result = await api.diyFlipperSendCommand('WIFI_AP_STOP')
+    setToolStatus(result.success ? 'Wi-Fi AP stop command sent' : `Wi-Fi AP stop failed: ${result.message}`)
   }, [])
 
   // ── render ────────────────────────────────────────────────────

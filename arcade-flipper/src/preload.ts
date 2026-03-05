@@ -39,13 +39,6 @@ type WifiApProfile = {
   updatedAt: string
 }
 
-type WifiApProfile = {
-  ssid: string
-  password: string
-  channel: number
-  updatedAt: string
-}
-
 type AiExplainPayload = {
   gameId: string
   title: string

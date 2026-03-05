@@ -256,6 +256,16 @@ export default function HackerMenu({
     })
   }, [irEntries])
 
+  const getWifiApPayload = useCallback(() => {
+    const channelRaw = Number.parseInt(wifiApChannelInput, 10)
+    const channel = Number.isFinite(channelRaw) ? Math.min(Math.max(channelRaw, 1), 13) : 6
+    return {
+      ssid: wifiApSsidInput.trim(),
+      password: wifiApPasswordInput.trim(),
+      channel,
+    }
+  }, [wifiApChannelInput, wifiApPasswordInput, wifiApSsidInput])
+
   const sendRawCommand = useCallback(() => {
     const trimmed = rawCommand.trim()
     if (!trimmed) return
@@ -287,6 +297,24 @@ export default function HackerMenu({
       case 'tab-ir':
       case 'home-open-ir':
         openView('ir')
+        return
+      case 'wifiap-start': {
+        const payload = getWifiApPayload()
+        if (!payload.ssid) return
+        onWifiApStart?.(payload)
+        return
+      }
+      case 'wifiap-stop':
+        onWifiApStop?.()
+        return
+      case 'wifiap-save': {
+        const payload = getWifiApPayload()
+        if (!payload.ssid) return
+        onWifiApSaveProfile?.(payload)
+        return
+      }
+      case 'wifiap-load':
+        onWifiApLoadProfile?.()
         return
       case 'nfc-run':
         onSelect?.('nfc')
@@ -334,7 +362,12 @@ export default function HackerMenu({
     onNfcSave,
     onReconnect,
     onSelect,
+    onWifiApLoadProfile,
+    onWifiApSaveProfile,
+    onWifiApStart,
+    onWifiApStop,
     openView,
+    getWifiApPayload,
     selectedIrId,
     sendRawCommand,
     stepIrEntry,
@@ -557,106 +590,6 @@ export default function HackerMenu({
     : deviceStatus?.connecting
       ? '#ffff00'
       : '#ff4444'
-
-  const sendRawCommand = useCallback(() => {
-    const trimmed = rawCommand.trim()
-    if (!trimmed) return
-    onSendRawCommand?.(trimmed)
-    setRawCommand('')
-  }, [onSendRawCommand, rawCommand])
-
-  const activateFocusedControl = useCallback(() => {
-    if (!focusedControl) return
-    if (focusedControl === 'header-reconnect') {
-      onReconnect?.()
-      return
-    }
-    if (focusedControl === 'header-exit') {
-      onBack?.()
-      return
-    }
-    if (focusedControl === 'tab-home') {
-      openView('home')
-      return
-    }
-    if (focusedControl === 'tab-nfc') {
-      openView('nfc')
-      return
-    }
-    if (focusedControl === 'tab-ir') {
-      openView('ir')
-      return
-    }
-    if (focusedControl === 'home-open-nfc') {
-      openView('nfc')
-      return
-    }
-    if (focusedControl === 'home-open-ir') {
-      openView('ir')
-      return
-    }
-    if (focusedControl.startsWith('home-module-')) {
-      const moduleKey = focusedControl.replace('home-module-', '')
-      onSelect?.(moduleKey)
-      return
-    }
-    if (focusedControl === 'nfc-run') {
-      onSelect?.('nfc')
-      return
-    }
-    if (focusedControl === 'nfc-read') {
-      onNfcRead?.()
-      return
-    }
-    if (focusedControl === 'nfc-save') {
-      if (!lastNfcUid) return
-      onNfcSave?.()
-      return
-    }
-    if (focusedControl === 'ir-run') {
-      onSelect?.('ir')
-      return
-    }
-    if (focusedControl === 'ir-reload') {
-      onIrReload?.()
-      return
-    }
-    if (focusedControl === 'ir-prev') {
-      stepIrEntry(-1)
-      return
-    }
-    if (focusedControl === 'ir-next') {
-      stepIrEntry(1)
-      return
-    }
-    if (focusedControl === 'ir-send') {
-      if (!selectedIrId) return
-      onIrSend?.(selectedIrId)
-      return
-    }
-    if (focusedControl === 'terminal-send') {
-      sendRawCommand()
-      return
-    }
-    if (focusedControl === 'terminal-clear') {
-      onClearSerialLog?.()
-    }
-  }, [
-    focusedControl,
-    lastNfcUid,
-    onBack,
-    onClearSerialLog,
-    onIrReload,
-    onIrSend,
-    onNfcRead,
-    onNfcSave,
-    onReconnect,
-    onSelect,
-    openView,
-    selectedIrId,
-    sendRawCommand,
-    stepIrEntry,
-  ])
 
   const nfcHealth = useMemo(() => {
     const lines = serialLines ?? []

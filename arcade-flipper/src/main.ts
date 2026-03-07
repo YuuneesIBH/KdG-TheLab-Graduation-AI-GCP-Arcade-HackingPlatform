@@ -112,7 +112,8 @@ const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
 ]
 
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/+$/, '')
-const OLLAMA_FALLBACK_URL = (process.env.OLLAMA_FALLBACK_URL ?? 'http://34.79.68.47:11434').replace(/\/+$/, '')
+const OLLAMA_FALLBACK_URL = process.env.OLLAMA_FALLBACK_URL?.replace(/\/+$/, '')
+const OLLAMA_ALLOW_FALLBACK = Boolean(OLLAMA_FALLBACK_URL && OLLAMA_FALLBACK_URL !== OLLAMA_URL)
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma2:27b'
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS ?? 45000)
 const OLLAMA_KEEP_ALIVE_SEC = Number(process.env.OLLAMA_KEEP_ALIVE_SEC ?? 1800) // 30 minuten loaded houden
@@ -173,7 +174,7 @@ async function checkOllamaReachable(targetUrl: string): Promise<{ ok: boolean; m
 
 async function callAiExplain(payload: AiExplainRequest): Promise<AiExplainResult> {
   const reachPrimary = await checkOllamaReachable(OLLAMA_URL)
-  if (!reachPrimary.ok && OLLAMA_FALLBACK_URL !== OLLAMA_URL) {
+  if (!reachPrimary.ok && OLLAMA_ALLOW_FALLBACK && OLLAMA_FALLBACK_URL) {
     const reachFallback = await checkOllamaReachable(OLLAMA_FALLBACK_URL)
     if (reachFallback.ok) {
       return callAiExplainWithUrl(payload, OLLAMA_FALLBACK_URL, 'fallback')
@@ -184,7 +185,12 @@ async function callAiExplain(payload: AiExplainRequest): Promise<AiExplainResult
     }
   }
   if (!reachPrimary.ok) {
-    return { success: false, message: `Kan Ollama niet bereiken op ${OLLAMA_URL}: ${reachPrimary.message ?? 'onbekende fout'}` }
+    return {
+      success: false,
+      message: OLLAMA_ALLOW_FALLBACK
+        ? `Kan Ollama niet bereiken op ${OLLAMA_URL}: ${reachPrimary.message ?? 'onbekende fout'}`
+        : `Kan Ollama niet bereiken op ${OLLAMA_URL}; fallback is uitgeschakeld`
+    }
   }
   return callAiExplainWithUrl(payload, OLLAMA_URL, 'primary')
 }
@@ -912,8 +918,9 @@ function loadWifiApProfile(): WifiApProfile | null {
 
 function saveWifiApProfile(profile: WifiApProfile) {
   const profileDir = path.dirname(DIY_WIFI_AP_PROFILE_PATH)
+  const redactedProfile = { ...profile, password: '' }
   fs.mkdirSync(profileDir, { recursive: true })
-  fs.writeFileSync(DIY_WIFI_AP_PROFILE_PATH, JSON.stringify(profile, null, 2))
+  fs.writeFileSync(DIY_WIFI_AP_PROFILE_PATH, JSON.stringify(redactedProfile, null, 2))
 }
 
 function resolveIrMiniDatabasePath() {
@@ -979,7 +986,12 @@ ipcMain.handle(
 
     try {
       saveWifiApProfile(normalized.profile)
-      return { success: true, message: 'Wi-Fi AP profile saved', profile: normalized.profile }
+      const redacted = { ...normalized.profile, password: '' }
+      return {
+        success: true,
+        message: 'Wi-Fi AP profile saved (password is not stored for security)',
+        profile: redacted
+      }
     } catch (error: unknown) {
       return {
         success: false,
@@ -1010,12 +1022,13 @@ ipcMain.handle(
 
     try {
       saveWifiApProfile(profile)
-      return { success: true, message: result.message, profile }
+      const redacted = { ...profile, password: '' }
+      return { success: true, message: `${result.message} (password not stored)`, profile: redacted }
     } catch (error: unknown) {
       return {
         success: false,
         message: `AP started but profile save failed: ${toErrorMessage(error)}`,
-        profile
+        profile: { ...profile, password: '' }
       }
     }
   }

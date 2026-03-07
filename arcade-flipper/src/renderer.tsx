@@ -148,54 +148,6 @@ function App() {
     }
   }, [isBootScreen])
 
-  // Prefetch AI hints for all games once at startup (sequential to avoid overload)
-  useEffect(() => {
-    const api = window.electron
-    if (!api?.aiExplain) return
-    let cancelled = false
-
-    const fetchOne = async (idx: number) => {
-      if (cancelled) return
-      const game = games[idx]
-      if (!game) return
-
-      setAiHints((prev) => ({
-        ...prev,
-        [game.id]: prev[game.id]?.status === 'ready' ? prev[game.id] : { status: 'loading' }
-      }))
-
-      try {
-        const res = await api.aiExplain({
-          gameId: game.id,
-          title: game.title,
-          genre: game.genre,
-          difficulty: game.difficulty
-        })
-        if (cancelled) return
-        setAiHints((prev) => ({
-          ...prev,
-          [game.id]: res.success
-            ? { status: 'ready', content: res.content ?? res.message ?? '' }
-            : { status: 'error', content: res.message ?? 'AI error' }
-        }))
-      } catch (error) {
-        if (cancelled) return
-        setAiHints((prev) => ({
-          ...prev,
-          [game.id]: { status: 'error', content: error instanceof Error ? error.message : String(error) }
-        }))
-      } finally {
-        if (cancelled) return
-        if (idx + 1 < games.length) {
-          setTimeout(() => void fetchOne(idx + 1), 300)
-        }
-      }
-    }
-
-    void fetchOne(0)
-    return () => { cancelled = true }
-  }, [])
-
   useEffect(() => {
     const api = window.electron
     if (!api) return

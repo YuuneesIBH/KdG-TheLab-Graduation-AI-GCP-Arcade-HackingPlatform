@@ -1,7 +1,7 @@
 /*
-  DIY Flipper ESP32 bridge firmware
+  Guppy ESP32 bridge firmware
   Protocol over USB serial (115200, newline-delimited):
-    HELLO -> DIYFLIPPER_READY ...
+    HELLO -> GUPPY_READY ...
     PING  -> PONG
     WIFI_SCAN
     WIFI_AUDIT
@@ -39,7 +39,7 @@ static const int IR_RX_PIN = 34;
 static const int PN532_IRQ_PIN = 27;
 static const int PN532_RST_PIN = 26;
 static const char* DEFAULT_IR_PAYLOAD = "NEC 0x20DF 0x10EF 38";
-static const char* DEFAULT_SOFTAP_SSID = "DIYFLIPPER_LAB";
+static const char* DEFAULT_SOFTAP_SSID = "GUPPY_LAB";
 static const uint8_t DEFAULT_SOFTAP_CHANNEL = 6;
 
 static String usbBuffer;
@@ -463,7 +463,7 @@ bool runWifiAudit(const String& commandLabel) {
 }
 
 void printReadyBanner() {
-  Serial.println("DIYFLIPPER_READY");
+  Serial.println("GUPPY_READY");
   Serial.println("FW:esp32-bridge-v2");
   Serial.println("CAPS:NFC_CLONE,NFC_READ,IR_BLAST,IR_SEND,GPIO_CTRL,WIFI_SCAN,WIFI_AUDIT,WIFI_AP_START,WIFI_AP_STOP,WIFI_AP_STATUS,BADUSB_INJECT,SHELL");
   Serial.print("HWLIB:IR=");

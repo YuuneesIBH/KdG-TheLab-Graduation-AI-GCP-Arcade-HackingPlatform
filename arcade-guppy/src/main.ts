@@ -20,7 +20,7 @@ type LaunchRequest = {
 type PortInfo = Awaited<ReturnType<typeof SerialPort.list>>[number]
 type PortInfoWithFriendlyName = PortInfo & { friendlyName?: string }
 
-type DiyFlipperStatus = {
+type GuppyStatus = {
   connected: boolean
   connecting: boolean
   autoConnect: boolean
@@ -32,6 +32,20 @@ type DiyFlipperStatus = {
 type IpcResult = {
   success: boolean
   message: string
+}
+type MacVendorLookupResult = {
+  success: boolean
+  vendors: Record<string, string>
+}
+type JammerGuideResult = {
+  success: boolean
+  content?: string
+  message?: string
+}
+type JammerMaclistResult = {
+  success: boolean
+  count: number
+  preview: string[]
 }
 
 type NfcCapturePayload = {
@@ -70,6 +84,31 @@ type AiExplainResult = {
   success: boolean
   message: string
   content?: string
+}
+
+type WifiJammerMode = 'firmware' | 'host'
+
+type WifiJammerPayload = {
+  iface?: string
+  mode?: 'auto' | WifiJammerMode
+  channel?: number
+  accessPoints?: string
+  stations?: string
+  filters?: string
+  packets?: number
+  delay?: number
+  reset?: number
+  code?: number
+  world?: boolean
+  noBroadcast?: boolean
+  verbose?: boolean
+}
+
+type WifiJammerState = {
+  running: boolean
+  mode?: WifiJammerMode
+  iface?: string
+  message?: string
 }
 
 const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
@@ -335,12 +374,12 @@ function applySuperMarioNesResolution(fullGamePath: string, targetBounds: Launch
   }
 }
 
-const DIY_FLIPPER_BAUD_RATE = 115200
-const DIY_FLIPPER_SCAN_INTERVAL_MS = 3000
-const DIY_NFC_CAPTURE_DIR = path.join(app.getPath('userData'), 'diyflipper', 'nfc-captures')
-const DIY_WIFI_AP_PROFILE_PATH = path.join(app.getPath('userData'), 'diyflipper', 'wifi-ap-profile.json')
+const GUPPY_BAUD_RATE = 115200
+const GUPPY_SCAN_INTERVAL_MS = 3000
+const GUPPY_NFC_CAPTURE_DIR = path.join(app.getPath('userData'), 'guppy', 'nfc-captures')
+const GUPPY_WIFI_AP_PROFILE_PATH = path.join(app.getPath('userData'), 'guppy', 'wifi-ap-profile.json')
 
-const DIY_MODULE_COMMANDS: Record<string, string> = {
+const GUPPY_MODULE_COMMANDS: Record<string, string> = {
   nfc: 'NFC_CLONE',
   badusb: 'BADUSB_INJECT',
   ir: 'IR_BLAST',
@@ -353,23 +392,200 @@ const DIY_MODULE_COMMANDS: Record<string, string> = {
 let mainWindow: BrowserWindow | null = null
 let activeGameProcess: ChildProcess | null = null
 
-let diyFlipperPort: SerialPort | null = null
-let diyFlipperLineBuffer = ''
-let diyFlipperScanTimer: NodeJS.Timeout | null = null
-let diyFlipperStatus: DiyFlipperStatus = {
+let guppyPort: SerialPort | null = null
+let guppyLineBuffer = ''
+let guppyScanTimer: NodeJS.Timeout | null = null
+let guppyCapabilities = new Set<string>()
+let guppyStatus: GuppyStatus = {
   connected: false,
   connecting: false,
   autoConnect: true
 }
 
-function publishDiyFlipperStatus() {
+let wifiJammerProcess: ChildProcess | null = null
+let wifiJammerState: WifiJammerState = { running: false }
+
+function publishGuppyStatus() {
   if (!mainWindow || mainWindow.isDestroyed()) return
-  mainWindow.webContents.send('diyflipper-status', diyFlipperStatus)
+  mainWindow.webContents.send('guppy-status', guppyStatus)
 }
 
-function setDiyFlipperStatus(patch: Partial<DiyFlipperStatus>) {
-  diyFlipperStatus = { ...diyFlipperStatus, ...patch }
-  publishDiyFlipperStatus()
+function setGuppyStatus(patch: Partial<GuppyStatus>) {
+  guppyStatus = { ...guppyStatus, ...patch }
+  publishGuppyStatus()
+}
+
+function publishWifiJammerState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('wifi-jammer-state', wifiJammerState)
+}
+
+function setWifiJammerState(patch: Partial<WifiJammerState>) {
+  wifiJammerState = { ...wifiJammerState, ...patch }
+  publishWifiJammerState()
+}
+
+function sendWifiJammerLog(raw: string) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    mainWindow.webContents.send('wifi-jammer-log', trimmed)
+  }
+}
+
+function clearGuppyCapabilities() {
+  guppyCapabilities = new Set<string>()
+}
+
+function parseGuppyCapabilities(line: string) {
+  const match = line.match(/^CAPS\s*:\s*(.+)$/i)
+  if (!match?.[1]) return null
+  const caps = match[1]
+    .split(',')
+    .map((entry) => entry.trim().toUpperCase())
+    .filter(Boolean)
+  return caps.length > 0 ? new Set(caps) : new Set<string>()
+}
+
+function updateGuppyCapabilitiesFromLine(line: string) {
+  const parsed = parseGuppyCapabilities(line)
+  if (!parsed) return
+  guppyCapabilities = parsed
+}
+
+function hasGuppyCapability(capability: string) {
+  return guppyCapabilities.has(capability.toUpperCase())
+}
+
+type FirmwareJammerCommands = {
+  startCommand: string
+  stopCommand: string
+}
+
+function resolveFirmwareJammerCommands(): FirmwareJammerCommands | null {
+  const caps = Array.from(guppyCapabilities)
+
+  const explicitStarts = caps.filter(
+    (cap) => /(WIFI_).*(DEAUTH|JAM)/.test(cap) && cap.endsWith('_START')
+  )
+  for (const startCommand of explicitStarts) {
+    const stopCommand = startCommand.replace(/_START$/, '_STOP')
+    if (hasGuppyCapability(stopCommand)) {
+      return { startCommand, stopCommand }
+    }
+  }
+
+  const directPairs: Array<[string, string]> = [
+    ['WIFI_DEAUTH_START', 'WIFI_DEAUTH_STOP'],
+    ['WIFI_JAMMER_START', 'WIFI_JAMMER_STOP'],
+    ['WIFI_JAM_START', 'WIFI_JAM_STOP'],
+    ['WIFI_DEAUTH', 'WIFI_DEAUTH_STOP'],
+    ['WIFI_JAMMER', 'WIFI_JAMMER_STOP'],
+    ['WIFI_JAM', 'WIFI_JAM_STOP'],
+  ]
+  for (const [startCommand, stopCommand] of directPairs) {
+    if (hasGuppyCapability(startCommand) || hasGuppyCapability(stopCommand)) {
+      return { startCommand, stopCommand }
+    }
+  }
+
+  return null
+}
+
+function sanitizeFirmwareToken(value: string) {
+  return value.trim().replace(/\s+/g, '_')
+}
+
+function buildFirmwareJammerStartCommand(command: string, payload: WifiJammerPayload) {
+  const args: string[] = []
+  const extras: string[] = []
+
+  const ap = sanitizeFirmwareToken(payload.accessPoints ?? '')
+  if (ap) args.push(ap)
+
+  if (typeof payload.channel === 'number' && Number.isFinite(payload.channel) && payload.channel > 0) {
+    args.push(String(Math.round(payload.channel)))
+  }
+
+  const station = sanitizeFirmwareToken(payload.stations ?? '')
+  if (station) args.push(station)
+
+  if (typeof payload.packets === 'number' && Number.isFinite(payload.packets) && payload.packets > 0) {
+    args.push(String(Math.max(1, Math.round(payload.packets))))
+  }
+
+  if (typeof payload.delay === 'number' && Number.isFinite(payload.delay) && payload.delay >= 0) {
+    args.push(String(payload.delay))
+  }
+
+  if (typeof payload.code === 'number' && Number.isFinite(payload.code)) {
+    args.push(String(Math.min(Math.max(Math.round(payload.code), 1), 66)))
+  }
+
+  if (typeof payload.reset === 'number' && Number.isFinite(payload.reset) && payload.reset >= 0) {
+    extras.push(`RESET=${Math.round(payload.reset)}`)
+  }
+
+  const filters = sanitizeFirmwareToken(payload.filters ?? '')
+  if (filters) extras.push(`FILTERS=${filters}`)
+  if (payload.world) extras.push('WORLD=1')
+  if (payload.noBroadcast) extras.push('NO_BROADCAST=1')
+  if (payload.verbose) extras.push('VERBOSE=1')
+
+  const tokenString = [...args, ...extras].join(' ')
+  return tokenString ? `${command} ${tokenString}` : command
+}
+
+type MonitorInterfaceResolution =
+  | { success: true; iface: string }
+  | { success: false; message: string }
+
+function detectMonitorInterfacesLinux() {
+  const probe = spawnSync('iwconfig', [], { encoding: 'utf8' })
+  if (probe.error) return { interfaces: [] as string[], error: toErrorMessage(probe.error) }
+  const combined = `${probe.stdout ?? ''}\n${probe.stderr ?? ''}`
+  if (!combined.trim()) {
+    return { interfaces: [] as string[], error: 'iwconfig produced no output' }
+  }
+
+  const interfaces: string[] = []
+  const blocks = combined.split(/\r?\n\r?\n+/)
+  for (const block of blocks) {
+    const trimmed = block.trim()
+    if (!trimmed || /no wireless extensions/i.test(trimmed)) continue
+    if (!/Mode:Monitor/i.test(trimmed)) continue
+    const firstLine = trimmed.split(/\r?\n/, 1)[0]
+    const match = firstLine.match(/^([^\s]+)/)
+    if (match?.[1]) {
+      interfaces.push(match[1].trim())
+    }
+  }
+  return { interfaces, error: '' }
+}
+
+function resolveMonitorInterface(explicitIface?: string): MonitorInterfaceResolution {
+  const provided = (explicitIface ?? '').trim()
+  if (provided) return { success: true, iface: provided }
+
+  if (process.platform !== 'linux') {
+    return {
+      success: false,
+      message: 'Host jammer mode requires Linux monitor interfaces (iwconfig). For plug-and-play, use firmware deauth commands (WIFI_DEAUTH_START/STOP in CAPS).'
+    }
+  }
+
+  const detected = detectMonitorInterfacesLinux()
+  if (detected.interfaces.length > 0) {
+    return { success: true, iface: detected.interfaces[0] }
+  }
+
+  return {
+    success: false,
+    message: detected.error
+      ? `No monitor interface detected (${detected.error}).`
+      : 'No monitor interface detected.'
+  }
 }
 
 function publishGameExited() {
@@ -535,35 +751,47 @@ async function listSerialPortsSafe() {
   try {
     return await SerialPort.list()
   } catch (error: unknown) {
-    console.error('[DIYFLIPPER] Failed to list serial ports:', error)
+    console.error('[GUPPY] Failed to list serial ports:', error)
     return []
   }
 }
 
-function attachDiyFlipperPortListeners(port: SerialPort) {
+function attachGuppyPortListeners(port: SerialPort) {
   port.on('data', (chunk: Buffer) => {
-    diyFlipperLineBuffer += chunk.toString('utf8')
+    guppyLineBuffer += chunk.toString('utf8')
 
-    let newlineIndex = diyFlipperLineBuffer.indexOf('\n')
+    let newlineIndex = guppyLineBuffer.indexOf('\n')
     while (newlineIndex >= 0) {
-      const line = diyFlipperLineBuffer.slice(0, newlineIndex).replace(/\r/g, '').trim()
-      diyFlipperLineBuffer = diyFlipperLineBuffer.slice(newlineIndex + 1)
-      newlineIndex = diyFlipperLineBuffer.indexOf('\n')
+      const line = guppyLineBuffer.slice(0, newlineIndex).replace(/\r/g, '').trim()
+      guppyLineBuffer = guppyLineBuffer.slice(newlineIndex + 1)
+      newlineIndex = guppyLineBuffer.indexOf('\n')
 
       if (!line) continue
-      setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
+      updateGuppyCapabilitiesFromLine(line)
+      setGuppyStatus({ lastSeenAt: Date.now(), error: undefined })
+      if (/(WIFI_).*(DEAUTH|JAM)|DEAUTH_/i.test(line)) {
+        sendWifiJammerLog(line)
+      }
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('diyflipper-line', line)
+        mainWindow.webContents.send('guppy-line', line)
       }
     }
   })
 
   port.on('error', (error) => {
-    console.error('[DIYFLIPPER] Serial error:', error)
-    if (diyFlipperPort === port) {
-      diyFlipperPort = null
-      diyFlipperLineBuffer = ''
-      setDiyFlipperStatus({
+    console.error('[GUPPY] Serial error:', error)
+    if (guppyPort === port) {
+      guppyPort = null
+      guppyLineBuffer = ''
+      clearGuppyCapabilities()
+      if (wifiJammerState.running && wifiJammerState.mode === 'firmware') {
+        setWifiJammerState({
+          running: false,
+          mode: 'firmware',
+          message: 'Firmware deauth stopped (serial error)'
+        })
+      }
+      setGuppyStatus({
         connected: false,
         connecting: false,
         portPath: undefined,
@@ -573,11 +801,19 @@ function attachDiyFlipperPortListeners(port: SerialPort) {
   })
 
   port.on('close', () => {
-    if (diyFlipperPort === port) {
-      console.warn('[DIYFLIPPER] Device disconnected')
-      diyFlipperPort = null
-      diyFlipperLineBuffer = ''
-      setDiyFlipperStatus({
+    if (guppyPort === port) {
+      console.warn('[GUPPY] Device disconnected')
+      guppyPort = null
+      guppyLineBuffer = ''
+      clearGuppyCapabilities()
+      if (wifiJammerState.running && wifiJammerState.mode === 'firmware') {
+        setWifiJammerState({
+          running: false,
+          mode: 'firmware',
+          message: 'Firmware deauth stopped (device disconnected)'
+        })
+      }
+      setGuppyStatus({
         connected: false,
         connecting: false,
         portPath: undefined,
@@ -587,9 +823,9 @@ function attachDiyFlipperPortListeners(port: SerialPort) {
   })
 }
 
-function hasDiyFlipperHandshakeMarker(buffer: string) {
+function hasGuppyHandshakeMarker(buffer: string) {
   return (
-    buffer.includes('DIYFLIPPER_READY')
+    buffer.includes('GUPPY_READY')
     || buffer.includes('PONG')
     || buffer.includes('FW:esp32-bridge')
     || buffer.includes('CAPS:')
@@ -597,7 +833,7 @@ function hasDiyFlipperHandshakeMarker(buffer: string) {
   )
 }
 
-async function probeDiyFlipperHandshake(port: SerialPort, timeoutMs = 4200) {
+async function probeGuppyHandshake(port: SerialPort, timeoutMs = 4200) {
   return new Promise<boolean>((resolve) => {
     let buffer = ''
     let settled = false
@@ -622,7 +858,7 @@ async function probeDiyFlipperHandshake(port: SerialPort, timeoutMs = 4200) {
 
     const onData = (chunk: Buffer) => {
       buffer += chunk.toString('utf8')
-      if (hasDiyFlipperHandshakeMarker(buffer)) {
+      if (hasGuppyHandshakeMarker(buffer)) {
         finish(true)
       }
     }
@@ -636,10 +872,10 @@ async function probeDiyFlipperHandshake(port: SerialPort, timeoutMs = 4200) {
   })
 }
 
-async function openDiyFlipperPort(portPath: string) {
+async function openGuppyPort(portPath: string) {
   const port = new SerialPort({
     path: portPath,
-    baudRate: DIY_FLIPPER_BAUD_RATE,
+    baudRate: GUPPY_BAUD_RATE,
     autoOpen: false
   })
 
@@ -650,12 +886,13 @@ async function openDiyFlipperPort(portPath: string) {
     })
   })
 
-  diyFlipperPort = port
-  diyFlipperLineBuffer = ''
-  attachDiyFlipperPortListeners(port)
+  guppyPort = port
+  guppyLineBuffer = ''
+  clearGuppyCapabilities()
+  attachGuppyPortListeners(port)
   await new Promise((resolve) => setTimeout(resolve, 320))
 
-  const handshakeOk = await probeDiyFlipperHandshake(port)
+  const handshakeOk = await probeGuppyHandshake(port)
   if (!handshakeOk) {
     await new Promise<void>((resolve) => {
       if (!port.isOpen) {
@@ -664,12 +901,13 @@ async function openDiyFlipperPort(portPath: string) {
       }
       port.close(() => resolve())
     })
-    diyFlipperPort = null
-    diyFlipperLineBuffer = ''
-    throw new Error('No DIYFLIPPER handshake (HELLO/PING timeout)')
+    guppyPort = null
+    guppyLineBuffer = ''
+    clearGuppyCapabilities()
+    throw new Error('No GUPPY handshake (HELLO/PING timeout)')
   }
 
-  setDiyFlipperStatus({
+  setGuppyStatus({
     connected: true,
     connecting: false,
     portPath,
@@ -678,20 +916,20 @@ async function openDiyFlipperPort(portPath: string) {
   })
 }
 
-async function connectDiyFlipper(preferredPath?: string) {
-  if (diyFlipperPort?.isOpen) {
-    return { success: true, message: `Already connected on ${diyFlipperStatus.portPath ?? 'serial'}` }
+async function connectGuppy(preferredPath?: string) {
+  if (guppyPort?.isOpen) {
+    return { success: true, message: `Already connected on ${guppyStatus.portPath ?? 'serial'}` }
   }
 
-  if (diyFlipperStatus.connecting) {
+  if (guppyStatus.connecting) {
     return { success: false, message: 'Connection already in progress' }
   }
 
-  setDiyFlipperStatus({ connecting: true, error: undefined })
+  setGuppyStatus({ connecting: true, error: undefined })
 
   const ports = await listSerialPortsSafe()
   if (!ports.length) {
-    setDiyFlipperStatus({ connecting: false, connected: false, error: 'No serial ports found' })
+    setGuppyStatus({ connecting: false, connected: false, error: 'No serial ports found' })
     return { success: false, message: 'No serial ports found' }
   }
 
@@ -700,7 +938,7 @@ async function connectDiyFlipper(preferredPath?: string) {
   if (preferredPath) {
     candidates = ports.filter((port) => port.path === preferredPath)
     if (!candidates.length) {
-      setDiyFlipperStatus({
+      setGuppyStatus({
         connecting: false,
         connected: false,
         error: `Requested port not found: ${preferredPath}`
@@ -714,13 +952,13 @@ async function connectDiyFlipper(preferredPath?: string) {
   const errors: string[] = []
   for (const candidate of candidates) {
     try {
-      await openDiyFlipperPort(candidate.path)
-      console.log(`[DIYFLIPPER] Connected on ${candidate.path}`)
+      await openGuppyPort(candidate.path)
+      console.log(`[GUPPY] Connected on ${candidate.path}`)
       return { success: true, message: `Connected on ${candidate.path}` }
     } catch (error: unknown) {
       const message = `${candidate.path}: ${toErrorMessage(error)}`
       errors.push(message)
-      console.warn(`[DIYFLIPPER] Failed to open ${message}`)
+      console.warn(`[GUPPY] Failed to open ${message}`)
     }
   }
 
@@ -728,15 +966,15 @@ async function connectDiyFlipper(preferredPath?: string) {
     ? `Could not connect. Tried: ${errors.join(' | ')}`
     : 'Could not connect to any serial device'
 
-  setDiyFlipperStatus({ connecting: false, connected: false, error: errorMessage })
+  setGuppyStatus({ connecting: false, connected: false, error: errorMessage })
   return { success: false, message: errorMessage }
 }
 
-async function disconnectDiyFlipper() {
-  setDiyFlipperStatus({ autoConnect: false })
+async function disconnectGuppy() {
+  setGuppyStatus({ autoConnect: false })
 
-  if (!diyFlipperPort) {
-    setDiyFlipperStatus({
+  if (!guppyPort) {
+    setGuppyStatus({
       connected: false,
       connecting: false,
       portPath: undefined,
@@ -745,9 +983,10 @@ async function disconnectDiyFlipper() {
     return { success: true, message: 'Already disconnected' }
   }
 
-  const port = diyFlipperPort
-  diyFlipperPort = null
-  diyFlipperLineBuffer = ''
+  const port = guppyPort
+  guppyPort = null
+  guppyLineBuffer = ''
+  clearGuppyCapabilities()
 
   await new Promise<void>((resolve) => {
     if (!port.isOpen) {
@@ -757,7 +996,7 @@ async function disconnectDiyFlipper() {
     port.close(() => resolve())
   })
 
-  setDiyFlipperStatus({
+  setGuppyStatus({
     connected: false,
     connecting: false,
     portPath: undefined,
@@ -766,55 +1005,55 @@ async function disconnectDiyFlipper() {
   return { success: true, message: 'Disconnected' }
 }
 
-async function writeDiyFlipperCommand(command: string) {
+async function writeGuppyCommand(command: string) {
   const trimmedCommand = command.trim()
   if (!trimmedCommand) {
     return { success: false, message: 'Command cannot be empty' }
   }
 
-  if (!diyFlipperPort?.isOpen) {
-    const reconnect = await connectDiyFlipper()
-    if (!reconnect.success || !diyFlipperPort?.isOpen) {
+  if (!guppyPort?.isOpen) {
+    const reconnect = await connectGuppy()
+    if (!reconnect.success || !guppyPort?.isOpen) {
       return { success: false, message: reconnect.message || 'Device not connected' }
     }
   }
 
   return new Promise<{ success: boolean; message: string }>((resolve) => {
-    diyFlipperPort!.write(`${trimmedCommand}\n`, (error) => {
+    guppyPort!.write(`${trimmedCommand}\n`, (error) => {
       if (error) {
-        setDiyFlipperStatus({ error: `Write failed: ${toErrorMessage(error)}` })
+        setGuppyStatus({ error: `Write failed: ${toErrorMessage(error)}` })
         resolve({ success: false, message: `Write failed: ${toErrorMessage(error)}` })
         return
       }
-      setDiyFlipperStatus({ lastSeenAt: Date.now(), error: undefined })
+      setGuppyStatus({ lastSeenAt: Date.now(), error: undefined })
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('diyflipper-line', `TX ${trimmedCommand}`)
+        mainWindow.webContents.send('guppy-line', `TX ${trimmedCommand}`)
       }
       resolve({ success: true, message: `Command sent: ${trimmedCommand}` })
     })
   })
 }
 
-function startDiyFlipperAutoConnect() {
-  if (diyFlipperScanTimer) return
+function startGuppyAutoConnect() {
+  if (guppyScanTimer) return
 
   const tick = async () => {
-    if (!diyFlipperStatus.autoConnect) return
-    if (diyFlipperPort?.isOpen) return
-    if (diyFlipperStatus.connecting) return
-    await connectDiyFlipper()
+    if (!guppyStatus.autoConnect) return
+    if (guppyPort?.isOpen) return
+    if (guppyStatus.connecting) return
+    await connectGuppy()
   }
 
   void tick()
-  diyFlipperScanTimer = setInterval(() => {
+  guppyScanTimer = setInterval(() => {
     void tick()
-  }, DIY_FLIPPER_SCAN_INTERVAL_MS)
+  }, GUPPY_SCAN_INTERVAL_MS)
 }
 
-function stopDiyFlipperAutoConnect() {
-  if (diyFlipperScanTimer) {
-    clearInterval(diyFlipperScanTimer)
-    diyFlipperScanTimer = null
+function stopGuppyAutoConnect() {
+  if (guppyScanTimer) {
+    clearInterval(guppyScanTimer)
+    guppyScanTimer = null
   }
 }
 
@@ -846,7 +1085,8 @@ function createWindow() {
     if (process.platform === 'win32') {
       mainWindow?.webContents.setZoomFactor(0.85)
     }
-    publishDiyFlipperStatus()
+    publishGuppyStatus()
+    publishWifiJammerState()
   })
 
   mainWindow.on('closed', () => {
@@ -903,8 +1143,8 @@ function normalizeWifiApProfileInput(
 
 function loadWifiApProfile(): WifiApProfile | null {
   try {
-    if (!fs.existsSync(DIY_WIFI_AP_PROFILE_PATH)) return null
-    const raw = fs.readFileSync(DIY_WIFI_AP_PROFILE_PATH, 'utf8')
+    if (!fs.existsSync(GUPPY_WIFI_AP_PROFILE_PATH)) return null
+    const raw = fs.readFileSync(GUPPY_WIFI_AP_PROFILE_PATH, 'utf8')
     const parsed = JSON.parse(raw) as Partial<WifiApProfile>
     const normalized = normalizeWifiApProfileInput(parsed)
     if (!normalized.ok) {
@@ -917,10 +1157,9 @@ function loadWifiApProfile(): WifiApProfile | null {
 }
 
 function saveWifiApProfile(profile: WifiApProfile) {
-  const profileDir = path.dirname(DIY_WIFI_AP_PROFILE_PATH)
-  const redactedProfile = { ...profile, password: '' }
+  const profileDir = path.dirname(GUPPY_WIFI_AP_PROFILE_PATH)
   fs.mkdirSync(profileDir, { recursive: true })
-  fs.writeFileSync(DIY_WIFI_AP_PROFILE_PATH, JSON.stringify(redactedProfile, null, 2))
+  fs.writeFileSync(GUPPY_WIFI_AP_PROFILE_PATH, JSON.stringify(profile, null, 2))
 }
 
 function resolveIrMiniDatabasePath() {
@@ -931,6 +1170,97 @@ function resolveIrMiniDatabasePath() {
     path.resolve(process.cwd(), 'docs/ir-mini-database.json')
   ]
   return candidates.find((candidate) => fs.existsSync(candidate))
+}
+
+let macVendorIndexCache: Map<string, string> | null = null
+
+function resolveMacVendorListPath() {
+  const candidates = [
+    path.resolve(__dirname, '../../arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+    path.resolve(__dirname, '../../../arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+    path.resolve(process.cwd(), 'arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+    path.resolve(app.getAppPath(), 'arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+  ]
+  return candidates.find((candidate) => fs.existsSync(candidate))
+}
+
+function resolvePacketsenderPath() {
+  const candidates = [
+    path.resolve(__dirname, '../../arcade-guppy/wifijammer-2.0/packetsender.py'),
+    path.resolve(__dirname, '../../../arcade-guppy/wifijammer-2.0/packetsender.py'),
+    path.resolve(process.cwd(), 'arcade-guppy/wifijammer-2.0/packetsender.py'),
+    path.resolve(app.getAppPath(), 'arcade-guppy/wifijammer-2.0/packetsender.py'),
+  ]
+  return candidates.find((candidate) => fs.existsSync(candidate))
+}
+
+async function terminateWifiJammerProcess(requestedMessage?: string) {
+  if (wifiJammerState.running && wifiJammerState.mode === 'firmware') {
+    const firmwareCommands = resolveFirmwareJammerCommands()
+    const stopCommand = firmwareCommands?.stopCommand ?? 'WIFI_DEAUTH_STOP'
+    const stopResult = await writeGuppyCommand(stopCommand)
+    if (!stopResult.success) {
+      return {
+        success: false,
+        message: `Firmware jammer stop failed: ${stopResult.message}`
+      }
+    }
+    const message = requestedMessage ?? 'Firmware deauth stop command sent'
+    sendWifiJammerLog(`FIRMWARE_STOP: ${stopCommand}`)
+    setWifiJammerState({ running: false, mode: 'firmware', iface: undefined, message })
+    return { success: true, message }
+  }
+
+  if (!wifiJammerProcess) {
+    const message = requestedMessage ?? 'Wi-Fi jammer is not running'
+    setWifiJammerState({ running: false, mode: wifiJammerState.mode, message })
+    return { success: true, message }
+  }
+
+  try {
+    wifiJammerProcess.kill()
+    const message = requestedMessage ?? 'Stopping Wi-Fi jammer'
+    setWifiJammerState({ running: false, mode: 'host', message })
+    return { success: true, message }
+  } catch (error: unknown) {
+    const message = toErrorMessage(error)
+    sendWifiJammerLog(`JAMMER_ERR:${message}`)
+    return { success: false, message }
+  }
+}
+
+function normalizeMacPrefix(value: string) {
+  const hexOnly = value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase()
+  if (hexOnly.length < 6) return ''
+  return `${hexOnly.slice(0, 2)}:${hexOnly.slice(2, 4)}:${hexOnly.slice(4, 6)}`
+}
+
+function getMacVendorIndex() {
+  if (macVendorIndexCache) return macVendorIndexCache
+  const listPath = resolveMacVendorListPath()
+  const index = new Map<string, string>()
+  if (!listPath) {
+    macVendorIndexCache = index
+    return index
+  }
+
+  try {
+    const raw = fs.readFileSync(listPath, 'utf8')
+    const lines = raw.split(/\r?\n/)
+    for (const line of lines) {
+      if (!line.includes('~')) continue
+      const [left, right] = line.split('~', 2)
+      const prefix = normalizeMacPrefix(left)
+      const vendor = (right ?? '').replace(/&amp;/g, '&').trim()
+      if (!prefix || !vendor) continue
+      if (!index.has(prefix)) index.set(prefix, vendor)
+    }
+  } catch (error: unknown) {
+    console.warn('[GUPPY] Failed to load MAC vendor list:', toErrorMessage(error))
+  }
+
+  macVendorIndexCache = index
+  return index
 }
 
 ipcMain.handle('set-fullscreen', async (_event, fullscreen: boolean) => {
@@ -948,27 +1278,27 @@ ipcMain.handle('ai-explain', async (_event, payload: AiExplainRequest): Promise<
   return callAiExplain(payload)
 })
 
-ipcMain.handle('diyflipper-get-status', async () => {
-  return diyFlipperStatus
+ipcMain.handle('guppy-get-status', async () => {
+  return guppyStatus
 })
 
-ipcMain.handle('diyflipper-connect', async (_event, preferredPath?: string) => {
-  setDiyFlipperStatus({ autoConnect: true })
-  return connectDiyFlipper(preferredPath)
+ipcMain.handle('guppy-connect', async (_event, preferredPath?: string) => {
+  setGuppyStatus({ autoConnect: true })
+  return connectGuppy(preferredPath)
 })
 
-ipcMain.handle('diyflipper-disconnect', async () => {
-  return disconnectDiyFlipper()
+ipcMain.handle('guppy-disconnect', async () => {
+  return disconnectGuppy()
 })
 
-ipcMain.handle('diyflipper-send-command', async (_event, command: string) => {
+ipcMain.handle('guppy-send-command', async (_event, command: string) => {
   if (typeof command !== 'string' || !command.trim()) {
     return { success: false, message: 'Invalid command' }
   }
-  return writeDiyFlipperCommand(command)
+  return writeGuppyCommand(command)
 })
 
-ipcMain.handle('diyflipper-load-wifi-ap-profile', async () => {
+ipcMain.handle('guppy-load-wifi-ap-profile', async () => {
   const profile = loadWifiApProfile()
   if (!profile) {
     return { success: true, message: 'No saved Wi-Fi AP profile', profile: null }
@@ -977,7 +1307,7 @@ ipcMain.handle('diyflipper-load-wifi-ap-profile', async () => {
 })
 
 ipcMain.handle(
-  'diyflipper-save-wifi-ap-profile',
+  'guppy-save-wifi-ap-profile',
   async (_event, payload: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => {
     const normalized = normalizeWifiApProfileInput(payload)
     if (!normalized.ok) {
@@ -986,11 +1316,10 @@ ipcMain.handle(
 
     try {
       saveWifiApProfile(normalized.profile)
-      const redacted = { ...normalized.profile, password: '' }
       return {
         success: true,
-        message: 'Wi-Fi AP profile saved (password is not stored for security)',
-        profile: redacted
+        message: 'Wi-Fi AP profile saved',
+        profile: normalized.profile
       }
     } catch (error: unknown) {
       return {
@@ -1003,7 +1332,7 @@ ipcMain.handle(
 )
 
 ipcMain.handle(
-  'diyflipper-start-wifi-ap',
+  'guppy-start-wifi-ap',
   async (_event, payload: Partial<Pick<WifiApProfile, 'ssid' | 'password' | 'channel'>>) => {
     const normalized = normalizeWifiApProfileInput(payload)
     if (!normalized.ok) {
@@ -1015,34 +1344,152 @@ ipcMain.handle(
       ? `WIFI_AP_START ${profile.ssid} ${profile.password} ${profile.channel}`
       : `WIFI_AP_START ${profile.ssid} ${profile.channel}`
 
-    const result = await writeDiyFlipperCommand(command)
+    const result = await writeGuppyCommand(command)
     if (!result.success) {
       return { success: false, message: result.message, profile: null }
     }
 
     try {
       saveWifiApProfile(profile)
-      const redacted = { ...profile, password: '' }
-      return { success: true, message: `${result.message} (password not stored)`, profile: redacted }
+      return { success: true, message: result.message, profile }
     } catch (error: unknown) {
       return {
         success: false,
         message: `AP started but profile save failed: ${toErrorMessage(error)}`,
-        profile: { ...profile, password: '' }
+        profile
       }
     }
   }
 )
 
-ipcMain.handle('diyflipper-run-module', async (_event, moduleKey: string) => {
-  const command = DIY_MODULE_COMMANDS[moduleKey]
+ipcMain.handle('guppy-get-wifi-jammer-status', async () => {
+  return { success: true, state: wifiJammerState }
+})
+
+ipcMain.handle('guppy-start-wifi-jammer', async (_event, payload: WifiJammerPayload) => {
+  if (wifiJammerProcess || (wifiJammerState.running && wifiJammerState.mode === 'firmware')) {
+    return { success: false, message: 'Wi-Fi jammer is already running' }
+  }
+
+  const requestedMode = payload?.mode ?? 'auto'
+  const firmwareCommands = resolveFirmwareJammerCommands()
+  const useFirmwareMode = requestedMode === 'firmware' || (requestedMode === 'auto' && Boolean(firmwareCommands))
+
+  if (useFirmwareMode) {
+    const connectResult = guppyPort?.isOpen ? { success: true, message: 'Connected' } : await connectGuppy()
+    if (!connectResult.success || !guppyPort?.isOpen) {
+      return {
+        success: false,
+        message: `Firmware jammer mode requires a connected ESP32 bridge: ${connectResult.message}`
+      }
+    }
+
+    const startCommandName = firmwareCommands?.startCommand ?? 'WIFI_DEAUTH_START'
+    const command = buildFirmwareJammerStartCommand(startCommandName, payload ?? {})
+    const writeResult = await writeGuppyCommand(command)
+    if (!writeResult.success) {
+      return { success: false, message: `Failed to send firmware command: ${writeResult.message}` }
+    }
+
+    sendWifiJammerLog(`FIRMWARE_START: ${command}`)
+    setWifiJammerState({
+      running: true,
+      mode: 'firmware',
+      iface: undefined,
+      message: `Firmware deauth command sent (${startCommandName})`
+    })
+    return { success: true, message: 'Firmware deauth command sent' }
+  }
+
+  const ifaceResolution = resolveMonitorInterface(payload?.iface)
+  if (!ifaceResolution.success) {
+    const firmwareHint = firmwareCommands
+      ? ''
+      : ' Firmware fallback unavailable: firmware did not advertise WIFI_DEAUTH/WIFI_JAM capabilities in CAPS.'
+    return { success: false, message: `${ifaceResolution.message}${firmwareHint}`.trim() }
+  }
+
+  const iface = ifaceResolution.iface
+  const scriptPath = resolvePacketsenderPath()
+  if (!scriptPath) {
+    return { success: false, message: 'packetsender.py not found' }
+  }
+
+  const pythonBase = process.env.NODE_ENV === 'production'
+    ? app.getAppPath()
+    : path.resolve(__dirname, '../../')
+  const pythonCmd = resolvePythonCommand(pythonBase)
+
+  const args: string[] = [scriptPath, '-i', iface]
+  if (typeof payload.channel === 'number' && Number.isFinite(payload.channel)) {
+    args.push('-c', String(Math.round(payload.channel)))
+  }
+  const pushTextArg = (flag: string, value?: string) => {
+    if (value) args.push(flag, value)
+  }
+  const pushNumberArg = (flag: string, value?: number) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      args.push(flag, String(value))
+    }
+  }
+  pushTextArg('-a', payload.accessPoints?.trim())
+  pushTextArg('-s', payload.stations?.trim())
+  pushTextArg('-f', payload.filters?.trim())
+  pushNumberArg('-p', payload.packets)
+  pushNumberArg('-d', payload.delay)
+  pushNumberArg('-r', payload.reset)
+  pushNumberArg('--code', payload.code)
+  if (payload.world) args.push('--world')
+  if (payload.noBroadcast) args.push('--no-broadcast')
+  if (payload.verbose) args.push('--verbose')
+
+  try {
+    wifiJammerProcess = spawn(
+      pythonCmd,
+      args,
+      {
+        cwd: path.dirname(scriptPath),
+        stdio: ['ignore', 'pipe', 'pipe']
+      }
+    )
+  } catch (error: unknown) {
+    const message = `Failed to launch Wi-Fi jammer: ${toErrorMessage(error)}`
+    sendWifiJammerLog(message)
+    return { success: false, message }
+  }
+
+  wifiJammerProcess.stdout?.on('data', (chunk: Buffer) => sendWifiJammerLog(chunk.toString()))
+  wifiJammerProcess.stderr?.on('data', (chunk: Buffer) => sendWifiJammerLog(chunk.toString()))
+  wifiJammerProcess.once('error', (error: Error) => {
+    sendWifiJammerLog(`JAMMER_ERR:${toErrorMessage(error)}`)
+    wifiJammerProcess = null
+    setWifiJammerState({ running: false, mode: 'host', message: `Jammer error: ${toErrorMessage(error)}` })
+  })
+  wifiJammerProcess.once('exit', (code, signal) => {
+    const message = `Wi-Fi jammer stopped (exit ${code ?? 'unknown'}${signal ? `, signal ${signal}` : ''})`
+    wifiJammerProcess = null
+    sendWifiJammerLog(message)
+    setWifiJammerState({ running: false, mode: 'host', message })
+  })
+
+  setWifiJammerState({ running: true, mode: 'host', iface, message: `Host Wi-Fi jammer running on ${iface}` })
+  sendWifiJammerLog(`JAMMER_START: ${pythonCmd} ${args.map((arg) => (/\s/.test(arg) ? `"${arg}"` : arg)).join(' ')}`)
+  return { success: true, message: 'Wi-Fi jammer started' }
+})
+
+ipcMain.handle('guppy-stop-wifi-jammer', async () => {
+  return terminateWifiJammerProcess('Stop requested from UI')
+})
+
+ipcMain.handle('guppy-run-module', async (_event, moduleKey: string) => {
+  const command = GUPPY_MODULE_COMMANDS[moduleKey]
   if (!command) {
     return { success: false, message: `Unknown module key: ${moduleKey}` }
   }
-  return writeDiyFlipperCommand(`RUN ${command}`)
+  return writeGuppyCommand(`RUN ${command}`)
 })
 
-ipcMain.handle('diyflipper-save-nfc-capture', async (_event, payload: NfcCapturePayload) => {
+ipcMain.handle('guppy-save-nfc-capture', async (_event, payload: NfcCapturePayload) => {
   try {
     const uid = (payload?.uid ?? '').trim()
     if (!uid) {
@@ -1054,14 +1501,14 @@ ipcMain.handle('diyflipper-save-nfc-capture', async (_event, payload: NfcCapture
     const stamp = iso.replace(/[:.]/g, '-')
     const safeLabel = sanitizeFilePart((payload?.label ?? uid).trim())
     const filename = `${stamp}_${safeLabel}.json`
-    const filePath = path.join(DIY_NFC_CAPTURE_DIR, filename)
+    const filePath = path.join(GUPPY_NFC_CAPTURE_DIR, filename)
 
-    fs.mkdirSync(DIY_NFC_CAPTURE_DIR, { recursive: true })
+    fs.mkdirSync(GUPPY_NFC_CAPTURE_DIR, { recursive: true })
     fs.writeFileSync(filePath, JSON.stringify({
       uid,
       label: payload?.label ?? uid,
       capturedAt: iso,
-      source: 'diyflipper',
+      source: 'guppy',
       rawLine: payload?.rawLine ?? ''
     }, null, 2))
 
@@ -1071,7 +1518,7 @@ ipcMain.handle('diyflipper-save-nfc-capture', async (_event, payload: NfcCapture
   }
 })
 
-ipcMain.handle('diyflipper-load-ir-mini-db', async () => {
+ipcMain.handle('guppy-load-ir-mini-db', async () => {
   try {
     const dbPath = resolveIrMiniDatabasePath()
     if (!dbPath) {
@@ -1109,7 +1556,7 @@ ipcMain.handle('diyflipper-load-ir-mini-db', async () => {
   }
 })
 
-ipcMain.handle('diyflipper-send-ir-entry', async (_event, entry: IrDatabaseEntry) => {
+ipcMain.handle('guppy-send-ir-entry', async (_event, entry: IrDatabaseEntry) => {
   if (!entry || typeof entry !== 'object') {
     return { success: false, message: 'Invalid IR entry payload' }
   }
@@ -1121,7 +1568,67 @@ ipcMain.handle('diyflipper-send-ir-entry', async (_event, entry: IrDatabaseEntry
   if (!protocol || !address || !command) {
     return { success: false, message: 'IR entry is missing protocol/address/command' }
   }
-  return writeDiyFlipperCommand(`IR_SEND ${protocol} ${address} ${command} ${carrierKhz}`)
+  return writeGuppyCommand(`IR_SEND ${protocol} ${address} ${command} ${carrierKhz}`)
+})
+
+ipcMain.handle('guppy-lookup-mac-vendors', async (_event, bssids: string[]): Promise<MacVendorLookupResult> => {
+  const index = getMacVendorIndex()
+  const vendors: Record<string, string> = {}
+  const safeInput = Array.isArray(bssids) ? bssids.slice(0, 400) : []
+  for (const mac of safeInput) {
+    if (typeof mac !== 'string') continue
+    const key = mac.trim()
+    if (!key) continue
+    const prefix = normalizeMacPrefix(key)
+    vendors[key] = prefix ? (index.get(prefix) ?? 'Unknown vendor') : 'Unknown vendor'
+  }
+  return { success: true, vendors }
+})
+
+function resolveJammerReadmePath() {
+  const candidates = [
+    path.resolve(__dirname, '../../arcade-guppy/wifijammer-2.0/README.md'),
+    path.resolve(__dirname, '../../../arcade-guppy/wifijammer-2.0/README.md'),
+    path.resolve(process.cwd(), 'arcade-guppy/wifijammer-2.0/README.md'),
+    path.resolve(app.getAppPath(), 'arcade-guppy/wifijammer-2.0/README.md'),
+  ]
+  return candidates.find((candidate) => fs.existsSync(candidate))
+}
+
+function resolveJammerMaclistPath() {
+  const candidates = [
+    path.resolve(__dirname, '../../arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+    path.resolve(__dirname, '../../../arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+    path.resolve(process.cwd(), 'arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+    path.resolve(app.getAppPath(), 'arcade-guppy/wifijammer-2.0/maclist/macs.txt'),
+  ]
+  return candidates.find((candidate) => fs.existsSync(candidate))
+}
+
+ipcMain.handle('guppy-read-wifijammer-guide', async (): Promise<JammerGuideResult> => {
+  const readmePath = resolveJammerReadmePath()
+  if (!readmePath) {
+    return { success: false, message: 'Wifijammer guide not found' }
+  }
+  try {
+    const content = fs.readFileSync(readmePath, 'utf8')
+    return { success: true, content }
+  } catch (error: unknown) {
+    return { success: false, message: toErrorMessage(error) }
+  }
+})
+
+ipcMain.handle('guppy-read-wifijammer-maclist', async (): Promise<JammerMaclistResult> => {
+  const maclistPath = resolveJammerMaclistPath()
+  if (!maclistPath) {
+    return { success: false, count: 0, preview: [] }
+  }
+  try {
+    const lines = fs.readFileSync(maclistPath, 'utf8').split(/\r?\n/).filter(Boolean)
+    return { success: true, count: lines.length, preview: lines.slice(0, 12) }
+  } catch {
+    return { success: false, count: 0, preview: [] }
+  }
 })
 
 ipcMain.handle('stop-game', async () => {
@@ -1162,8 +1669,19 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
     }
 
     const isDev = process.env.NODE_ENV === 'development'
+    const devRoot = path.resolve(__dirname, '../../')
+    const devArcadeDir = fs
+      .readdirSync(devRoot, { withFileTypes: true })
+      .find((entry) => {
+        if (!entry.isDirectory()) return false
+        if (!entry.name.startsWith('arcade-')) return false
+        return fs.existsSync(path.join(devRoot, entry.name, 'src', 'index.html'))
+      })
+
     const basePath = isDev
-      ? path.resolve(__dirname, '../../arcade-flipper/src')
+      ? devArcadeDir
+        ? path.join(devRoot, devArcadeDir.name, 'src')
+        : path.join(devRoot, 'src')
       : app.getAppPath()
 
     function resolveSafe(base: string, rel: string) {
@@ -1342,15 +1860,16 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 
 app.whenReady().then(() => {
   createWindow()
-  startDiyFlipperAutoConnect()
+  startGuppyAutoConnect()
 })
 
 app.on('before-quit', async () => {
-  stopDiyFlipperAutoConnect()
+  stopGuppyAutoConnect()
   await stopActiveGameProcess(true)
-  if (diyFlipperPort?.isOpen) {
-    await disconnectDiyFlipper()
+  if (guppyPort?.isOpen) {
+    await disconnectGuppy()
   }
+  await terminateWifiJammerProcess('Application exiting')
 })
 
 app.on('window-all-closed', () => {
@@ -1364,3 +1883,4 @@ app.on('activate', () => {
     createWindow()
   }
 })
+

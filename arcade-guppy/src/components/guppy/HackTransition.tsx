@@ -77,7 +77,7 @@ const HACK_LINES = [
   'NFC CLONE OPERATION: SUCCESS',
   'ELEVATING PRIVILEGES TO ROOT...',
   '> ROOT ACCESS GRANTED',
-  '> WELCOME TO FLIPPER ZERO TERMINAL',
+  '> WELCOME TO GUPPY TERMINAL',
 ]
 
 function GlitchLines({ active }: { active: boolean }) {
@@ -183,7 +183,7 @@ function BreachSplash({ active }: { active: boolean }) {
         textShadow: '0 0 15px #00ccff',
         animation: 'htBlink 0.45s steps(2) infinite',
       }}>
-        FLIPPER ZERO TERMINAL — READY
+        GUPPY TERMINAL - READY
       </div>
 <div style={{
         fontFamily: '"Courier New", monospace',

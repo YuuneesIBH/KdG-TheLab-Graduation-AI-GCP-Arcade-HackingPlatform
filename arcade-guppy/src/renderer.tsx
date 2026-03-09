@@ -3,13 +3,13 @@ import ReactDOM from 'react-dom/client'
 import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
-import HackerMenu from './components/flipper/HackerMenu'
+import HackerMenu from './components/guppy/HackerMenu'
 import { games } from './components/arcade/GameMenu'
-import type { DiyFlipperStatus, IrDatabaseEntry } from './electron'
+import type { GuppyStatus, IrDatabaseEntry, WifiApProfile, WifiJammerPayload, WifiJammerState } from './electron'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
 
-const INITIAL_DIY_FLIPPER_STATUS: DiyFlipperStatus = {
+const INITIAL_GUPPY_STATUS: GuppyStatus = {
   connected: false,
   connecting: false,
   autoConnect: true,
@@ -30,25 +30,20 @@ const BOOT_LINES = [
   'Press COIN to continue...',
 ]
 
-type WifiApProfile = {
-  ssid: string
-  password: string
-  channel: number
-  updatedAt: string
-}
-
 function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const isBootScreen = screen === 'boot'
 
-  const [diyFlipperStatus, setDiyFlipperStatus] = useState<DiyFlipperStatus>(INITIAL_DIY_FLIPPER_STATUS)
-  const [diyFlipperLastLine, setDiyFlipperLastLine] = useState<string>('')
-  const [diyFlipperSerialLines, setDiyFlipperSerialLines] = useState<string[]>([])
+  const [guppyStatus, setGuppyStatus] = useState<GuppyStatus>(INITIAL_GUPPY_STATUS)
+  const [guppyLastLine, setGuppyLastLine] = useState<string>('')
+  const [guppySerialLines, setGuppySerialLines] = useState<string[]>([])
   const [toolStatus, setToolStatus] = useState<string>('Ready')
   const [lastNfcUid, setLastNfcUid] = useState<string>('')
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
   const [wifiApProfile, setWifiApProfile] = useState<WifiApProfile | null>(null)
+  const [wifiJammerState, setWifiJammerState] = useState<WifiJammerState>({ running: false })
+  const [wifiJammerLog, setWifiJammerLog] = useState<string[]>([])
 
   // ── arcade boot state ─────────────────────────────────────────
   const [coins, setCoins] = useState(0)
@@ -150,47 +145,58 @@ function App() {
 
   useEffect(() => {
     const api = window.electron
-    if (!api) return
+    if (!api) {
+      setToolStatus('Electron API unavailable')
+      return
+    }
 
     let isMounted = true
 
     const readInitialStatus = async () => {
       try {
-        const status = await api.diyFlipperGetStatus()
+        const status = await api.guppyGetStatus()
         if (!isMounted) return
-        setDiyFlipperStatus(status)
+        setGuppyStatus(status)
 
-        await api.diyFlipperConnect()
-        const irLoad = await api.diyFlipperLoadIrMiniDb()
+        await api.guppyConnect()
+        const irLoad = await api.guppyLoadIrMiniDb()
         if (!isMounted) return
 
         if (irLoad.success) {
           setIrDbEntries(irLoad.entries ?? [])
-          return
+        } else {
+          setToolStatus(`IR DB load failed: ${irLoad.message}`)
         }
 
-        setToolStatus(`IR DB load failed: ${irLoad.message}`)
+        const wifiProfileLoad = await api.guppyLoadWifiApProfile()
+        if (!isMounted) return
+        if (wifiProfileLoad.success) {
+          setWifiApProfile(wifiProfileLoad.profile ?? null)
+        } else {
+          setToolStatus(`Wi-Fi AP profile load failed: ${wifiProfileLoad.message}`)
+        }
+
+        const jammerStatus = await api.guppyGetWifiJammerStatus()
+        if (!isMounted) return
+        if (jammerStatus.success) {
+          setWifiJammerState(jammerStatus.state ?? { running: false })
+        }
       } catch (error) {
         if (!isMounted) return
         const message = error instanceof Error ? error.message : String(error)
         setToolStatus(`Hardware init failed: ${message}`)
-        console.error('[DIYFLIPPER] Failed to initialize hardware state:', error)
-      }
-
-      const wifiProfileLoad = await window.electron!.diyFlipperLoadWifiApProfile()
-      if (wifiProfileLoad.success) {
-        setWifiApProfile(wifiProfileLoad.profile ?? null)
+        console.error('[GUPPY] Failed to initialize hardware state:', error)
       }
     }
 
-    const unsubscribeStatus = api.onDiyFlipperStatus((status) => {
-      setDiyFlipperStatus(status)
+    const unsubscribeStatus = api.onGuppyStatus((status) => {
+      setGuppyStatus(status)
     })
 
-    const unsubscribeLine = api.onDiyFlipperLine((line) => {
-      setDiyFlipperLastLine(line)
+    const unsubscribeLine = api.onGuppyLine((line) => {
+      setGuppyLastLine(line)
       const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
-      setDiyFlipperSerialLines((prev) => {
+      setGuppySerialLines((prev) => {
         const next = [...prev, `[${stamp}] ${line}`]
         return next.length > 140 ? next.slice(next.length - 140) : next
       })
@@ -202,47 +208,71 @@ function App() {
       }
     })
 
+    const unsubscribeJammerState = api.onWifiJammerState((state) => {
+      setWifiJammerState(state)
+    })
+
+    const unsubscribeJammerLog = api.onWifiJammerLog((line) => {
+      setWifiJammerLog((prev) => {
+        const next = [...prev, line]
+        return next.length > 120 ? next.slice(next.length - 120) : next
+      })
+    })
+
     void readInitialStatus()
 
     return () => {
       isMounted = false
       unsubscribeStatus()
       unsubscribeLine()
+      unsubscribeJammerState()
+      unsubscribeJammerLog()
     }
-  }, [])
+  }, [setToolStatus])
 
   const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
 
   const handleModuleSelect = useCallback(async (key: string) => {
     const api = window.electron
-    if (!api) return
+    if (!api) {
+      setToolStatus('Electron API unavailable')
+      return
+    }
 
-    const result = await api.diyFlipperRunModule(key)
+    const result = await api.guppyRunModule(key)
     if (!result.success) {
       setToolStatus(`Module failed (${key}): ${result.message}`)
-      console.warn('[DIYFLIPPER] Module launch failed:', result.message)
+      console.warn('[GUPPY] Module launch failed:', result.message)
       return
     }
 
     setToolStatus(`Module sent (${key})`)
-    console.log('[DIYFLIPPER] Module command sent:', key)
-  }, [])
+    console.log('[GUPPY] Module command sent:', key)
+  }, [setToolStatus])
 
   useEffect(() => {
-    if (!window.electron) return
-    if (!diyFlipperStatus.connected) return
+    const api = window.electron
+    if (!api) {
+      setToolStatus('Electron API unavailable')
+      return
+    }
+    if (!guppyStatus.connected) return
 
-    void window.electron.diyFlipperLoadWifiApProfile().then((result) => {
+    void api.guppyLoadWifiApProfile().then((result) => {
       if (result.success) {
         setWifiApProfile(result.profile ?? null)
       }
     })
-  }, [diyFlipperStatus.connected])
+  }, [guppyStatus.connected])
 
   const handleNfcRead = useCallback(async () => {
     const api = window.electron
-    if (!api) return
-    const result = await api.diyFlipperSendCommand('NFC_READ')
+    if (!api) {
+      const fallback: { success: boolean; message: string } = { success: false, message: 'Electron API unavailable' }
+      setToolStatus(fallback.message)
+      return fallback
+    }
+    const result = await api.guppySendCommand('NFC_READ')
     setToolStatus(result.success ? 'NFC read command sent' : `NFC read failed: ${result.message}`)
   }, [])
 
@@ -253,18 +283,18 @@ function App() {
       setToolStatus('No NFC UID captured yet')
       return
     }
-    const result = await api.diyFlipperSaveNfcCapture({
+    const result = await api.guppySaveNfcCapture({
       uid: lastNfcUid,
       label: `nfcCapture-${lastNfcUid}`,
-      rawLine: diyFlipperLastLine
+      rawLine: guppyLastLine
     })
     setToolStatus(result.success ? `Saved NFC capture to ${result.message}` : `NFC save failed: ${result.message}`)
-  }, [lastNfcUid, diyFlipperLastLine])
+  }, [lastNfcUid, guppyLastLine])
 
   const handleIrReload = useCallback(async () => {
     const api = window.electron
     if (!api) return
-    const result = await api.diyFlipperLoadIrMiniDb()
+    const result = await api.guppyLoadIrMiniDb()
     if (!result.success) {
       setToolStatus(`IR DB load failed: ${result.message}`)
       return
@@ -281,7 +311,7 @@ function App() {
       setToolStatus('IR entry not found')
       return
     }
-    const result = await api.diyFlipperSendIrEntry(entry)
+    const result = await api.guppySendIrEntry(entry)
     setToolStatus(result.success ? `IR sent: ${entry.name}` : `IR send failed: ${result.message}`)
   }, [irDbEntries])
 
@@ -290,25 +320,25 @@ function App() {
     if (!api) return
     const trimmed = command.trim()
     if (!trimmed) return
-    const result = await api.diyFlipperSendCommand(trimmed)
+    const result = await api.guppySendCommand(trimmed)
     setToolStatus(result.success ? `Raw command sent: ${trimmed}` : `Raw command failed: ${result.message}`)
   }, [])
 
   const handleReconnectHardware = useCallback(async () => {
     const api = window.electron
     if (!api) return
-    const result = await api.diyFlipperConnect()
+    const result = await api.guppyConnect()
     setToolStatus(result.success ? result.message : `Reconnect failed: ${result.message}`)
   }, [])
 
   const handleClearSerialLog = useCallback(() => {
-    setDiyFlipperSerialLines([])
+    setGuppySerialLines([])
   }, [])
 
   const handleWifiApSaveProfile = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
     const api = window.electron
     if (!api) return
-    const result = await api.diyFlipperSaveWifiApProfile(profile)
+    const result = await api.guppySaveWifiApProfile(profile)
     if (!result.success) {
       setToolStatus(`Wi-Fi AP profile save failed: ${result.message}`)
       return
@@ -320,7 +350,7 @@ function App() {
   const handleWifiApLoadProfile = useCallback(async () => {
     const api = window.electron
     if (!api) return
-    const result = await api.diyFlipperLoadWifiApProfile()
+    const result = await api.guppyLoadWifiApProfile()
     if (!result.success) {
       setToolStatus(`Wi-Fi AP profile load failed: ${result.message}`)
       return
@@ -332,7 +362,7 @@ function App() {
   const handleWifiApStart = useCallback(async (profile: { ssid: string; password: string; channel: number }) => {
     const api = window.electron
     if (!api) return
-    const result = await api.diyFlipperStartWifiAp(profile)
+    const result = await api.guppyStartWifiAp(profile)
     if (!result.success) {
       setToolStatus(`Wi-Fi AP start failed: ${result.message}`)
       return
@@ -344,9 +374,39 @@ function App() {
   const handleWifiApStop = useCallback(async () => {
     const api = window.electron
     if (!api) return
-    const result = await api.diyFlipperSendCommand('WIFI_AP_STOP')
+    const result = await api.guppySendCommand('WIFI_AP_STOP')
     setToolStatus(result.success ? 'Wi-Fi AP stop command sent' : `Wi-Fi AP stop failed: ${result.message}`)
   }, [])
+
+  const handleWifiJammerStart = useCallback(async (payload: WifiJammerPayload) => {
+    const api = window.electron
+    if (!api) {
+      const fallback: { success: boolean; message: string } = { success: false, message: 'Electron API unavailable' }
+      setToolStatus(fallback.message)
+      return fallback
+    }
+    const result = await api.guppyStartWifiJammer(payload)
+    setToolStatus(result.success ? result.message : `Wi-Fi jammer start failed: ${result.message}`)
+    if (!result.success) {
+      console.warn('[GUPPY] Wi-Fi jammer start failed:', result.message)
+    }
+    return result
+  }, [setToolStatus])
+
+  const handleWifiJammerStop = useCallback(async () => {
+    const api = window.electron
+    if (!api) {
+      const fallback: { success: boolean; message: string } = { success: false, message: 'Electron API unavailable' }
+      setToolStatus(fallback.message)
+      return fallback
+    }
+    const result = await api.guppyStopWifiJammer()
+    setToolStatus(result.success ? result.message : `Wi-Fi jammer stop failed: ${result.message}`)
+    if (!result.success) {
+      console.warn('[GUPPY] Wi-Fi jammer stop failed:', result.message)
+    }
+    return result
+  }, [setToolStatus])
 
   // ── render ────────────────────────────────────────────────────
   if (screen === 'hacker-menu')
@@ -354,8 +414,8 @@ function App() {
       <HackerMenu
         onSelect={handleModuleSelect}
         onBack={() => setScreen('boot')}
-        deviceStatus={diyFlipperStatus}
-        lastDeviceLine={diyFlipperLastLine}
+        deviceStatus={guppyStatus}
+        lastDeviceLine={guppyLastLine}
         onNfcRead={handleNfcRead}
         onNfcSave={handleNfcSave}
         onIrReload={handleIrReload}
@@ -363,7 +423,7 @@ function App() {
         lastNfcUid={lastNfcUid}
         irDbEntries={irDbEntries}
         toolStatus={toolStatus}
-        serialLines={diyFlipperSerialLines}
+        serialLines={guppySerialLines}
         onSendRawCommand={handleRawSerialCommand}
         onClearSerialLog={handleClearSerialLog}
         onReconnect={handleReconnectHardware}
@@ -372,6 +432,11 @@ function App() {
         onWifiApLoadProfile={handleWifiApLoadProfile}
         onWifiApStart={handleWifiApStart}
         onWifiApStop={handleWifiApStop}
+        wifiJammerState={wifiJammerState}
+        wifiJammerLog={wifiJammerLog}
+        onWifiJammerStart={handleWifiJammerStart}
+        onWifiJammerStop={handleWifiJammerStop}
+        onSetToolStatus={setToolStatus}
       />
     )
 

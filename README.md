@@ -1,7 +1,7 @@
 # The Lab Graduation - Arcade and Hacking Platform
 
 Desktop launcher met retro arcade UI, gebouwd met Electron + React.
-De app combineert een fullscreen arcade flow met een Flipper-achtige hacker terminal flow en DIY hardware-integratie via serial.
+De app combineert een fullscreen arcade flow met een Guppy-achtige hacker terminal flow en DIY hardware-integratie via serial.
 
 ## AI Arcade Vision
 
@@ -21,7 +21,7 @@ Dit project bevat:
 - Een game menu met selectie en launch flow
 - Een game display-laag die lokale games start via Electron IPC
 - Een hacker transition + terminal menu als tweede experience
-- Auto-detect en auto-connect van DIY Flipper hardware (ESP32/serial)
+- Auto-detect en auto-connect van DIY Guppy hardware (ESP32/serial)
 - Lokale Python/Pygame games in de repository
 
 ## Tech Stack
@@ -41,7 +41,7 @@ Dit project bevat:
 - TypeScript (main/renderer typed code)
 - electron-vite (dev/build pipeline)
 - Python + Pygame (lokale arcade games)
-- serialport (USB serial communicatie met DIY Flipper hardware)
+- serialport (USB serial communicatie met DIY Guppy hardware)
 
 ## Belangrijkste Features
 
@@ -50,7 +50,7 @@ Dit project bevat:
 - Launch support voor `.py`, `.jar` en `.exe`
 - Embedded launch mode met viewport data
 - Hacker terminal mode met keyboard en gamepad navigatie
-- Auto-reconnect naar DIY Flipper hardware om de paar seconden
+- Auto-reconnect naar DIY Guppy hardware om de paar seconden
 - Module dispatch vanuit hacker menu (`RUN NFC_CLONE`, `RUN IR_BLAST`, ...)
 
 ## Projectstructuur
@@ -63,14 +63,14 @@ Dit project bevat:
 ├── tsconfig.json
 ├── docs/
 │   ├── AI_ARCADE_PLATFORM_ARCHITECTURE.md
-│   └── DIYFLIPPER_QUICKSTART.md
+│   └── DIYGUPPY_QUICKSTART.md
 ├── firmware/
-│   └── esp32_diyflipper/
-│       └── esp32_diyflipper.ino
+│   └── esp32_guppy/
+│       └── esp32_guppy.ino
 ├── scripts/
 │   ├── run-electron-vite.js
 │   └── setup-python-venv.js
-└── arcade-flipper/
+└── arcade-guppy/
     └── src/
         ├── main.ts
         ├── preload.ts
@@ -80,7 +80,7 @@ Dit project bevat:
         │   │   ├── boot.tsx
         │   │   ├── GameMenu.tsx
         │   │   └── ArcadeGame.tsx
-        │   └── flipper/
+        │   └── guppy/
         │       ├── HackTransition.tsx
         │       └── HackerMenu.tsx
         ├── assets/
@@ -89,15 +89,15 @@ Dit project bevat:
 
 ## Architectuur Samenvatting
 
-- `arcade-flipper/src/main.ts`
-  Beheert Electron window/fullscreen, game launch/stop, IPC handlers, en DIY Flipper serial auto-connect.
-- `arcade-flipper/src/preload.ts`
-  Exposeert `window.electron` API (`launchGame`, `stopGame`, `diyFlipper*`, `onGameExit`, ...).
-- `arcade-flipper/src/renderer.tsx`
+- `arcade-guppy/src/main.ts`
+  Beheert Electron window/fullscreen, game launch/stop, IPC handlers, en DIY Guppy serial auto-connect.
+- `arcade-guppy/src/preload.ts`
+  Exposeert `window.electron` API (`launchGame`, `stopGame`, `guppy*`, `onGameExit`, ...).
+- `arcade-guppy/src/renderer.tsx`
   Router tussen boot, arcade menu, arcade game view en hacker menu.
-- `arcade-flipper/src/components/arcade/GameMenu.tsx`
+- `arcade-guppy/src/components/arcade/GameMenu.tsx`
   Bevat de hardcoded game catalogus (id/title/image/executable/...).
-- `arcade-flipper/src/components/flipper/HackerMenu.tsx`
+- `arcade-guppy/src/components/guppy/HackerMenu.tsx`
   UI voor modules en hardware status (`HW::CONNECTING`, `HW::ONLINE`, `HW::OFFLINE`).
 
 ## Vereisten
@@ -108,7 +108,7 @@ Dit project bevat:
 - `pygame` in je actieve Python-omgeving
 
 Optioneel (voor hardware flow):
-- DIY Flipper device via USB serial (ESP32 bridge firmware)
+- DIY Guppy device via USB serial (ESP32 bridge firmware)
 
 ## Installatie
 
@@ -159,12 +159,12 @@ npm run check
 ## Nieuwe Games Toevoegen
 
 Games worden gelezen uit de `games` array in:
-`arcade-flipper/src/components/arcade/GameMenu.tsx`
+`arcade-guppy/src/components/arcade/GameMenu.tsx`
 
-1. Voeg game files toe onder `arcade-flipper/src/games/<YourGame>/`
-2. Voeg een thumbnail toe in `arcade-flipper/src/assets/`
+1. Voeg game files toe onder `arcade-guppy/src/games/<YourGame>/`
+2. Voeg een thumbnail toe in `arcade-guppy/src/assets/`
 3. Voeg een object toe in de `games` array in `GameMenu.tsx`
-4. Gebruik een executable pad relatief vanaf `arcade-flipper/src`, bijvoorbeeld:
+4. Gebruik een executable pad relatief vanaf `arcade-guppy/src`, bijvoorbeeld:
    - `games/RetroBird/main.py`
    - `games/pong.py`
    - `games/MyGame/game.exe`
@@ -184,7 +184,7 @@ Voor Python launches worden deze env vars meegegeven:
 - `ARCADE_WINDOW_POS` (`x,y`)
 - `ARCADE_WINDOW_SIZE` (`widthxheight`)
 
-## DIY Flipper Hardware (Serial)
+## DIY Guppy Hardware (Serial)
 
 De app ondersteunt momenteel:
 - Serial device auto-detect + auto-connect
@@ -197,8 +197,8 @@ De app ondersteunt momenteel:
   - `RUN SHELL`
 
 Voor wiring + firmware setup:
-- Zie `docs/DIYFLIPPER_QUICKSTART.md`
-- Firmware: `firmware/esp32_diyflipper/esp32_diyflipper.ino`
+- Zie `docs/DIYGUPPY_QUICKSTART.md`
+- Firmware: `firmware/esp32_guppy/esp32_guppy.ino`
 
 ## Platform Notes
 
@@ -212,3 +212,4 @@ The Lab Graduation Project:
 - Younes: arcade platform (launcher en interface)
 - Rayan: hardware (arcade cabinet, knoppen, computer setup)
 - Matthias: Raspberry Pi Pico hacking tool
+

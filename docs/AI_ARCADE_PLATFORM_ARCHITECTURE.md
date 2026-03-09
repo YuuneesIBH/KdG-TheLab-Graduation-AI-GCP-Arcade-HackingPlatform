@@ -61,7 +61,7 @@ flowchart LR
   - anti-abuse and anomaly flags.
 
 ### 4) Hardware + Audio Interaction Layer
-- Consumes local input events from the existing DIY Flipper serial channel.
+- Consumes local input events from the existing DIY Guppy serial channel.
 - Maps events to game actions and cyber challenge interactions.
 - Drives reactive audio cues (threat alert, successful exploit, defense recovered).
 - Streams selected non-sensitive event metadata to session services.
@@ -183,3 +183,4 @@ flowchart LR
 3. Add auth token flow in Electron client.
 4. Stand up Ollama integration adapter with structured output validation.
 5. Create one fully isolated cyber challenge template with automated teardown tests.
+

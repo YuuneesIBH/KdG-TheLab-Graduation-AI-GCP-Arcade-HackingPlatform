@@ -10,5 +10,6 @@
     "baseUrl": ".",
     "paths": {}
   },
-  "include": ["arcade-flipper/src/electron.d.ts"]
+  "include": ["arcade-guppy/src/electron.d.ts"]
 }
+

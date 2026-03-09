@@ -1,9 +1,9 @@
-# DIY Flipper Quickstart (ESP32 + PN532 + IR)
+# DIY Guppy Quickstart (ESP32 + PN532 + IR)
 
 This project includes:
-- Electron auto-detect + auto-connect to a DIY Flipper serial device.
-- Module command dispatch from the Flipper menu to hardware.
-- A baseline ESP32 bridge sketch: `firmware/esp32_diyflipper/esp32_diyflipper.ino`.
+- Electron auto-detect + auto-connect to a DIY Guppy serial device.
+- Module command dispatch from the Guppy menu to hardware.
+- A baseline ESP32 bridge sketch: `firmware/esp32_guppy/esp32_guppy.ino`.
 
 ## Architecture
 
@@ -111,8 +111,8 @@ The ESP32 firmware already forwards commands to Pico on these pins.
 ## 3) Flash ESP32
 
 Flash:
-- `firmware/esp32_diyflipper/esp32_diyflipper.ino`
-- Optional hardware isolation test: `firmware/esp32_diyflipper/pn532_hsu_probe/pn532_hsu_probe.ino`
+- `firmware/esp32_guppy/esp32_guppy.ino`
+- Optional hardware isolation test: `firmware/esp32_guppy/pn532_hsu_probe/pn532_hsu_probe.ino`
 
 Requirements:
 - Arduino IDE + ESP32 board support
@@ -121,11 +121,11 @@ Requirements:
 - Serial monitor: `115200`
 
 PN532-Arduino interface flags:
-- Main sketch uses `firmware/esp32_diyflipper/build_opt.h` with `-DNFC_INTERFACE_I2C`.
-- HSU probe uses `firmware/esp32_diyflipper/pn532_hsu_probe/build_opt.h` with `-DNFC_INTERFACE_HSU`.
+- Main sketch uses `firmware/esp32_guppy/build_opt.h` with `-DNFC_INTERFACE_I2C`.
+- HSU probe uses `firmware/esp32_guppy/pn532_hsu_probe/build_opt.h` with `-DNFC_INTERFACE_HSU`.
 
 On boot, the board prints:
-- `DIYFLIPPER_READY`
+- `GUPPY_READY`
 - firmware/version line
 - capabilities line
 
@@ -138,7 +138,7 @@ npm install
 npm run dev
 ```
 
-Open the Flipper menu in-app. Header/footer should show:
+Open the Guppy menu in-app. Header/footer should show:
 - `HW::CONNECTING` briefly
 - then `HW::ONLINE COMx` on Windows when connected
 
@@ -146,7 +146,7 @@ No manual connect button is required; app auto-reconnects every few seconds.
 
 ## 5) Module Commands Sent By App
 
-When you execute modules in the Flipper menu, app sends:
+When you execute modules in the Guppy menu, app sends:
 - `RUN NFC_CLONE`
 - `RUN BADUSB_INJECT`
 - `RUN IR_BLAST`
@@ -163,10 +163,41 @@ Health checks:
 - You can manually send `WIFI_AUDIT` for a quick security summary
 - You can manually send `WIFI_AP_START <SSID> [PASSWORD] [CHANNEL]` to start a local AP
 - You can manually send `WIFI_AP_STATUS` and `WIFI_AP_STOP` to inspect/stop the AP
-- The app stores last used Wi-Fi AP profile locally (`userData/diyflipper/wifi-ap-profile.json`) and reloads it on reconnect
+- The app stores last used Wi-Fi AP profile locally (`userData/guppy/wifi-ap-profile.json`) and reloads it on reconnect
+
+## 6) Wi-Fi Deauth Backends (Plug-and-Play vs Host Fallback)
+
+The app now prefers a firmware deauth backend to avoid manual monitor-interface setup.
+
+### Firmware mode (recommended)
+
+For plug-and-play deauth from the GUI, your ESP32 firmware should advertise one of these capability pairs in `CAPS:`:
+
+- `WIFI_DEAUTH_START` + `WIFI_DEAUTH_STOP`
+- `WIFI_JAMMER_START` + `WIFI_JAMMER_STOP`
+- `WIFI_JAM_START` + `WIFI_JAM_STOP`
+
+The GUI fills target AP + channel directly from `WIFI_SCAN` results and sends start/stop commands over serial.
+
+### Host fallback mode (legacy `packetsender.py`)
+
+If firmware deauth capability is missing, the app can fall back to host-side `packetsender.py`:
+
+- Requires Linux (`iwconfig`) and at least one interface already in monitor mode.
+- The app auto-detects the first monitor interface, so manual interface selection is not required.
+- On Windows/macOS, host fallback is not supported by this flow.
+
+## 7) Hardware Options
+
+| Setup | Extra Wi-Fi/BT chips | Notes |
+|---|---|---|
+| ESP32-WROOM/ESP32-WROOM-32E only | None | Simplest wiring. Works if your firmware implements deauth start/stop commands. |
+| ESP32 + ESP8266 (Spacehuhn-style split) | ESP8266 module | Common when keeping scan/UI logic on ESP32 and packet injection logic on ESP8266 firmware. |
+| ESP32 + USB NIC on host | External monitor-capable NIC | Uses host fallback (`packetsender.py`), not pure firmware plug-and-play. |
 
 ## Notes
 
 - The ESP32 sketch includes placeholder handlers for NFC/IR/BadUSB/Shell.
 - Replace placeholders with your real PN532 and IR logic.
 - Keep all logic levels at `3.3V`.
+

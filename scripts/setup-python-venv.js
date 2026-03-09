@@ -3,7 +3,7 @@ const path = require('path')
 const { spawnSync } = require('child_process')
 
 const repoRoot = path.resolve(__dirname, '..')
-const arcadeRoot = path.join(repoRoot, 'arcade-flipper')
+const arcadeRoot = path.join(repoRoot, 'arcade-guppy')
 const venvDir = path.join(arcadeRoot, '.venv')
 const isWindows = process.platform === 'win32'
 const baselinePackages = ['pygame']
@@ -138,3 +138,4 @@ for (const requirementsPath of requirementsFiles) {
 }
 
 log(`Ready. Python launcher will use: ${venvPython}`)
+

@@ -1,4 +1,4 @@
-import { HackButton, HackTransition } from '../flipper/HackTransition'
+import { HackButton, HackTransition } from '../guppy/HackTransition'
 
 type BootProps = {
   coins: number

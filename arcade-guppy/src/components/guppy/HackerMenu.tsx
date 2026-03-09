@@ -1,14 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-const MENU_ITEMS = [
-  { key: 'nfc', cmd: 'flipper run nfc_clone', desc: 'Read/emulate NFC & RFID cards', color: '#00ccff', tag: '[NFC]' },
-  { key: 'badusb', cmd: 'flipper run badusb_inject', desc: 'HID keystroke injection', color: '#ff4444', tag: '[USB]' },
-  { key: 'ir', cmd: 'flipper run ir_blast', desc: 'Infrared signal transmitter', color: '#ff8800', tag: '[IR]' },
-  { key: 'gpio', cmd: 'flipper run gpio_ctrl', desc: 'GPIO pin control & logic analyzer', color: '#ffff00', tag: '[GPIO]' },
-  { key: 'wifi', cmd: 'flipper run wifi_audit', desc: 'Legal Wi-Fi recon & security audit summary', color: '#66ddff', tag: '[WIFI]' },
-  { key: 'wifiap', cmd: 'flipper run wifi_ap_start', desc: 'Start local ESP32 SoftAP (lab network)', color: '#33bbff', tag: '[AP]' },
-  { key: 'terminal', cmd: 'flipper shell --root', desc: 'Open interactive root shell', color: '#00ff88', tag: '[SH]' },
-]
+import WifiResultsModal, { type WifiNetwork, buildWifiNetworkList } from './WifiResultsModal'
+import type { WifiJammerPayload, WifiJammerState } from '../../electron'
 
 const VIEW_ITEMS = [
   { key: 'home', label: 'HOME', color: '#00ff41' },
@@ -16,12 +8,10 @@ const VIEW_ITEMS = [
   { key: 'ir', label: 'IR', color: '#ff8800' },
   { key: 'wifi', label: 'WIFI', color: '#33bbff' },
 ] as const
-const HOME_MODULE_ITEMS = MENU_ITEMS.filter(
-  (moduleItem) => moduleItem.key !== 'nfc' && moduleItem.key !== 'ir' && moduleItem.key !== 'wifi' && moduleItem.key !== 'wifiap'
-)
 
 type ViewKey = (typeof VIEW_ITEMS)[number]['key']
 type ControlId = string
+type WifiResultsMode = 'SCAN' | 'AUDIT'
 
 const BASE_FOCUSABLE_CONTROLS: ControlId[] = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir', 'tab-wifi']
 
@@ -33,7 +23,7 @@ const TAB_CONTROL_BY_VIEW: Record<ViewKey, ControlId> = {
 }
 
 const BOOT_SEQUENCE = [
-  '> Flipper Zero OS v0.91.1 - ARM Cortex-M4 @ 64MHz',
+  '> Guppy OS v1.0.0 - ARM Cortex-M4 @ 64MHz',
   '> Checking hardware... Flash: OK RAM: OK SD: MOUNTED',
   '> Bridge online. Loading module selector...',
   '> Routing terminal and tool pages...',
@@ -87,6 +77,11 @@ type HackerMenuProps = {
   onWifiApLoadProfile?: () => void
   onWifiApStart?: (profile: { ssid: string; password: string; channel: number }) => void
   onWifiApStop?: () => void
+  wifiJammerState?: WifiJammerState | null
+  wifiJammerLog?: string[]
+  onWifiJammerStart?: (payload: WifiJammerPayload) => Promise<{success: boolean, message: string}> | void
+  onWifiJammerStop?: () => Promise<{success: boolean, message: string}> | void
+  onSetToolStatus?: (message: string) => void
 }
 
 function MatrixBg() {
@@ -147,9 +142,9 @@ function tabButtonStyle(active: boolean, color: string, compact: boolean): React
     border: `1px solid ${color}`,
     color: active ? '#ffffff' : color,
     fontFamily: 'inherit',
-    fontSize: compact ? '12px' : '11px',
+    fontSize: compact ? '14px' : '13px',
     letterSpacing: '1px',
-    padding: compact ? '7px 11px' : '5px 10px',
+    padding: compact ? '10px 14px' : '8px 12px',
     cursor: 'pointer',
     textShadow: active ? `0 0 8px ${color}` : 'none',
   }
@@ -161,8 +156,8 @@ function actionButtonStyle(color: string, compact: boolean): React.CSSProperties
     border: `1px solid ${color}`,
     color,
     fontFamily: 'inherit',
-    padding: compact ? '9px 10px' : '8px 10px',
-    fontSize: compact ? '12px' : '11px',
+    padding: compact ? '12px 14px' : '10px 12px',
+    fontSize: compact ? '14px' : '13px',
     letterSpacing: '1px',
     cursor: 'pointer',
   }
@@ -174,6 +169,24 @@ function focusedControlStyle(active: boolean, color: string): React.CSSPropertie
     boxShadow: `0 0 0 2px ${color}, 0 0 16px ${color}88`,
     transform: 'translateY(-1px)',
   }
+}
+
+function collectWifiResultLines(lines: string[], mode: WifiResultsMode): string[] {
+  if (!lines.length) return []
+
+  const byMode: Record<WifiResultsMode, RegExp[]> = {
+    SCAN: [/WIFI_SCAN/i, /WIFI_AP/i, /SSID/i, /RSSI/i, /SECURITY/i, /AUTH/i, /CHANNEL/i, /CHAN/i, /BSSID/i, /FOUND/i, /NETWORK/i],
+    AUDIT: [/WIFI_AUDIT/i, /AUDIT/i, /VULN/i, /WPA/i, /WEP/i, /OPEN/i, /WEAK/i, /RISK/i],
+  }
+
+  return lines.filter((line) => {
+    const trimmed = line.trim()
+    if (!trimmed) return false
+    if (/^TX\s+/i.test(trimmed)) return false
+    if (byMode[mode].some((pattern) => pattern.test(trimmed))) return true
+    if (/^[^,\s][^,]*,\s*-?\d{1,3}(?:,\s*[^,]+){0,2}$/i.test(trimmed)) return true
+    return false
+  })
 }
 
 export default function HackerMenu({
@@ -197,6 +210,11 @@ export default function HackerMenu({
   onWifiApLoadProfile,
   onWifiApStart,
   onWifiApStop,
+  wifiJammerState,
+  wifiJammerLog,
+  onWifiJammerStart,
+  onWifiJammerStop,
+  onSetToolStatus,
 }: HackerMenuProps) {
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
   const [activeView, setActiveView] = useState<ViewKey>('home')
@@ -211,9 +229,34 @@ export default function HackerMenu({
   const [wifiApSsidInput, setWifiApSsidInput] = useState('')
   const [wifiApPasswordInput, setWifiApPasswordInput] = useState('')
   const [wifiApChannelInput, setWifiApChannelInput] = useState('6')
+  const [wifiResultsTitle, setWifiResultsTitle] = useState('')
+  const [wifiResults, setWifiResults] = useState<string[]>([])
+  const [showWifiResults, setShowWifiResults] = useState(false)
+  const [wifiResultsMode, setWifiResultsMode] = useState<WifiResultsMode>('SCAN')
+  const [jamChannel, setJamChannel] = useState('')
+  const [jamAccessPoints, setJamAccessPoints] = useState('')
+  const [jamStations, setJamStations] = useState('')
+  const [jamFilters, setJamFilters] = useState('')
+  const [jamPackets, setJamPackets] = useState('25')
+  const [jamDelay, setJamDelay] = useState('1')
+  const [jamReset, setJamReset] = useState('0')
+  const [jamCode, setJamCode] = useState('7')
+  const [jamWorld, setJamWorld] = useState(false)
+  const [jamNoBroadcast, setJamNoBroadcast] = useState(false)
+  const [jamVerbose, setJamVerbose] = useState(false)
+  const [selectedScanNetwork, setSelectedScanNetwork] = useState<WifiNetwork | null>(null)
+  const wifiScanNetworks = useMemo(() => buildWifiNetworkList(wifiResults), [wifiResults])
+  const wifiNetworkKey = useCallback((network: WifiNetwork) => `${network.ssid}|${network.bssid}|${network.channel}`, [])
+  const selectedNetworkKey = selectedScanNetwork ? wifiNetworkKey(selectedScanNetwork) : ''
+  const stationSuggestions = useMemo(() => {
+    const values = new Set<string>()
+    values.add('ff:ff:ff:ff:ff:ff')
+    if (selectedScanNetwork?.bssid) values.add(selectedScanNetwork.bssid)
+    return Array.from(values)
+  }, [selectedScanNetwork])
 
   const serialLogRef = useRef<HTMLDivElement>(null)
-  const isCompact = viewport.width < 1220 || viewport.height < 860
+  const isCompact = viewport.width < 1080 || viewport.height < 740
   const irEntries = useMemo(() => irDbEntries ?? [], [irDbEntries])
   const isIrStepControl = focusedControl === 'ir-prev' || focusedControl === 'ir-next'
 
@@ -243,7 +286,17 @@ export default function HackerMenu({
     setWifiApSsidInput(wifiApProfile.ssid ?? '')
     setWifiApPasswordInput(wifiApProfile.password ?? '')
     setWifiApChannelInput(String(wifiApProfile.channel ?? 6))
-  }, [wifiApProfile])
+    setJamAccessPoints((current) => current || wifiApProfile.ssid || '')
+    if (!jamChannel && wifiApProfile.channel) {
+      setJamChannel(String(wifiApProfile.channel))
+    }
+  }, [wifiApProfile, jamChannel])
+
+  useEffect(() => {
+    if (!showWifiResults) return
+    const lines = serialLines ?? []
+    setWifiResults(collectWifiResultLines(lines, wifiResultsMode))
+  }, [serialLines, showWifiResults, wifiResultsMode])
 
   const openView = useCallback((view: ViewKey) => {
     setActiveView(view)
@@ -277,13 +330,89 @@ export default function HackerMenu({
     setRawCommand('')
   }, [onSendRawCommand, rawCommand])
 
+  const handleWifiScan = useCallback(() => {
+    setWifiResults([])
+    setWifiResultsTitle('Wi-Fi Networks')
+    setWifiResultsMode('SCAN')
+    setShowWifiResults(true)
+    onSendRawCommand?.('WIFI_SCAN')
+  }, [onSendRawCommand])
+
+  const handleWifiResultsSelect = useCallback((network: WifiNetwork) => {
+    setSelectedScanNetwork(network)
+    setJamAccessPoints(network.bssid || network.ssid || '')
+    setJamChannel(network.channel)
+    setWifiResultsTitle(`Targeting ${network.ssid}`)
+    setShowWifiResults(false)
+    onSetToolStatus?.(`Selected Wi-Fi target: ${network.ssid} (${network.bssid || 'no BSSID'})`)
+  }, [onSetToolStatus])
+
+  const handleNetworkDropdownChange = useCallback((key: string) => {
+    if (!key) return
+    const network = wifiScanNetworks.find((candidate) => wifiNetworkKey(candidate) === key)
+    if (network) {
+      handleWifiResultsSelect(network)
+    }
+  }, [wifiNetworkKey, wifiScanNetworks, handleWifiResultsSelect])
+
+  const handleStationInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setJamStations(event.target.value)
+  }, [])
+
+  const handleStartJammer = useCallback(() => {
+    const payload: WifiJammerPayload = { mode: 'auto' }
+    const channelValue = Number.parseInt(jamChannel, 10)
+    if (Number.isFinite(channelValue) && channelValue > 0) {
+      payload.channel = Math.round(channelValue)
+    }
+    const parseMaybe = (value: string) => {
+      const parsed = Number.parseFloat(value)
+      return Number.isFinite(parsed) ? parsed : undefined
+    }
+    const packetsValue = parseMaybe(jamPackets)
+    if (typeof packetsValue === 'number' && packetsValue > 0) {
+      payload.packets = Math.max(1, Math.round(packetsValue))
+    }
+    const delayValue = parseMaybe(jamDelay)
+    if (typeof delayValue === 'number') {
+      payload.delay = delayValue
+    }
+    const resetValue = parseMaybe(jamReset)
+    if (typeof resetValue === 'number' && resetValue >= 0) {
+      payload.reset = Math.round(resetValue)
+    }
+    const codeValue = Number.parseInt(jamCode, 10)
+    if (Number.isFinite(codeValue)) {
+      payload.code = Math.min(Math.max(codeValue, 1), 66)
+    }
+    if (jamAccessPoints.trim()) payload.accessPoints = jamAccessPoints.trim()
+    if (jamStations.trim()) payload.stations = jamStations.trim()
+    if (jamFilters.trim()) payload.filters = jamFilters.trim()
+    if (jamWorld) payload.world = true
+    if (jamNoBroadcast) payload.noBroadcast = true
+    if (jamVerbose) payload.verbose = true
+    void onWifiJammerStart?.(payload)
+  }, [
+    jamAccessPoints,
+    jamChannel,
+    jamCode,
+    jamDelay,
+    jamFilters,
+    jamNoBroadcast,
+    jamPackets,
+    jamReset,
+    jamStations,
+    jamVerbose,
+    jamWorld,
+    onWifiJammerStart,
+  ])
+
+  const handleStopJammer = useCallback(() => {
+    void onWifiJammerStop?.()
+  }, [onWifiJammerStop])
+
   const activateFocusedControl = useCallback(() => {
     if (!focusedControl) return
-    if (focusedControl.startsWith('home-module-')) {
-      const moduleKey = focusedControl.replace('home-module-', '')
-      onSelect?.(moduleKey)
-      return
-    }
     switch (focusedControl) {
       case 'header-reconnect':
         onReconnect?.()
@@ -306,17 +435,8 @@ export default function HackerMenu({
       case 'home-open-wifi':
         openView('wifi')
         return
-      case 'wifi-run':
-        onSelect?.('wifi')
-        return
       case 'wifi-scan':
-        onSendRawCommand?.('WIFI_SCAN')
-        return
-      case 'wifi-audit':
-        onSendRawCommand?.('WIFI_AUDIT')
-        return
-      case 'wifiap-status':
-        onSendRawCommand?.('WIFI_AP_STATUS')
+        handleWifiScan()
         return
       case 'wifiap-start': {
         const payload = getWifiApPayload()
@@ -335,6 +455,12 @@ export default function HackerMenu({
       }
       case 'wifiap-load':
         onWifiApLoadProfile?.()
+        return
+      case 'jam-start':
+        handleStartJammer()
+        return
+      case 'jam-stop':
+        handleStopJammer()
         return
       case 'nfc-run':
         onSelect?.('nfc')
@@ -381,12 +507,12 @@ export default function HackerMenu({
     onNfcRead,
     onNfcSave,
     onReconnect,
-    onSendRawCommand,
     onSelect,
     onWifiApLoadProfile,
     onWifiApSaveProfile,
     onWifiApStart,
     onWifiApStop,
+    handleWifiScan,
     openView,
     getWifiApPayload,
     selectedIrId,
@@ -398,13 +524,13 @@ export default function HackerMenu({
     const controls = [...BASE_FOCUSABLE_CONTROLS]
     if (activeView === 'home') {
       controls.push('home-open-nfc', 'home-open-ir', 'home-open-wifi')
-      controls.push(...HOME_MODULE_ITEMS.map((moduleItem) => `home-module-${moduleItem.key}`))
     } else if (activeView === 'nfc') {
       controls.push('nfc-run', 'nfc-read', 'nfc-save')
     } else if (activeView === 'ir') {
       controls.push('ir-run', 'ir-reload', 'ir-prev', 'ir-next', 'ir-send')
     } else {
-      controls.push('wifi-run', 'wifi-scan', 'wifi-audit', 'wifiap-status', 'wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
+      controls.push('wifi-scan', 'wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
+      controls.push('jam-start', 'jam-stop')
     }
     controls.push('terminal-send', 'terminal-clear')
     return controls
@@ -650,15 +776,21 @@ export default function HackerMenu({
     return 'No Wi-Fi lines yet.'
   }, [serialLines])
 
+  const jamStatusRunning = wifiJammerState?.running ?? false
+  const jamStatusColor = jamStatusRunning ? '#33ff88' : '#ff6f6f'
+  const jamStatusMessage = wifiJammerState?.message ?? (jamStatusRunning ? 'Jammer active' : 'Idle')
+  const jamModeLabel = (wifiJammerState?.mode ?? 'firmware').toUpperCase()
+  const jamLogPreview = (wifiJammerLog ?? []).slice(-6)
+
   const selectedIrEntry = useMemo(() => irEntries.find((entry) => entry.id === selectedIrId), [irEntries, selectedIrId])
 
   const promptCommand = activeView === 'home'
-    ? 'flipper status --overview'
+    ? 'guppy status --overview'
     : activeView === 'nfc'
-      ? 'flipper nfc --monitor'
+      ? 'guppy nfc --monitor'
       : activeView === 'ir'
-        ? 'flipper ir --send'
-        : 'flipper wifi --audit'
+        ? 'guppy ir --send'
+        : 'guppy wifi --audit'
 
   const promptColor = activeView === 'home'
     ? '#00ff41'
@@ -710,7 +842,7 @@ export default function HackerMenu({
           ))}
         </div>
         <span style={{ color: '#00ff41', fontSize: isCompact ? '12px' : '11px', letterSpacing: isCompact ? '2px' : '4px', textShadow: '0 0 10px #00ff41', fontWeight: 'bold' }}>
-          FLIPPER ZERO - CONTROL CONSOLE
+          GUPPY - CONTROL CONSOLE
         </span>
         <div style={{ display: 'flex', gap: isCompact ? '8px' : '12px', alignItems: 'center', flexWrap: isCompact ? 'wrap' : 'nowrap', justifyContent: 'flex-end' }}>
           <span style={{ color: hardwareColor, fontSize: isCompact ? '11px' : '10px', letterSpacing: '2px', textShadow: `0 0 6px ${hardwareColor}` }}>
@@ -740,10 +872,10 @@ export default function HackerMenu({
         overflowY: 'auto',
         zIndex: 15,
       }}>
-        <div style={{ width: 'min(1180px, 98vw)', display: 'flex', flexDirection: 'column', gap: isCompact ? '6px' : '8px' }}>
+        <div style={{ width: 'min(1360px, 99vw)', display: 'flex', flexDirection: 'column', gap: isCompact ? '8px' : '10px' }}>
           <div style={{ marginBottom: isCompact ? '4px' : '8px' }}>
             {(isCompact ? bootLines.slice(-2) : bootLines).map((line, i) => (
-              <div key={i} style={{ fontSize: isCompact ? '12px' : '11px', lineHeight: isCompact ? '1.5' : '1.85', color: '#3a5a3a', letterSpacing: '0.5px' }}>
+              <div key={i} style={{ fontSize: isCompact ? '13px' : '12px', lineHeight: isCompact ? '1.55' : '1.9', color: '#3a5a3a', letterSpacing: '0.5px' }}>
                 {line || '\u00A0'}
               </div>
             ))}
@@ -758,18 +890,18 @@ export default function HackerMenu({
             }}>
               <div style={{
                 background: '#00ff41', color: '#000',
-                padding: isCompact ? '6px 8px' : '3px 12px', fontSize: isCompact ? '11px' : '10px',
+                padding: isCompact ? '7px 10px' : '6px 14px', fontSize: isCompact ? '12px' : '11px',
                 letterSpacing: isCompact ? '1px' : '2px', fontWeight: 'bold',
                 display: 'flex', justifyContent: 'space-between',
                 gap: '8px', flexWrap: isCompact ? 'wrap' : 'nowrap',
               }}>
-                <span>root@flipper:~ - control-center [{activeView.toUpperCase()}]</span>
+                <span>root@guppy:~ - control-center [{activeView.toUpperCase()}]</span>
                 <span>DPAD/L-STICK NAV | A SELECT | B BACK | LB/RB VIEW</span>
               </div>
 
               <div className="console-grid" style={{
                 display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 380px)',
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(360px, 430px)',
               }}>
                 <div className="left-pane" style={{
                   borderRight: '1px solid #081408',
@@ -804,8 +936,8 @@ export default function HackerMenu({
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#00ff41', letterSpacing: '1.2px', textShadow: '0 0 8px #00ff41' }}>
                           CONTROL OVERVIEW
                         </div>
-                        <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#4f744f', letterSpacing: '0.2px', lineHeight: '1.4' }}>
-                          Start here. Gebruik dedicated pages voor NFC, IR en Wi-Fi. Quick actions hieronder blijven algemeen.
+                        <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#4f744f', letterSpacing: '0.2px', lineHeight: '1.45' }}>
+                          Start here. Gebruik dedicated pages voor NFC, IR en Wi-Fi.
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
@@ -838,29 +970,11 @@ export default function HackerMenu({
                           </button>
                         </div>
 
-                        <div style={{ border: '1px solid #1a3a1a', background: 'rgba(0, 30, 0, 0.2)', padding: '10px', display: 'grid', gap: '6px' }}>
+                        <div style={{ border: '1px solid #1a3a1a', background: 'rgba(0, 30, 0, 0.2)', padding: '12px', display: 'grid', gap: '8px' }}>
                           <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>HW::{hardwareLabel}</div>
                           <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>NFC_HW::{nfcHealth}</div>
                           <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#a5d3a5' }}>IR_DB::{irEntries.length} entries</div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5a855a', wordBreak: 'break-word' }}>LAST_RX::{lastDeviceLine || 'none'}</div>
-                        </div>
-
-                        <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8abf8a', letterSpacing: '0.8px' }}>
-                          OTHER MODULES
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
-                          {HOME_MODULE_ITEMS.map((moduleItem) => (
-                            <button
-                              key={moduleItem.key}
-                              onClick={() => onSelect?.(moduleItem.key)}
-                              style={{
-                                ...actionButtonStyle(moduleItem.color, isCompact),
-                                ...focusedControlStyle(focusedControl === `home-module-${moduleItem.key}`, moduleItem.color),
-                              }}
-                            >
-                              {moduleItem.tag} {moduleItem.cmd}
-                            </button>
-                          ))}
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#5a855a', wordBreak: 'break-word' }}>LAST_RX::{lastDeviceLine || 'none'}</div>
                         </div>
                       </div>
                     )}
@@ -870,7 +984,7 @@ export default function HackerMenu({
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#00ccff', letterSpacing: '1.2px', textShadow: '0 0 8px #00ccff' }}>
                           NFC PAGE
                         </div>
-                        <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#4b6f8a', letterSpacing: '0.2px', lineHeight: '1.4' }}>
+                        <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#4b6f8a', letterSpacing: '0.2px', lineHeight: '1.45' }}>
                           Dedicated controls for PN532 checks, card reading, and capture saving.
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
@@ -918,22 +1032,13 @@ export default function HackerMenu({
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#33bbff', letterSpacing: '1.2px', textShadow: '0 0 8px #33bbff' }}>
                           WIFI PAGE
                         </div>
-                        <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#5e94b2', letterSpacing: '0.2px', lineHeight: '1.4' }}>
-                          Dedicated Wi-Fi controls: scan/audit and apart AP profile met save/load.
+                        <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#5e94b2', letterSpacing: '0.2px', lineHeight: '1.45' }}>
+                          Dedicated Wi-Fi controls with a separate results window for scan/audit output.
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
                           <button
-                            onClick={() => onSelect?.('wifi')}
-                            style={{
-                              ...actionButtonStyle('#33bbff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'wifi-run', '#33bbff'),
-                            }}
-                          >
-                            RUN WIFI_AUDIT
-                          </button>
-                          <button
-                            onClick={() => onSendRawCommand?.('WIFI_SCAN')}
+                            onClick={() => handleWifiScan()}
                             style={{
                               ...actionButtonStyle('#66ddff', isCompact),
                               ...focusedControlStyle(focusedControl === 'wifi-scan', '#66ddff'),
@@ -942,22 +1047,12 @@ export default function HackerMenu({
                             WIFI SCAN
                           </button>
                           <button
-                            onClick={() => onSendRawCommand?.('WIFI_AUDIT')}
+                            onClick={() => setShowWifiResults(true)}
                             style={{
-                              ...actionButtonStyle('#66ddff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'wifi-audit', '#66ddff'),
+                              ...actionButtonStyle('#33bbff', isCompact),
                             }}
                           >
-                            WIFI AUDIT
-                          </button>
-                          <button
-                            onClick={() => onSendRawCommand?.('WIFI_AP_STATUS')}
-                            style={{
-                              ...actionButtonStyle('#66ddff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'wifiap-status', '#66ddff'),
-                            }}
-                          >
-                            AP STATUS
+                            OPEN RESULTS WINDOW
                           </button>
                         </div>
 
@@ -1065,6 +1160,219 @@ export default function HackerMenu({
                             LAST::{wifiLastLine}
                           </div>
                         </div>
+                        <div style={{ border: '1px solid #0b2c3f', background: 'rgba(6, 21, 31, 0.45)', padding: '12px', display: 'grid', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: isCompact ? '12px' : '13px', color: '#66ddff', letterSpacing: '1px' }}>WI-FI DEAUTH</div>
+                            <span style={{ fontSize: isCompact ? '11px' : '12px', color: jamStatusColor, letterSpacing: '0.8px' }}>
+                              {jamStatusRunning ? 'RUNNING' : 'STOPPED'}
+                            </span>
+                            <span style={{ fontSize: isCompact ? '11px' : '12px', color: '#8ad8ff', letterSpacing: '0.8px' }}>
+                              MODE {jamModeLabel}
+                            </span>
+                            <span style={{ fontSize: isCompact ? '11px' : '12px', color: '#aad7ff', wordBreak: 'break-word' }}>
+                              {jamStatusMessage}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#7bb5cd', lineHeight: '1.4' }}>
+                            Firmware-first flow: pick an AP from scan results and start deauth without manual monitor interface setup.
+                          </div>
+                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#a0dff7', letterSpacing: '0.5px', border: '1px solid #154050', padding: '8px' }}>
+                            TARGET::{selectedScanNetwork
+                              ? `${selectedScanNetwork.ssid} ${selectedScanNetwork.bssid ? `(${selectedScanNetwork.bssid})` : ''}`
+                              : (jamAccessPoints || 'none')} / CH{jamChannel || 'auto'}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                            <select
+                              value={selectedNetworkKey}
+                              onChange={(event) => handleNetworkDropdownChange(event.target.value)}
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            >
+                              <option value="">Scan to populate targets</option>
+                              {wifiScanNetworks.map((network) => (
+                                <option key={wifiNetworkKey(network)} value={wifiNetworkKey(network)}>
+                                  {network.ssid || '(hidden)'} - CH{network.channel} - {network.bssid || 'no BSSID'}
+                                </option>
+                              ))}
+                            </select>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                value={jamStations}
+                                onChange={handleStationInputChange}
+                                list="jam-station-suggestions"
+                                placeholder="target station (mac or broadcast)"
+                                style={{
+                                  background: '#001014',
+                                  border: '1px solid #1c4f6f',
+                                  color: '#9edcff',
+                                  fontFamily: 'inherit',
+                                  fontSize: isCompact ? '12px' : '11px',
+                                  padding: '6px 8px',
+                                  width: '100%',
+                                }}
+                              />
+                              <datalist id="jam-station-suggestions">
+                                {stationSuggestions.map((station) => (
+                                  <option key={station} value={station} />
+                                ))}
+                              </datalist>
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                            <input
+                              value={jamChannel}
+                              onChange={(e) => setJamChannel(e.target.value)}
+                              placeholder="channel"
+                              inputMode="numeric"
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                            <input
+                              value={jamPackets}
+                              onChange={(e) => setJamPackets(e.target.value)}
+                              placeholder="packets / turn"
+                              inputMode="numeric"
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                            <input
+                              value={jamDelay}
+                              onChange={(e) => setJamDelay(e.target.value)}
+                              placeholder="delay (s)"
+                              inputMode="numeric"
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                            <input
+                              value={jamReset}
+                              onChange={(e) => setJamReset(e.target.value)}
+                              placeholder="reset after N"
+                              inputMode="numeric"
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                            <input
+                              value={jamCode}
+                              onChange={(e) => setJamCode(e.target.value)}
+                              placeholder="reason code"
+                              inputMode="numeric"
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                            <input
+                              value={jamAccessPoints}
+                              onChange={(e) => setJamAccessPoints(e.target.value)}
+                              placeholder="target APs"
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                                width: '100%',
+                              }}
+                            />
+                            <input
+                              value={jamFilters}
+                              onChange={(e) => setJamFilters(e.target.value)}
+                              placeholder="filters (comma)"
+                              style={{
+                                background: '#001014',
+                                border: '1px solid #1c4f6f',
+                                color: '#9edcff',
+                                fontFamily: 'inherit',
+                                fontSize: isCompact ? '12px' : '11px',
+                                padding: '6px 8px',
+                                width: '100%',
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: isCompact ? '11px' : '10px', color: '#8ac0d8' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <input type="checkbox" checked={jamWorld} onChange={(e) => setJamWorld(e.target.checked)} />
+                              WORLD
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <input type="checkbox" checked={jamNoBroadcast} onChange={(e) => setJamNoBroadcast(e.target.checked)} />
+                              NO-BROADCAST
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <input type="checkbox" checked={jamVerbose} onChange={(e) => setJamVerbose(e.target.checked)} />
+                              VERBOSE
+                            </label>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                            <button
+                              onClick={handleStartJammer}
+                              style={{
+                                ...actionButtonStyle('#33ff88', isCompact),
+                                ...focusedControlStyle(focusedControl === 'jam-start', '#33ff88'),
+                              }}
+                            >
+                              START DEAUTH
+                            </button>
+                            <button
+                              onClick={handleStopJammer}
+                              style={{
+                                ...actionButtonStyle('#ff6f6f', isCompact),
+                                ...focusedControlStyle(focusedControl === 'jam-stop', '#ff6f6f'),
+                              }}
+                            >
+                              STOP DEAUTH
+                            </button>
+                          </div>
+                          <div style={{ border: '1px solid #1b3a46', padding: '10px', display: 'grid', gap: '6px' }}>
+                            <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#93d7ff' }}>DEAUTH LOG ({jamLogPreview.length})</div>
+                            <div style={{ maxHeight: isCompact ? '120px' : '160px', overflow: 'auto', fontSize: isCompact ? '11px' : '10px', color: '#7bc6ff', lineHeight: '1.5' }}>
+                              {jamLogPreview.length === 0
+                                ? 'No log lines yet.'
+                                : jamLogPreview.map((line, index) => (
+                                    <div key={`${line}-${index}`} style={{ wordBreak: 'break-word' }}>
+                                      {line}
+                                    </div>
+                                  ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -1073,7 +1381,7 @@ export default function HackerMenu({
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#ff8800', letterSpacing: '1.2px', textShadow: '0 0 8px #ff8800' }}>
                           IR PAGE
                         </div>
-                        <div style={{ fontSize: isCompact ? '12px' : '10px', color: '#8a6230', letterSpacing: '0.2px', lineHeight: '1.4' }}>
+                        <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#8a6230', letterSpacing: '0.2px', lineHeight: '1.45' }}>
                           Dedicated controls for IR database management and signal sending.
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
@@ -1166,7 +1474,7 @@ export default function HackerMenu({
                     padding: isCompact ? '8px 10px' : '10px 12px',
                     borderBottom: '1px solid #081408',
                     color: '#7fbf7f',
-                    fontSize: isCompact ? '12px' : '11px',
+                    fontSize: isCompact ? '13px' : '12px',
                     letterSpacing: '1px',
                   }}>
                     SERIAL TERMINAL (STATIC)
@@ -1194,7 +1502,7 @@ export default function HackerMenu({
                         border: '1px solid #2b5a2b',
                         color: '#9fe49f',
                         fontFamily: 'inherit',
-                        fontSize: isCompact ? '12px' : '11px',
+                        fontSize: isCompact ? '13px' : '12px',
                         padding: '6px 8px',
                       }}
                     />
@@ -1231,10 +1539,10 @@ export default function HackerMenu({
                     }}
                   >
                     {(serialLines ?? []).length === 0 ? (
-                      <div style={{ color: '#2b4a2b', fontSize: isCompact ? '11px' : '10px' }}>No serial lines yet.</div>
+                      <div style={{ color: '#2b4a2b', fontSize: isCompact ? '12px' : '11px' }}>No serial lines yet.</div>
                     ) : (
                       (serialLines ?? []).map((line, index) => (
-                        <div key={`${index}-${line.slice(0, 24)}`} style={{ color: '#69a869', fontSize: isCompact ? '11px' : '10px', lineHeight: '1.4' }}>
+                        <div key={`${index}-${line.slice(0, 24)}`} style={{ color: '#69a869', fontSize: isCompact ? '12px' : '11px', lineHeight: '1.45' }}>
                           {line}
                         </div>
                       ))
@@ -1263,7 +1571,7 @@ export default function HackerMenu({
                 display: 'flex', alignItems: 'center', gap: '6px',
                 flexWrap: 'wrap',
               }}>
-                <span style={{ color: '#00cc44', fontSize: isCompact ? '13px' : '12px' }}>root@flipper</span>
+                <span style={{ color: '#00cc44', fontSize: isCompact ? '13px' : '12px' }}>root@guppy</span>
                 <span style={{ color: '#555', fontSize: isCompact ? '13px' : '12px' }}>:</span>
                 <span style={{ color: '#4466cc', fontSize: isCompact ? '13px' : '12px' }}>~</span>
                 <span style={{ color: '#888', fontSize: isCompact ? '13px' : '12px' }}>$</span>
@@ -1307,6 +1615,17 @@ export default function HackerMenu({
         ))}
       </div>
 
+      <WifiResultsModal 
+        isOpen={showWifiResults}
+        title={wifiResultsTitle}
+        mode={wifiResultsMode}
+        results={wifiResults}
+        onClose={() => setShowWifiResults(false)}
+        isCompact={isCompact}
+        onSelectNetwork={handleWifiResultsSelect}
+      />
+
+
       <style>{`
         @keyframes scanrow {
           0%   { transform: translateX(-100%); }
@@ -1326,3 +1645,4 @@ export default function HackerMenu({
     </div>
   )
 }
+

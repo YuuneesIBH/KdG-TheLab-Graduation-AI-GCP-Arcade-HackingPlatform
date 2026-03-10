@@ -32,7 +32,7 @@ WIDTH, HEIGHT = screen.get_size()
 pygame.display.set_caption("PONG")
 clock = pygame.time.Clock()
 FPS = 60
-JOYSTICK_DEADZONE = 0.25
+JOYSTICK_DEADZONE = 0.35
 BLACK      = (0,   0,   0)
 GREEN      = (0,   255, 70)
 GREEN_DIM  = (0,   80,  25)
@@ -50,7 +50,8 @@ except:
     font_small = pygame.font.SysFont("monospace", 22, bold=True)
 PAD_W, PAD_H = 19, 185
 BALL_R       = 10
-PAD_SPEED    = 35
+PAD_SPEED    = 24
+PAD_SPEED_ANALOG = 18
 INIT_SPEED   = 25
 WIN_SCORE    = 7
 MARGIN       = 50
@@ -87,9 +88,9 @@ scanlines  = make_scanlines()
 vignette   = make_vignette()
 field_bg   = make_field_bg()
 print("Done.")
-joystick = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
-if joystick:
-    joystick.init()
+joysticks = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
+for js in joysticks:
+    js.init()
 def pixel_text(surf, text, font, colour, cx, cy, shadow=True):
     if shadow:
         s = font.render(text, False, GREEN_DARK)
@@ -115,8 +116,10 @@ class Paddle:
     def rect(self):
         return pygame.Rect(self.x, int(self.y), PAD_W, PAD_H)
 
-    def move_player(self, up, down):
-        if up:
+    def move_player(self, up, down, axis_value=0.0):
+        if abs(axis_value) > JOYSTICK_DEADZONE:
+            self.vy = axis_value * PAD_SPEED_ANALOG
+        elif up:
             self.vy = -PAD_SPEED
         elif down:
             self.vy = PAD_SPEED
@@ -196,13 +199,13 @@ class Ball:
         pygame.draw.circle(surf, GREEN_DIM, (int(self.x), int(self.y)), BALL_R + 4)
         pygame.draw.circle(surf, GREEN,     (int(self.x), int(self.y)), BALL_R)
         pygame.draw.circle(surf, WHITE,     (int(self.x) - 3, int(self.y) - 3), 3)
-def draw_hud(surf, score_p, score_ai, paused):
-    pixel_text(surf, str(score_p),  font_big, GREEN, WIDTH // 4,     70)
-    pixel_text(surf, str(score_ai), font_big, AMBER, WIDTH * 3 // 4, 70)
-    pixel_text(surf, "< SPELER >", font_small, GREEN_DIM, WIDTH // 4,     130, shadow=False)
-    pixel_text(surf, "<  A.I.  >", font_small, AMBER_DIM, WIDTH * 3 // 4, 130, shadow=False)
+def draw_hud(surf, score_p1, score_p2, paused):
+    pixel_text(surf, str(score_p1), font_big, GREEN, WIDTH // 4,     70)
+    pixel_text(surf, str(score_p2), font_big, AMBER, WIDTH * 3 // 4, 70)
+    pixel_text(surf, "<  P1  >", font_small, GREEN_DIM, WIDTH // 4,     130, shadow=False)
+    pixel_text(surf, "<  P2  >", font_small, AMBER_DIM, WIDTH * 3 // 4, 130, shadow=False)
 
-    hint = "[ UP/DN of LS ] BEWEEG    [ P ] PAUZE    [ ESC ] STOP"
+    hint = "[P1] UP/DN of LS1    [P2] W/S of LS2    [ P ] PAUZE    [ ESC ] STOP"
     pixel_text(surf, hint, font_small, GREEN_DIM, WIDTH // 2, HEIGHT - 22, shadow=False)
 
     t = pygame.time.get_ticks()
@@ -218,7 +221,7 @@ def draw_hud(surf, score_p, score_ai, paused):
         pixel_text(surf, "DRUK  P  OM  VERDER  TE  GAAN", font_small, GREEN_DIM,
                    WIDTH // 2, HEIGHT // 2 + 60)
 def win_screen(winner):
-    colour = GREEN if winner == "SPELER" else AMBER
+    colour = GREEN if winner == "P1" else AMBER
     t = 0
     while True:
         clock.tick(FPS)
@@ -242,10 +245,10 @@ def win_screen(winner):
         screen.blit(vignette,  (0, 0))
         pygame.display.flip()
 def game():
-    player = Paddle(MARGIN,                 GREEN)
-    ai_pad = Paddle(WIDTH - MARGIN - PAD_W, AMBER)
+    player1 = Paddle(MARGIN,                 GREEN)
+    player2 = Paddle(WIDTH - MARGIN - PAD_W, AMBER)
     ball   = Ball()
-    score_p = score_ai = 0
+    score_p1 = score_p2 = 0
     paused  = False
     direction = 1
 
@@ -262,49 +265,58 @@ def game():
 
         if paused:
             screen.blit(field_bg, (0, 0))
-            player.draw(screen)
-            ai_pad.draw(screen)
+            player1.draw(screen)
+            player2.draw(screen)
             ball.draw(screen)
-            draw_hud(screen, score_p, score_ai, True)
+            draw_hud(screen, score_p1, score_p2, True)
             screen.blit(scanlines, (0, 0))
             screen.blit(vignette,  (0, 0))
             pygame.display.flip()
             continue
 
         keys = pygame.key.get_pressed()
-        joy_up = joy_down = False
-        if joystick:
-            axis_y = joystick.get_axis(1)
-            joy_up = axis_y < -JOYSTICK_DEADZONE
-            joy_down = axis_y > JOYSTICK_DEADZONE
-        player.move_player(keys[pygame.K_UP] or joy_up, keys[pygame.K_DOWN] or joy_down)
-        ai_pad.move_ai(ball)
-        result = ball.update(player, ai_pad)
+
+        # Joystick inputs (LS Y) for both players
+        joy1_axis = joy2_axis = 0.0
+        if len(joysticks) >= 1:
+            joy1_axis = joysticks[0].get_axis(1)
+        if len(joysticks) >= 2:
+            joy2_axis = joysticks[1].get_axis(1)
+
+        p1_up = keys[pygame.K_UP] or joy1_axis < -JOYSTICK_DEADZONE
+        p1_dn = keys[pygame.K_DOWN] or joy1_axis > JOYSTICK_DEADZONE
+        p2_up = keys[pygame.K_w] or joy2_axis < -JOYSTICK_DEADZONE
+        p2_dn = keys[pygame.K_s] or joy2_axis > JOYSTICK_DEADZONE
+
+        player1.move_player(p1_up, p1_dn, joy1_axis)
+        player2.move_player(p2_up, p2_dn, joy2_axis)
+
+        result = ball.update(player1, player2)
 
         if result:
             if result == "player":
-                score_p  += 1; direction = -1
+                score_p1  += 1; direction = -1
             else:
-                score_ai += 1; direction = 1
+                score_p2 += 1; direction = 1
 
             screen.blit(field_bg, (0, 0))
-            player.draw(screen); ai_pad.draw(screen); ball.draw(screen)
-            draw_hud(screen, score_p, score_ai, False)
+            player1.draw(screen); player2.draw(screen); ball.draw(screen)
+            draw_hud(screen, score_p1, score_p2, False)
             screen.blit(scanlines, (0, 0))
             screen.blit(vignette,  (0, 0))
             pygame.display.flip()
 
-            if score_p  >= WIN_SCORE: pygame.time.delay(500); win_screen("SPELER"); return
-            if score_ai >= WIN_SCORE: pygame.time.delay(500); win_screen("A.I.");   return
+            if score_p1 >= WIN_SCORE: pygame.time.delay(500); win_screen("P1"); return
+            if score_p2 >= WIN_SCORE: pygame.time.delay(500); win_screen("P2"); return
 
             ball.reset(direction)
             pygame.time.delay(400)
 
         screen.blit(field_bg, (0, 0))
-        player.draw(screen)
-        ai_pad.draw(screen)
+        player1.draw(screen)
+        player2.draw(screen)
         ball.draw(screen)
-        draw_hud(screen, score_p, score_ai, False)
+        draw_hud(screen, score_p1, score_p2, False)
         screen.blit(scanlines, (0, 0))
         screen.blit(vignette,  (0, 0))
         pygame.display.flip()

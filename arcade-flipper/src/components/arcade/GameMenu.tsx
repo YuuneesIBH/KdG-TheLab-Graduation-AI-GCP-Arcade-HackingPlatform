@@ -42,6 +42,8 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const [crtFlicker, setCrtFlicker] = React.useState(false)
   const [scanlineOffset, setScanlineOffset] = React.useState(0)
   const [glitchLine, setGlitchLine] = React.useState(-1)
+  const gamepadDirRef = React.useRef(0)
+  const gamepadFireRef = React.useRef(false)
 
   const list = games
 
@@ -116,27 +118,28 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
   React.useEffect(() => {
     let raf = 0
-    let cooldownUntil = 0
 
     const poll = () => {
       const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((g) => g?.connected)
       if (gamepad) {
-        const now = Date.now()
         const axisY = gamepad.axes[1] ?? 0
         const pressed = (btn: number) => Boolean(gamepad.buttons[btn]?.pressed)
 
-        if (now >= cooldownUntil) {
-          if (axisY < -0.55 || pressed(12)) {
-            moveSelection(-1)
-            cooldownUntil = now + 180
-          } else if (axisY > 0.55 || pressed(13)) {
-            moveSelection(1)
-            cooldownUntil = now + 180
-          } else if (pressed(0) || pressed(9)) { // A of START
-            startSelected()
-            cooldownUntil = now + 240
-          }
+        const dir = axisY < -0.55 || pressed(12)
+          ? -1
+          : axisY > 0.55 || pressed(13)
+            ? 1
+            : 0
+
+        if (dir !== 0 && gamepadDirRef.current === 0) {
+          moveSelection(dir)
         }
+
+        gamepadDirRef.current = dir
+
+        const fire = pressed(0) || pressed(9) // A of START
+        if (fire && !gamepadFireRef.current) startSelected()
+        gamepadFireRef.current = fire
       }
       raf = requestAnimationFrame(poll)
     }

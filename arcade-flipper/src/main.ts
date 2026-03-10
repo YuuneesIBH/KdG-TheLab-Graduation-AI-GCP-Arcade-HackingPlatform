@@ -1316,7 +1316,14 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 
     if (gameExtension === '.exe') {
       const exeProcess = spawn(fullGamePath, [], {
-        stdio: 'ignore'
+        stdio: 'ignore',
+        cwd: path.dirname(fullGamePath),
+        env: {
+          ...process.env,
+          ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
+          ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
+          ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
+        }
       })
       trackActiveGameProcess(exeProcess, 'exe')
 

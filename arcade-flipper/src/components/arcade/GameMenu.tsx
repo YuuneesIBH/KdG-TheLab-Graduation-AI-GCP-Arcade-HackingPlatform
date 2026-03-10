@@ -30,6 +30,7 @@ const games: GameCard[] = [
   { id: 'angry-walls', title: 'ANGRY WALLS', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Explore dungeons and hunt loot.', image: '../assets/angrywalls.png', accent: '#aa44ff', executable: 'games/AngryWalls/main.py', difficulty: '★★☆', players: '1P', year: '1996' },
   { id: 'elemental-clash', title: 'ELEMENTAL CLASH', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Arcane duel between warrior and wizard.', image: '../assets/elementalclash.png', accent: '#ff5500', executable: 'games/ElementalClash/src/main.py', difficulty: '★★★', players: '2P', year: '2025' },
   { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
+  { id: 'mame-emulator', title: 'MAME EMULATOR', genre: 'ARCADE', badge: 'EMULATOR', tagline: 'Start de ingebouwde MAME emulator.', image: '../assets/spaceinvaders.png', accent: '#4de0ff', executable: 'games/mame/mame.exe', difficulty: '★★★', players: 'Multi', year: '1997' },
 ]
 
 export { games }

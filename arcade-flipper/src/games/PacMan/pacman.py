@@ -3,8 +3,12 @@ import os
 import pygame
 pygame.init()
 pygame.joystick.init()
-joysticks = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
-for js in joysticks:
+JOYSTICK_DEADZONE = 0.3
+JOYSTICK_SPEED = 30
+active_js_index = None
+def _refresh_joysticks():
+  return [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
+for js in _refresh_joysticks():
   js.init()
 
 black = (0,0,0)
@@ -12,8 +16,6 @@ white = (255,255,255)
 blue = (0,0,255)
 red = (255,0,0)
 yellow   = ( 255, 255,   0)
-JOYSTICK_DEADZONE = 0.3
-JOYSTICK_SPEED = 30
 
 Trollicon=pygame.image.load('images/Trollman.png')
 pygame.display.set_icon(Trollicon)
@@ -327,13 +329,24 @@ b_h = (3*60)+19
 i_w = 303-16-32
 c_w = 303+(32-16)
 
+def pick_active_js():
+  global active_js_index
+  pads = [js for js in _refresh_joysticks() if js.get_init() or js.init() is None]
+  if active_js_index is None or not any(js.get_id() == active_js_index for js in pads):
+    active_js_index = pads[0].get_id() if pads else None
+  for js in pads:
+    moved = False
+    if js.get_numaxes() >= 2:
+      moved = abs(js.get_axis(0)) > JOYSTICK_DEADZONE or abs(js.get_axis(1)) > JOYSTICK_DEADZONE
+    pressed = any(js.get_button(i) for i in range(js.get_numbuttons()))
+    if moved or pressed:
+      active_js_index = js.get_id()
+      break
+  return next((js for js in pads if js.get_id() == active_js_index), None)
+
 def startGame():
   while True:
-      # refresh joystick (in case controllers changed)
-      js = None
-      if pygame.joystick.get_count() > 0:
-          js = pygame.joystick.Joystick(0)
-          js.init()
+      js = pick_active_js()
       all_sprites_list = pygame.sprite.RenderPlain()
       block_list = pygame.sprite.RenderPlain()
       monsta_list = pygame.sprite.RenderPlain()
@@ -389,11 +402,16 @@ def startGame():
       done = False
 
       while not done:
+          # allow any controller to claim active before handling events
+          js = pick_active_js()
+
           for event in pygame.event.get():
               if event.type == pygame.QUIT:
                   return
 
               if event.type == pygame.KEYDOWN:
+                  if event.key in (pygame.K_ESCAPE, pygame.K_z, pygame.K_w):
+                      return
                   if event.key == pygame.K_LEFT:
                       Pacman.changespeed(-30,0)
                   if event.key == pygame.K_RIGHT:
@@ -485,13 +503,13 @@ def doNext(message, left):
         if event.type == pygame.QUIT:
           return False
         if event.type == pygame.KEYDOWN:
-          if event.key == pygame.K_ESCAPE:
+          if event.key in (pygame.K_ESCAPE, pygame.K_z, pygame.K_w):
             return False
           if event.key == pygame.K_RETURN:
             return True
       # joystick buttons: A/Start continue, B/Back esc
-      if pygame.joystick.get_count() > 0:
-        js = pygame.joystick.Joystick(0)
+      js = pick_active_js()
+      if js:
         if js.get_button(0) or js.get_button(9):
           return True
         if js.get_button(1) or js.get_button(8):

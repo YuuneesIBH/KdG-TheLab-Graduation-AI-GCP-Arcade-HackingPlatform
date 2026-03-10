@@ -27,7 +27,7 @@ const BOOT_LINES = [
   'Init Coin Mech.........OK',
   'Loading game data......',
   '',
-  'Press COIN to continue...',
+  'Press W/X/C/V/B/N to continue...',
 ]
 
 type WifiApProfile = {

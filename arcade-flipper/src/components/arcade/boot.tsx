@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { HackButton, HackTransition } from '../flipper/HackTransition'
 
 type BootProps = {
@@ -36,6 +37,20 @@ export function BootScreen({
   onGoToHacker
 }: BootProps) {
   const readyToStart = progress >= 100
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+      if (['w', 'x', 'c', 'v', 'b', 'n'].includes(key)) {
+        if (readyToStart) {
+          e.preventDefault()
+          onStart()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onStart, readyToStart])
 
   return (
     <>
@@ -326,6 +341,9 @@ export function BootScreen({
                   >
                     START
                   </button>
+                  <div style={{ color: '#00ff88', fontSize: '12px', letterSpacing: '2px', marginTop: '6px', textShadow: '0 0 8px #00ff88' }}>
+                    Press W / X / C / V / B / N to start
+                  </div>
                 </div>
 <div style={{
                   background: '#000000',

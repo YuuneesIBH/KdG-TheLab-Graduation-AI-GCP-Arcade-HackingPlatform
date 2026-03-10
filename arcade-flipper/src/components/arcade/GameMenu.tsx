@@ -114,6 +114,37 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     return () => clearInterval(t)
   }, [])
 
+  React.useEffect(() => {
+    let raf = 0
+    let cooldownUntil = 0
+
+    const poll = () => {
+      const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((g) => g?.connected)
+      if (gamepad) {
+        const now = Date.now()
+        const axisY = gamepad.axes[1] ?? 0
+        const pressed = (btn: number) => Boolean(gamepad.buttons[btn]?.pressed)
+
+        if (now >= cooldownUntil) {
+          if (axisY < -0.55 || pressed(12)) {
+            moveSelection(-1)
+            cooldownUntil = now + 180
+          } else if (axisY > 0.55 || pressed(13)) {
+            moveSelection(1)
+            cooldownUntil = now + 180
+          } else if (pressed(0) || pressed(9)) { // A of START
+            startSelected()
+            cooldownUntil = now + 240
+          }
+        }
+      }
+      raf = requestAnimationFrame(poll)
+    }
+
+    poll()
+    return () => cancelAnimationFrame(raf)
+  }, [moveSelection, startSelected])
+
   const visibleRange = 4
   const itemSpacing = 140
   const iconSize = 132
@@ -429,10 +460,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                   }}
                 >
                   <div style={{ color: 'rgba(190,220,255,0.70)', fontWeight: 900, letterSpacing: 2, fontSize: 13, textShadow: '0 0 10px rgba(0,204,255,0.25)' }}>
-                    ↑/↓ (arriba/abajo) · SCROLL
+                    ↑/↓ · D-PAD · L-STICK = SCROLL
                   </div>
                   <div style={{ color: '#ffff00', fontWeight: 950, letterSpacing: 2, fontSize: 13, textShadow: '0 0 12px rgba(255,255,0,0.45)' }}>
-                    ENTER = PLAY
+                    ENTER / A / START = PLAY
                   </div>
                 </div>
               </div>
@@ -542,7 +573,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
                   <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
                     <div style={{ color: '#00ccff', fontWeight: 900, letterSpacing: 2, fontSize: hintFont, textShadow: `0 0 ${hintGlow}px rgba(0,204,255,0.35)` }}>
-                      Select & Go
+                      D-PAD / L-STICK = SCROLL · A / START / ENTER = PLAY
                     </div>
                   </div>
                 </div>

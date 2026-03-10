@@ -32,7 +32,7 @@ WIDTH, HEIGHT = screen.get_size()
 pygame.display.set_caption("PONG")
 clock = pygame.time.Clock()
 FPS = 60
-JOYSTICK_DEADZONE = 0.35
+JOYSTICK_DEADZONE = 0.32
 BLACK      = (0,   0,   0)
 GREEN      = (0,   255, 70)
 GREEN_DIM  = (0,   80,  25)
@@ -50,8 +50,8 @@ except:
     font_small = pygame.font.SysFont("monospace", 22, bold=True)
 PAD_W, PAD_H = 19, 185
 BALL_R       = 10
-PAD_SPEED    = 24
-PAD_SPEED_ANALOG = 18
+PAD_SPEED    = 28
+PAD_SPEED_ANALOG = 22
 INIT_SPEED   = 25
 WIN_SCORE    = 7
 MARGIN       = 50
@@ -276,20 +276,23 @@ def game():
 
         keys = pygame.key.get_pressed()
 
-        # Joystick inputs (LS Y) for both players
-        joy1_axis = joy2_axis = 0.0
-        if len(joysticks) >= 1:
-            joy1_axis = joysticks[0].get_axis(1)
+        # Joystick inputs (LS Y) — swap mapping: JS0 -> P2, JS1 -> P1 (if both present)
         if len(joysticks) >= 2:
-            joy2_axis = joysticks[1].get_axis(1)
+            p1_axis = joysticks[1].get_axis(1)
+            p2_axis = joysticks[0].get_axis(1)
+        elif len(joysticks) == 1:
+            p1_axis = joysticks[0].get_axis(1)
+            p2_axis = 0.0
+        else:
+            p1_axis = p2_axis = 0.0
 
-        p1_up = keys[pygame.K_UP] or joy1_axis < -JOYSTICK_DEADZONE
-        p1_dn = keys[pygame.K_DOWN] or joy1_axis > JOYSTICK_DEADZONE
-        p2_up = keys[pygame.K_w] or joy2_axis < -JOYSTICK_DEADZONE
-        p2_dn = keys[pygame.K_s] or joy2_axis > JOYSTICK_DEADZONE
+        p1_up = keys[pygame.K_UP] or p1_axis < -JOYSTICK_DEADZONE
+        p1_dn = keys[pygame.K_DOWN] or p1_axis > JOYSTICK_DEADZONE
+        p2_up = keys[pygame.K_w] or p2_axis < -JOYSTICK_DEADZONE
+        p2_dn = keys[pygame.K_s] or p2_axis > JOYSTICK_DEADZONE
 
-        player1.move_player(p1_up, p1_dn, joy1_axis)
-        player2.move_player(p2_up, p2_dn, joy2_axis)
+        player1.move_player(p1_up, p1_dn, p1_axis)
+        player2.move_player(p2_up, p2_dn, p2_axis)
 
         result = ball.update(player1, player2)
 

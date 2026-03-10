@@ -36,7 +36,6 @@ const games: GameCard[] = [
 export { games }
 
 export function MenuScreen({ particles, onSelectGame }: MenuProps) {
-  const [hoveredId, setHoveredId] = React.useState<string | null>(null)
   const [selectedId, setSelectedId] = React.useState<string>(games[0]?.id ?? '')
 
   const [crtFlicker, setCrtFlicker] = React.useState(false)
@@ -47,6 +46,8 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const gamepadLastFireRef = React.useRef(0)
   const lastStartRef = React.useRef(0)
   const activeGamepadIndexRef = React.useRef<number | null>(null)
+  const gamepadStartArmedRef = React.useRef(false)
+  const menuMountedAtRef = React.useRef(Date.now())
   const [isLaunching, setIsLaunching] = React.useState(false)
 
   const list = games
@@ -60,30 +61,30 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
   React.useEffect(() => {
     if (!list.some(g => g.id === selectedId)) setSelectedId(list[0]?.id ?? '')
-    setHoveredId(null)
   }, [list.length])
 
-  const focusId = hoveredId ?? selectedId
+  const focusId = selectedId
   const focusGame = React.useMemo(() => list.find(g => g.id === focusId) ?? list[0], [list, focusId])
 
   const accent = focusGame?.accent ?? '#00ccff'
 
-  const startSelected = React.useCallback(() => {
+  const launchGame = React.useCallback((targetId: string | null) => {
+    if (!targetId) return
     if (isLaunching) return
     const now = Date.now()
     if (now - lastStartRef.current < 800) return
     lastStartRef.current = now
     setIsLaunching(true)
-
-    const targetId = focusId
-    if (targetId) {
-      setSelectedId(targetId)
-      onSelectGame?.(targetId)
-    }
+    setSelectedId(targetId)
+    onSelectGame?.(targetId)
 
     // small window to block double fire
     window.setTimeout(() => setIsLaunching(false), 700)
-  }, [focusId, isLaunching, onSelectGame])
+  }, [isLaunching, onSelectGame])
+
+  const startSelected = React.useCallback(() => {
+    launchGame(selectedId)
+  }, [launchGame, selectedId])
 
   const wrapIndex = React.useCallback((i: number, len: number) => {
     if (len <= 0) return 0
@@ -94,8 +95,17 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     if (!list.length) return
     const ni = wrapIndex(selectedIndex + dir, list.length)
     const target = list[ni]
-    if (target) setSelectedId(target.id)
+    if (target) {
+      setSelectedId(target.id)
+    }
   }, [list, selectedIndex, wrapIndex])
+
+  React.useEffect(() => {
+    menuMountedAtRef.current = Date.now()
+    gamepadStartArmedRef.current = false
+    gamepadFireRef.current = false
+    gamepadDirRef.current = 0
+  }, [])
 
   React.useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -103,7 +113,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
       if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1) }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1) }
       if (e.key === 'Enter') { e.preventDefault(); startSelected() }
-      if (e.key === 'Escape') { e.preventDefault(); setHoveredId(null) }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -176,6 +185,16 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
         const fire = pressed(0) || pressed(9) // A of START
         const now = Date.now()
+        // Ignore held start/select from boot screen until we see a clean release.
+        if (!gamepadStartArmedRef.current) {
+          if (!fire && now - menuMountedAtRef.current > 220) {
+            gamepadStartArmedRef.current = true
+          }
+          gamepadFireRef.current = fire
+          raf = requestAnimationFrame(poll)
+          return
+        }
+
         if (dir === 0 && fire && !gamepadFireRef.current && now - gamepadLastFireRef.current > 400) {
           startSelected()
           gamepadLastFireRef.current = now
@@ -438,16 +457,15 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                     const scale = clamp(1 - abs * 0.08, 0.56, 1)
                     const opacity = clamp(1 - abs * 0.20, 0.22, 1)
                     const rot = clamp(offset * 3.1, -12, 12)
-                    const isFocus = g.id === (hoveredId ?? selectedId)
+                    const isFocus = g.id === selectedId
                     const isSelected = g.id === selectedId
 
                     return (
                       <div
                         key={g.id}
-                        onMouseEnter={() => setHoveredId(g.id)}
-                        onMouseLeave={() => setHoveredId(null)}
+                        onMouseEnter={() => setSelectedId(g.id)}
                         onClick={() => setSelectedId(g.id)}
-                        onDoubleClick={startSelected}
+                        onDoubleClick={() => launchGame(g.id)}
                         style={{
                           position: 'absolute',
                           left: 0,

@@ -1834,8 +1834,15 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 
     if (gameExtension === '.exe') {
       const exeProcess = spawn(fullGamePath, [], {
-        stdio: 'ignore'
+        stdio: 'ignore',
+        cwd: path.dirname(fullGamePath)
       })
+
+      exeProcess.on('error', (error) => {
+        console.error('[LAUNCH] EXE start failed:', error)
+        restoreArcadeWindow()
+      })
+
       trackActiveGameProcess(exeProcess, 'exe')
 
       return {
@@ -1883,4 +1890,3 @@ app.on('activate', () => {
     createWindow()
   }
 })
-

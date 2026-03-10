@@ -51,3 +51,6 @@ arcade-guppy/src/games/RetroRaceGame/src/nbproject/private/
 .tmp-*.js
 
 arcade-flipper/src/games/Mame_Emulator/mame.sym
+arcade-guppy/src/games/Mame_Emulator/mame.sym
+arcade-guppy/src/games/Mame_Emulator/mame.sym
+./arcade-guppy/src/games/Mame_Emulator/mame.sym

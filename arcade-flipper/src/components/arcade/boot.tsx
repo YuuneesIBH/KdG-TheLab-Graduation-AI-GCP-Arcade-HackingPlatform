@@ -41,6 +41,7 @@ export function BootScreen({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return
       const key = e.key.toLowerCase()
       if (['w', 'x', 'c', 'v', 'b', 'n', 'enter'].includes(key)) {
         if (readyToStart) {
@@ -96,6 +97,7 @@ export function BootScreen({
       <div style={{
         background: 'linear-gradient(180deg, #001a40 0%, #000d1f 40%, #000510 70%, #000000 100%)',
         minHeight: '100vh',
+        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -104,7 +106,7 @@ export function BootScreen({
         paddingBottom: '60px',
         fontFamily: '"Courier New", "Press Start 2P", monospace',
         position: 'relative',
-        overflow: 'auto',
+        overflow: 'hidden',
         filter: crtFlicker
           ? 'brightness(1) contrast(1.25)'
           : 'brightness(1.22) contrast(1.1)',

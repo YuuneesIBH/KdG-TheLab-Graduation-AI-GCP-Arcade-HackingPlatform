@@ -83,6 +83,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
   React.useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      if (e.repeat) return
       if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1) }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1) }
       if (e.key === 'Enter') { e.preventDefault(); startSelected() }

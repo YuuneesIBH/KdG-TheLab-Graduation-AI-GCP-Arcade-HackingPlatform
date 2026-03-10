@@ -11,6 +11,12 @@ def _refresh_joysticks():
 for js in _refresh_joysticks():
   js.init()
 
+def _js_id(js):
+  if hasattr(js, "get_instance_id"):
+    try: return js.get_instance_id()
+    except TypeError: pass
+  return js.get_id()
+
 black = (0,0,0)
 white = (255,255,255)
 blue = (0,0,255)
@@ -332,17 +338,17 @@ c_w = 303+(32-16)
 def pick_active_js():
   global active_js_index
   pads = [js for js in _refresh_joysticks() if js.get_init() or js.init() is None]
-  if active_js_index is None or not any(js.get_id() == active_js_index for js in pads):
-    active_js_index = pads[0].get_id() if pads else None
+  if active_js_index is None or not any(_js_id(js) == active_js_index for js in pads):
+    active_js_index = _js_id(pads[0]) if pads else None
   for js in pads:
     moved = False
     if js.get_numaxes() >= 2:
       moved = abs(js.get_axis(0)) > JOYSTICK_DEADZONE or abs(js.get_axis(1)) > JOYSTICK_DEADZONE
     pressed = any(js.get_button(i) for i in range(js.get_numbuttons()))
     if moved or pressed:
-      active_js_index = js.get_id()
+      active_js_index = _js_id(js)
       break
-  return next((js for js in pads if js.get_id() == active_js_index), None)
+  return next((js for js in pads if _js_id(js) == active_js_index), None)
 
 def startGame():
   while True:
@@ -405,7 +411,7 @@ def startGame():
           # allow any controller to claim active before handling events
           js = pick_active_js()
 
-          for event in pygame.event.get():
+      for event in pygame.event.get():
               if event.type == pygame.QUIT:
                   return
 
@@ -442,6 +448,11 @@ def startGame():
                       Pacman.change_x = -JOYSTICK_SPEED if axis_x < 0 else JOYSTICK_SPEED
                   else:
                       Pacman.change_y = -JOYSTICK_SPEED if axis_y < 0 else JOYSTICK_SPEED
+
+          # immediate quit if key held (failsafe)
+          pressed = pygame.key.get_pressed()
+          if pressed[pygame.K_ESCAPE] or pressed[pygame.K_v] or pressed[pygame.K_e]:
+              return
           Pacman.update(wall_list,gate)
 
           returned = Pinky.changespeed(Pinky_directions,False,p_turn,p_steps,pl)
@@ -514,6 +525,9 @@ def doNext(message, left):
           return True
         if js.get_button(1) or js.get_button(8):
           return False
+      pressed = pygame.key.get_pressed()
+      if pressed[pygame.K_ESCAPE] or pressed[pygame.K_v] or pressed[pygame.K_e]:
+        return False
       w = pygame.Surface((400,200))
       w.set_alpha(10)
       w.fill((128,128,128))

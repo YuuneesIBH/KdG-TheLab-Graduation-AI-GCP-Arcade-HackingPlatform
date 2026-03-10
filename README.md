@@ -155,7 +155,7 @@ npm run check
 - BLOCK STORM (`games/BlockStorm/main.py`)
 - ANGRY WALLS (`games/AngryWalls/main.py`)
 - PONG (`games/pong.py`)
-- EMULATOR (`games/Emulator/mame.exe`)
+- EMULATOR (`games/Mame_Emulator/mame.exe`)
 
 ## Nieuwe Games Toevoegen
 

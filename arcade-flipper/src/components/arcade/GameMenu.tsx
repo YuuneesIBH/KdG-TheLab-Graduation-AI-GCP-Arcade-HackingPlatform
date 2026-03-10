@@ -45,6 +45,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const gamepadDirRef = React.useRef(0)
   const gamepadFireRef = React.useRef(false)
   const gamepadLastFireRef = React.useRef(0)
+  const lastStartRef = React.useRef(0)
   const activeGamepadIndexRef = React.useRef<number | null>(null)
 
   const list = games
@@ -67,6 +68,10 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const accent = focusGame?.accent ?? '#00ccff'
 
   const startSelected = React.useCallback(() => {
+    const now = Date.now()
+    if (now - lastStartRef.current < 450) return
+    lastStartRef.current = now
+
     const targetId = focusId
     if (targetId) {
       setSelectedId(targetId)
@@ -165,7 +170,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
         const fire = pressed(0) || pressed(9) // A of START
         const now = Date.now()
-        if (dir === 0 && fire && !gamepadFireRef.current && now - gamepadLastFireRef.current > 280) {
+        if (dir === 0 && fire && !gamepadFireRef.current && now - gamepadLastFireRef.current > 320) {
           startSelected()
           gamepadLastFireRef.current = now
         }

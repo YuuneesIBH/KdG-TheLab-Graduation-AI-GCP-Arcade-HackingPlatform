@@ -108,8 +108,8 @@ export function BootScreen({
         position: 'relative',
         overflow: 'hidden',
         filter: crtFlicker
-          ? 'brightness(1) contrast(1.25)'
-          : 'brightness(1.22) contrast(1.1)',
+          ? 'brightness(1.2) contrast(1.18)'
+          : 'brightness(1.38) contrast(1.08)',
         transition: 'filter 0.06s',
         transform: `translateX(${pixelShift}px)`
       }}>

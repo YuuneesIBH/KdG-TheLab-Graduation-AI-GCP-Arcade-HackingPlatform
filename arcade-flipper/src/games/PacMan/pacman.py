@@ -523,8 +523,6 @@ def doNext(message, left):
       if js:
         if js.get_button(0) or js.get_button(9):
           return True
-        if js.get_button(1) or js.get_button(8):
-          return False
       pressed = pygame.key.get_pressed()
       if pressed[pygame.K_ESCAPE] or pressed[pygame.K_v] or pressed[pygame.K_e]:
         return False

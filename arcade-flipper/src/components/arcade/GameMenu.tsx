@@ -230,7 +230,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           position: 'relative',
           overflow: 'hidden',
           fontFamily: '"Courier New", "Press Start 2P", monospace',
-          filter: crtFlicker ? 'brightness(1.02) contrast(1.2)' : 'brightness(1.22) contrast(1.1)',
+          filter: crtFlicker ? 'brightness(1.18) contrast(1.14)' : 'brightness(1.36) contrast(1.08)',
           transition: 'filter 0.06s',
         }}
       >
@@ -340,9 +340,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           <div onWheel={onWheel} style={{ position: 'relative', overflow: 'hidden' }}>
             <div
               style={{
-                border: '6px solid #0088ff',
-                background: '#000814',
-                boxShadow: '0 0 30px rgba(0,136,255,0.45), inset 0 0 20px rgba(0,136,255,0.18), 6px 6px 0 rgba(0,0,0,0.6)',
+              border: '6px solid #0088ff',
+              background: '#06132a',
+              boxShadow: '0 0 32px rgba(0,136,255,0.55), inset 0 0 22px rgba(0,136,255,0.24), 6px 6px 0 rgba(0,0,0,0.5)',
                 padding: 6,
                 borderRadius: 18,
                 height: '100%',
@@ -350,9 +350,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             >
               <div
                 style={{
-                  border: '4px solid #004488',
-                  background: 'linear-gradient(180deg, #001122, #000a14)',
-                  boxShadow: 'inset 0 0 30px rgba(0,68,136,0.28)',
+              border: '4px solid #004488',
+              background: 'linear-gradient(180deg, #0a2040, #021020)',
+              boxShadow: 'inset 0 0 34px rgba(0,68,136,0.36)',
                   borderRadius: 14,
                   height: '100%',
                   position: 'relative',
@@ -497,9 +497,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           <div style={{ position: 'relative', overflow: 'hidden' }}>
             <div
               style={{
-                border: '6px solid #0088ff',
-                background: '#000814',
-                boxShadow: '0 0 30px rgba(0,136,255,0.45), inset 0 0 20px rgba(0,136,255,0.18), 6px 6px 0 rgba(0,0,0,0.6)',
+              border: '6px solid #0088ff',
+              background: '#06132a',
+              boxShadow: '0 0 32px rgba(0,136,255,0.55), inset 0 0 22px rgba(0,136,255,0.24), 6px 6px 0 rgba(0,0,0,0.5)',
                 padding: 6,
                 borderRadius: 18,
                 height: '100%',
@@ -507,9 +507,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
             >
               <div
                 style={{
-                  border: '4px solid #004488',
-                  background: 'linear-gradient(180deg, #001122, #000a14)',
-                  boxShadow: 'inset 0 0 30px rgba(0,68,136,0.28)',
+              border: '4px solid #004488',
+              background: 'linear-gradient(180deg, #0a2040, #021020)',
+              boxShadow: 'inset 0 0 34px rgba(0,68,136,0.36)',
                   borderRadius: 14,
                   height: '100%',
                   position: 'relative',
@@ -526,7 +526,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       objectFit: 'cover',
                       display: 'block',
                       imageRendering: 'pixelated',
-                      filter: 'brightness(1.26) saturate(1.08)',
+                      filter: 'brightness(1.42) saturate(1.08)',
                     }}
                   />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.04) 0%, transparent 48%, rgba(0,0,0,0.56) 100%)' }} />
@@ -580,12 +580,12 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                         padding: `${playPadY}px ${playPadX}px`,
                         borderRadius: 2,
                         border: `${playBorder}px solid ${accent}`,
-                        background: `linear-gradient(180deg, ${accent}22, rgba(0,8,20,0.65))`,
-                        color: '#ffffff',
-                        fontWeight: 950,
-                        letterSpacing: 3,
-                        fontSize: playFont,
-                        boxShadow: `0 0 ${playShadow}px ${accent}22`,
+                    background: `linear-gradient(180deg, ${accent}22, rgba(0,8,20,0.65))`,
+                    color: '#ffffff',
+                    fontWeight: 950,
+                    letterSpacing: 3,
+                    fontSize: playFont,
+                    boxShadow: `0 0 ${playShadow}px ${accent}33`,
                         fontFamily: 'inherit',
                         flex: '0 0 auto',
                         textShadow: `${Math.round(2 * infoScale)}px ${Math.round(2 * infoScale)}px 0 rgba(0,0,0,0.6)`,

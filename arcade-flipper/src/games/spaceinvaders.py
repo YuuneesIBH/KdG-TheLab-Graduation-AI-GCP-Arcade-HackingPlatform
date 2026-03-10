@@ -52,6 +52,10 @@ try:
     pygame.font.init()
 except:
     pass
+pygame.joystick.init()
+joystick = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
+if joystick:
+    joystick.init()
 
 display_flags = pygame.NOFRAME | pygame.SCALED
 if not embedded_mode:
@@ -590,7 +594,7 @@ class SpaceBattle:
                     pygame.quit()
                     sys.exit()
                 elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE and self.game_state == "playing":
+                    if event.key in (pygame.K_SPACE, pygame.K_a) and self.game_state == "playing":
                         self.player.shoot()
                     elif event.key == pygame.K_r and self.game_state == "game_over":
                         self.reset_game()
@@ -601,6 +605,14 @@ class SpaceBattle:
                     self.player.move("left")
                 if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
                     self.player.move("right")
+                if joystick:
+                    axis_x = joystick.get_axis(0)
+                    if axis_x < -0.35:
+                        self.player.move("left")
+                    elif axis_x > 0.35:
+                        self.player.move("right")
+                    if joystick.get_button(0):  # A / bottom face button
+                        self.player.shoot()
                 self.spawn_alien()
                 self.player.update_bullets()
                 self.player.update_powerups()

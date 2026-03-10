@@ -11,6 +11,7 @@ PLAYER_SPEED = 6
 BULLET_SPEED = 10
 ALIEN_SPAWN_RATE = 60
 POWERUP_SPEED = 3
+JOYSTICK_DEADZONE = 0.25
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
@@ -607,9 +608,9 @@ class SpaceBattle:
                     self.player.move("right")
                 if joystick:
                     axis_x = joystick.get_axis(0)
-                    if axis_x < -0.35:
+                    if axis_x < -JOYSTICK_DEADZONE:
                         self.player.move("left")
-                    elif axis_x > 0.35:
+                    elif axis_x > JOYSTICK_DEADZONE:
                         self.player.move("right")
                     if joystick.get_button(0):  # A / bottom face button
                         self.player.shoot()

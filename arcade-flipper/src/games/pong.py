@@ -5,6 +5,7 @@ import random
 import os
 
 pygame.init()
+pygame.joystick.init()
 embedded_mode = os.environ.get('ARCADE_EMBEDDED') == '1'
 window_size_raw = os.environ.get('ARCADE_WINDOW_SIZE')
 window_pos = os.environ.get('ARCADE_WINDOW_POS')
@@ -31,6 +32,7 @@ WIDTH, HEIGHT = screen.get_size()
 pygame.display.set_caption("PONG")
 clock = pygame.time.Clock()
 FPS = 60
+JOYSTICK_DEADZONE = 0.25
 BLACK      = (0,   0,   0)
 GREEN      = (0,   255, 70)
 GREEN_DIM  = (0,   80,  25)
@@ -85,6 +87,9 @@ scanlines  = make_scanlines()
 vignette   = make_vignette()
 field_bg   = make_field_bg()
 print("Done.")
+joystick = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
+if joystick:
+    joystick.init()
 def pixel_text(surf, text, font, colour, cx, cy, shadow=True):
     if shadow:
         s = font.render(text, False, GREEN_DARK)
@@ -197,7 +202,7 @@ def draw_hud(surf, score_p, score_ai, paused):
     pixel_text(surf, "< SPELER >", font_small, GREEN_DIM, WIDTH // 4,     130, shadow=False)
     pixel_text(surf, "<  A.I.  >", font_small, AMBER_DIM, WIDTH * 3 // 4, 130, shadow=False)
 
-    hint = "[ UP/DN ] BEWEEG    [ P ] PAUZE    [ ESC ] STOP"
+    hint = "[ UP/DN of LS ] BEWEEG    [ P ] PAUZE    [ ESC ] STOP"
     pixel_text(surf, hint, font_small, GREEN_DIM, WIDTH // 2, HEIGHT - 22, shadow=False)
 
     t = pygame.time.get_ticks()
@@ -267,7 +272,12 @@ def game():
             continue
 
         keys = pygame.key.get_pressed()
-        player.move_player(keys[pygame.K_UP], keys[pygame.K_DOWN])
+        joy_up = joy_down = False
+        if joystick:
+            axis_y = joystick.get_axis(1)
+            joy_up = axis_y < -JOYSTICK_DEADZONE
+            joy_down = axis_y > JOYSTICK_DEADZONE
+        player.move_player(keys[pygame.K_UP] or joy_up, keys[pygame.K_DOWN] or joy_down)
         ai_pad.move_ai(ball)
         result = ball.update(player, ai_pad)
 

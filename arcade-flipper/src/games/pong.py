@@ -52,6 +52,9 @@ PAD_W, PAD_H = 19, 185
 BALL_R       = 10
 PAD_SPEED    = 28
 PAD_SPEED_ANALOG = 22
+INIT_SPEED   = 10
+BALL_ACCEL   = 1.003
+BALL_MAX_SPEED = 45
 INIT_SPEED   = 25
 WIN_SCORE    = 7
 MARGIN       = 50
@@ -146,9 +149,9 @@ class Ball:
         self.x = WIDTH  / 2
         self.y = HEIGHT / 2
         angle  = random.uniform(-0.6, 0.6)
-        self.vx = math.cos(angle) * INIT_SPEED * direction
-        self.vy = math.sin(angle) * INIT_SPEED
         self.speed = INIT_SPEED
+        self.vx = math.cos(angle) * self.speed * direction
+        self.vy = math.sin(angle) * self.speed
         self.trail.clear()
 
     @property
@@ -174,7 +177,7 @@ class Ball:
             if self.rect.colliderect(pad.rect):
                 rel = (self.y - (pad.y + PAD_H / 2)) / (PAD_H / 2)
                 rel = max(-1.0, min(1.0, rel))
-                self.speed = min(self.speed + 1.5, 100)
+                self.speed = min(self.speed + 0.5, BALL_MAX_SPEED)
                 angle = rel * math.pi / 3.5
                 direction = 1 if pad is player else -1
                 self.vx = math.cos(angle) * self.speed * direction
@@ -188,6 +191,14 @@ class Ball:
             return "ai"
         if self.x > WIDTH:
             return "player"
+
+        # Gradual acceleration over time
+        if self.speed < BALL_MAX_SPEED:
+            self.speed = min(self.speed * BALL_ACCEL, BALL_MAX_SPEED)
+            norm = math.hypot(self.vx, self.vy) or 1.0
+            scale = self.speed / norm
+            self.vx *= scale
+            self.vy *= scale
         return None
 
     def draw(self, surf):

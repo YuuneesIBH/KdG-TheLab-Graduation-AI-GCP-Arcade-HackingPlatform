@@ -120,7 +120,8 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     let raf = 0
 
     const poll = () => {
-      const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((g) => g?.connected)
+      const pads = Array.from(navigator.getGamepads?.() ?? []).filter((g) => g?.connected)
+      const gamepad = pads.length > 1 ? pads[1] : pads[0]
       if (gamepad) {
         const axisY = gamepad.axes[1] ?? 0
         const pressed = (btn: number) => Boolean(gamepad.buttons[btn]?.pressed)

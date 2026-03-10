@@ -41,7 +41,7 @@ export function BootScreen({
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase()
-      if (['w', 'x', 'c', 'v', 'b', 'n'].includes(key)) {
+      if (['w', 'x', 'c', 'v', 'b', 'n', 'enter'].includes(key)) {
         if (readyToStart) {
           e.preventDefault()
           onStart()
@@ -50,6 +50,27 @@ export function BootScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onStart, readyToStart])
+
+  useEffect(() => {
+    let raf = 0
+    let cooldownUntil = 0
+
+    const poll = () => {
+      const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((g) => g?.connected)
+      if (gamepad && readyToStart) {
+        const now = Date.now()
+        const pressed = (idx: number) => Boolean(gamepad.buttons[idx]?.pressed)
+        if (now >= cooldownUntil && (pressed(0) || pressed(9))) {
+          onStart()
+          cooldownUntil = now + 400
+        }
+      }
+      raf = requestAnimationFrame(poll)
+    }
+
+    poll()
+    return () => cancelAnimationFrame(raf)
   }, [onStart, readyToStart])
 
   return (
@@ -342,7 +363,7 @@ export function BootScreen({
                     START
                   </button>
                   <div style={{ color: '#00ff88', fontSize: '12px', letterSpacing: '2px', marginTop: '6px', textShadow: '0 0 8px #00ff88' }}>
-                    Press W / X / C / V / B / N to start
+                    Press ENTER or A/START to start
                   </div>
                 </div>
 <div style={{

@@ -44,6 +44,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const [glitchLine, setGlitchLine] = React.useState(-1)
   const gamepadDirRef = React.useRef(0)
   const gamepadFireRef = React.useRef(false)
+  const gamepadLastFireRef = React.useRef(0)
   const activeGamepadIndexRef = React.useRef<number | null>(null)
 
   const list = games
@@ -66,8 +67,12 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const accent = focusGame?.accent ?? '#00ccff'
 
   const startSelected = React.useCallback(() => {
-    if (selectedId) onSelectGame?.(selectedId)
-  }, [onSelectGame, selectedId])
+    const targetId = focusId
+    if (targetId) {
+      setSelectedId(targetId)
+      onSelectGame?.(targetId)
+    }
+  }, [focusId, onSelectGame])
 
   const wrapIndex = React.useCallback((i: number, len: number) => {
     if (len <= 0) return 0
@@ -159,7 +164,11 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         gamepadDirRef.current = dir
 
         const fire = pressed(0) || pressed(9) // A of START
-        if (fire && !gamepadFireRef.current) startSelected()
+        const now = Date.now()
+        if (dir === 0 && fire && !gamepadFireRef.current && now - gamepadLastFireRef.current > 280) {
+          startSelected()
+          gamepadLastFireRef.current = now
+        }
         gamepadFireRef.current = fire
       }
       raf = requestAnimationFrame(poll)

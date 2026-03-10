@@ -255,6 +255,21 @@ def win_screen(winner):
         screen.blit(scanlines, (0, 0))
         screen.blit(vignette,  (0, 0))
         pygame.display.flip()
+
+def countdown(player1, player2, ball):
+    for num in ["3", "2", "1"]:
+        t0 = pygame.time.get_ticks()
+        while pygame.time.get_ticks() - t0 < 800:
+            clock.tick(FPS)
+            screen.blit(field_bg, (0, 0))
+            player1.draw(screen)
+            player2.draw(screen)
+            ball.draw(screen)
+            draw_hud(screen, 0, 0, False)
+            pixel_text(screen, num, font_big, WHITE, WIDTH // 2, HEIGHT // 2, shadow=False)
+            screen.blit(scanlines, (0, 0))
+            screen.blit(vignette,  (0, 0))
+            pygame.display.flip()
 def game():
     player1 = Paddle(MARGIN,                 GREEN)
     player2 = Paddle(WIDTH - MARGIN - PAD_W, AMBER)
@@ -262,6 +277,8 @@ def game():
     score_p1 = score_p2 = 0
     paused  = False
     direction = 1
+
+    countdown(player1, player2, ball)
 
     while True:
         clock.tick(FPS)

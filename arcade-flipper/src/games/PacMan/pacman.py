@@ -410,7 +410,7 @@ def startGame():
                   return
 
               if event.type == pygame.KEYDOWN:
-                  if event.key in (pygame.K_ESCAPE, pygame.K_z, pygame.K_w):
+                  if event.key in (pygame.K_ESCAPE, pygame.K_v, pygame.K_e):
                       return
                   if event.key == pygame.K_LEFT:
                       Pacman.changespeed(-30,0)
@@ -503,7 +503,7 @@ def doNext(message, left):
         if event.type == pygame.QUIT:
           return False
         if event.type == pygame.KEYDOWN:
-          if event.key in (pygame.K_ESCAPE, pygame.K_z, pygame.K_w):
+          if event.key in (pygame.K_ESCAPE, pygame.K_v, pygame.K_e):
             return False
           if event.key == pygame.K_RETURN:
             return True

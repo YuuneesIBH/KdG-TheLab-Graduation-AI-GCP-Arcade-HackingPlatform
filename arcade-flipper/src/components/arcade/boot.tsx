@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { HackButton, HackTransition } from '../flipper/HackTransition'
 
 type BootProps = {
@@ -37,6 +37,7 @@ export function BootScreen({
   onGoToHacker
 }: BootProps) {
   const readyToStart = progress >= 100
+  const activePadIndex = useRef<number | null>(null)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -57,7 +58,24 @@ export function BootScreen({
     let cooldownUntil = 0
 
     const poll = () => {
-      const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((g) => g?.connected)
+      const pads = Array.from(navigator.getGamepads?.() ?? [])
+        .filter((g): g is Gamepad => Boolean(g && g.connected))
+        .sort((a, b) => a.index - b.index)
+
+      if (activePadIndex.current === null || !pads.some((p) => p.index === activePadIndex.current)) {
+        activePadIndex.current = pads[0]?.index ?? null
+      }
+
+      for (const p of pads) {
+        const axisMoved = Math.abs(p.axes[1] ?? 0) > 0.35 || Math.abs(p.axes[0] ?? 0) > 0.35
+        const buttonPressed = p.buttons?.some((b) => b?.pressed)
+        if (axisMoved || buttonPressed) {
+          activePadIndex.current = p.index
+          break
+        }
+      }
+
+      const gamepad = pads.find((p) => p.index === activePadIndex.current)
       if (gamepad && readyToStart) {
         const now = Date.now()
         const pressed = (idx: number) => Boolean(gamepad.buttons[idx]?.pressed)

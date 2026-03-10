@@ -44,6 +44,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const [glitchLine, setGlitchLine] = React.useState(-1)
   const gamepadDirRef = React.useRef(0)
   const gamepadFireRef = React.useRef(false)
+  const activeGamepadIndexRef = React.useRef<number | null>(null)
 
   const list = games
 
@@ -120,8 +121,26 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     let raf = 0
 
     const poll = () => {
-      const pads = Array.from(navigator.getGamepads?.() ?? []).filter((g) => g?.connected)
-      const gamepad = pads[0] ?? pads[1] // P1 first; fallback to P2 only if P1 ontbreekt
+      const pads = Array.from(navigator.getGamepads?.() ?? [])
+        .filter((g): g is Gamepad => Boolean(g && g.connected))
+        .sort((a, b) => a.index - b.index)
+
+      // keep active index if still present, otherwise smallest index
+      if (activeGamepadIndexRef.current === null || !pads.some((p) => p.index === activeGamepadIndexRef.current)) {
+        activeGamepadIndexRef.current = pads[0]?.index ?? null
+      }
+
+      // allow pad that moves/presses first to claim control
+      for (const p of pads) {
+        const axisMoved = Math.abs(p.axes[1] ?? 0) > 0.35 || Math.abs(p.axes[0] ?? 0) > 0.35
+        const buttonPressed = p.buttons?.some((b) => b?.pressed)
+        if (axisMoved || buttonPressed) {
+          activeGamepadIndexRef.current = p.index
+          break
+        }
+      }
+
+      const gamepad = pads.find((p) => p.index === activeGamepadIndexRef.current)
       if (gamepad) {
         const axisY = gamepad.axes[1] ?? 0
         const pressed = (btn: number) => Boolean(gamepad.buttons[btn]?.pressed)

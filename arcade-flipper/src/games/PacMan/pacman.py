@@ -1,12 +1,19 @@
   
 import os
 import pygame
-  
+pygame.init()
+pygame.joystick.init()
+joysticks = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
+for js in joysticks:
+  js.init()
+
 black = (0,0,0)
 white = (255,255,255)
 blue = (0,0,255)
 red = (255,0,0)
 yellow   = ( 255, 255,   0)
+JOYSTICK_DEADZONE = 0.3
+JOYSTICK_SPEED = 30
 
 Trollicon=pygame.image.load('images/Trollman.png')
 pygame.display.set_icon(Trollicon)
@@ -303,7 +310,6 @@ def present_frame():
     scaled = pygame.transform.scale(screen, window_size)
     display_surface.blit(scaled, (0, 0))
   pygame.display.flip()
-pygame.init()
 display_surface = init_display_surface()
 screen = pygame.Surface((LOGICAL_WIDTH, LOGICAL_HEIGHT))
 pygame.display.set_caption('Pacman')
@@ -323,6 +329,11 @@ c_w = 303+(32-16)
 
 def startGame():
   while True:
+      # refresh joystick (in case controllers changed)
+      js = None
+      if pygame.joystick.get_count() > 0:
+          js = pygame.joystick.Joystick(0)
+          js.init()
       all_sprites_list = pygame.sprite.RenderPlain()
       block_list = pygame.sprite.RenderPlain()
       monsta_list = pygame.sprite.RenderPlain()
@@ -401,6 +412,18 @@ def startGame():
                       Pacman.changespeed(0,30)
                   if event.key == pygame.K_DOWN:
                       Pacman.changespeed(0,-30)
+
+          # joystick override (when axis moves)
+          if js:
+              axis_x = js.get_axis(0) if js.get_numaxes() > 0 else 0
+              axis_y = js.get_axis(1) if js.get_numaxes() > 1 else 0
+              if abs(axis_x) > JOYSTICK_DEADZONE or abs(axis_y) > JOYSTICK_DEADZONE:
+                  Pacman.change_x = 0
+                  Pacman.change_y = 0
+                  if abs(axis_x) > abs(axis_y):
+                      Pacman.change_x = -JOYSTICK_SPEED if axis_x < 0 else JOYSTICK_SPEED
+                  else:
+                      Pacman.change_y = -JOYSTICK_SPEED if axis_y < 0 else JOYSTICK_SPEED
           Pacman.update(wall_list,gate)
 
           returned = Pinky.changespeed(Pinky_directions,False,p_turn,p_steps,pl)
@@ -466,6 +489,13 @@ def doNext(message, left):
             return False
           if event.key == pygame.K_RETURN:
             return True
+      # joystick buttons: A/Start continue, B/Back esc
+      if pygame.joystick.get_count() > 0:
+        js = pygame.joystick.Joystick(0)
+        if js.get_button(0) or js.get_button(9):
+          return True
+        if js.get_button(1) or js.get_button(8):
+          return False
       w = pygame.Surface((400,200))
       w.set_alpha(10)
       w.fill((128,128,128))

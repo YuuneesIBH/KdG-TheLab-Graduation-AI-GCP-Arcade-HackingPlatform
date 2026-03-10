@@ -52,9 +52,9 @@ PAD_W, PAD_H = 19, 185
 BALL_R       = 10
 PAD_SPEED    = 28
 PAD_SPEED_ANALOG = 22
-INIT_SPEED   = 10
-BALL_ACCEL   = 1.003
-BALL_MAX_SPEED = 45
+INIT_SPEED   = 3
+BALL_ACCEL   = 1.0008
+BALL_MAX_SPEED = 18
 INIT_SPEED   = 25
 WIN_SCORE    = 7
 MARGIN       = 50
@@ -177,7 +177,7 @@ class Ball:
             if self.rect.colliderect(pad.rect):
                 rel = (self.y - (pad.y + PAD_H / 2)) / (PAD_H / 2)
                 rel = max(-1.0, min(1.0, rel))
-                self.speed = min(self.speed + 0.5, BALL_MAX_SPEED)
+                self.speed = min(self.speed + 0.2, BALL_MAX_SPEED)
                 angle = rel * math.pi / 3.5
                 direction = 1 if pad is player else -1
                 self.vx = math.cos(angle) * self.speed * direction

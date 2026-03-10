@@ -155,7 +155,7 @@ npm run check
 - BLOCK STORM (`games/BlockStorm/main.py`)
 - ANGRY WALLS (`games/AngryWalls/main.py`)
 - PONG (`games/pong.py`)
-- EMULATOR (`games/Emulator/main.py`)
+- EMULATOR (`games/Emulator/mame.exe`)
 
 ## Nieuwe Games Toevoegen
 
@@ -213,4 +213,3 @@ The Lab Graduation Project:
 - Younes: arcade platform (launcher en interface)
 - Rayan: hardware (arcade cabinet, knoppen, computer setup)
 - Matthias: Raspberry Pi Pico hacking tool
-

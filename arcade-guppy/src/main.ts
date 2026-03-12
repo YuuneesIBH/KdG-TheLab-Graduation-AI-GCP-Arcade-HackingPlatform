@@ -3,31 +3,21 @@ import path from 'path'
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import fs from 'fs'
 import { SerialPort } from 'serialport'
-
-type LaunchViewport = {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-type LaunchRequest = {
-  gamePath: string
-  mode?: 'external' | 'embedded'
-  viewport?: LaunchViewport
-}
+import type {
+  AiExplainPayload,
+  AiExplainResponse,
+  GuppyStatus,
+  IrDatabaseEntry,
+  LaunchRequest,
+  LaunchViewport,
+  NfcCapturePayload,
+  WifiApProfile,
+  WifiJammerPayload,
+  WifiJammerState,
+} from './shared/electron-types'
 
 type PortInfo = Awaited<ReturnType<typeof SerialPort.list>>[number]
 type PortInfoWithFriendlyName = PortInfo & { friendlyName?: string }
-
-type GuppyStatus = {
-  connected: boolean
-  connecting: boolean
-  autoConnect: boolean
-  portPath?: string
-  error?: string
-  lastSeenAt?: number
-}
 
 type IpcResult = {
   success: boolean
@@ -48,68 +38,8 @@ type JammerMaclistResult = {
   preview: string[]
 }
 
-type NfcCapturePayload = {
-  uid: string
-  label?: string
-  rawLine?: string
-}
-
-type IrDatabaseEntry = {
-  id: string
-  name: string
-  protocol: string
-  address: string
-  command: string
-  carrierKhz?: number
-  source?: string
-}
-
-type WifiApProfile = {
-  ssid: string
-  password: string
-  channel: number
-  updatedAt: string
-}
-
-type AiExplainRequest = {
-  gameId: string
-  title: string
-  genre?: string
-  difficulty?: string
-  lastEvent?: string
-  language?: string
-}
-
-type AiExplainResult = {
-  success: boolean
-  message: string
-  content?: string
-}
-
-type WifiJammerMode = 'firmware' | 'host'
-
-type WifiJammerPayload = {
-  iface?: string
-  mode?: 'auto' | WifiJammerMode
-  channel?: number
-  accessPoints?: string
-  stations?: string
-  filters?: string
-  packets?: number
-  delay?: number
-  reset?: number
-  code?: number
-  world?: boolean
-  noBroadcast?: boolean
-  verbose?: boolean
-}
-
-type WifiJammerState = {
-  running: boolean
-  mode?: WifiJammerMode
-  iface?: string
-  message?: string
-}
+type AiExplainRequest = AiExplainPayload & { language?: string }
+type AiExplainResult = AiExplainResponse
 
 const DEFAULT_IR_MINI_DATABASE: IrDatabaseEntry[] = [
   {

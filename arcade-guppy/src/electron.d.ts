@@ -1,81 +1,33 @@
-export type LaunchViewport = {
-  x: number
-  y: number
-  width: number
-  height: number
-}
+import type {
+  AiExplainPayload,
+  AiExplainResponse,
+  GuppyStatus,
+  IpcMessageResponse,
+  IpcSuccessResponse,
+  IrDatabaseEntry,
+  LaunchRequest,
+  NfcCapturePayload,
+  WifiApProfile,
+  WifiJammerPayload,
+  WifiJammerState,
+} from './shared/electron-types'
 
-export type LaunchRequest = {
-  gamePath: string
-  mode?: 'external' | 'embedded'
-  viewport?: LaunchViewport
-}
+export type {
+  AiExplainPayload,
+  AiExplainResponse,
+  GuppyStatus,
+  IpcMessageResponse,
+  IpcSuccessResponse,
+  IrDatabaseEntry,
+  LaunchRequest,
+  LaunchViewport,
+  NfcCapturePayload,
+  WifiApProfile,
+  WifiJammerMode,
+  WifiJammerPayload,
+  WifiJammerState,
+} from './shared/electron-types'
 
-export type GuppyStatus = {
-  connected: boolean
-  connecting: boolean
-  autoConnect: boolean
-  portPath?: string
-  error?: string
-  lastSeenAt?: number
-}
-
-export type IrDatabaseEntry = {
-  id: string
-  name: string
-  protocol: string
-  address: string
-  command: string
-  carrierKhz?: number
-  source?: string
-}
-
-export type WifiApProfile = {
-  ssid: string
-  password: string
-  channel: number
-  updatedAt: string
-}
-
-export type WifiJammerPayload = {
-  iface?: string
-  mode?: 'auto' | 'firmware' | 'host'
-  channel?: number
-  accessPoints?: string
-  stations?: string
-  filters?: string
-  packets?: number
-  delay?: number
-  reset?: number
-  code?: number
-  world?: boolean
-  noBroadcast?: boolean
-  verbose?: boolean
-}
-
-export type WifiJammerState = {
-  running: boolean
-  mode?: 'firmware' | 'host'
-  iface?: string
-  message?: string
-}
-
-export type AiExplainPayload = {
-  gameId: string
-  title: string
-  genre?: string
-  difficulty?: string
-  lastEvent?: string
-}
-
-export type AiExplainResponse = {
-  success: boolean
-  message: string
-  content?: string
-}
-
-type IpcSuccessResponse = { success: boolean }
-type IpcMessageResponse = { success: boolean; message: string }
 type IrDbResponse = IpcMessageResponse & { entries?: IrDatabaseEntry[] }
 
 export interface ElectronAPI {
@@ -89,7 +41,7 @@ export interface ElectronAPI {
   guppyDisconnect: () => Promise<{success: boolean, message: string}>
   guppySendCommand: (command: string) => Promise<{success: boolean, message: string}>
   guppyRunModule: (moduleKey: string) => Promise<{success: boolean, message: string}>
-  guppySaveNfcCapture: (payload: { uid: string; label?: string; rawLine?: string }) => Promise<{success: boolean, message: string}>
+  guppySaveNfcCapture: (payload: NfcCapturePayload) => Promise<{success: boolean, message: string}>
   guppyLoadIrMiniDb: () => Promise<{success: boolean, message: string, entries: IrDatabaseEntry[]}>
   guppySendIrEntry: (entry: IrDatabaseEntry) => Promise<{success: boolean, message: string}>
   guppyLoadWifiApProfile: () => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>

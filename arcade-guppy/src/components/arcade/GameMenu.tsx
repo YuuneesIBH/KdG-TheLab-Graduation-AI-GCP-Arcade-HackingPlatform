@@ -216,7 +216,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const titleFont = Math.round(34 * infoScale)
   const taglineFont = Math.round(17 * infoScale)
   const playFont = Math.round(15 * infoScale)
-  const hintFont = Math.round(13 * infoScale)
 
   const titleGlow = Math.round(18 * infoScale)
   const titleOffset = Math.round(3 * infoScale)
@@ -227,7 +226,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const playBorder = Math.max(3, Math.round(3 * infoScale))
   const playShadow = Math.round(28 * infoScale)
 
-  const hintGlow = Math.round(10 * infoScale)
   const barHeight = Math.round(6 * infoScale)
   const barGlow = Math.round(26 * infoScale)
 
@@ -506,28 +504,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                   })}
                 </div>
 
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 12,
-                    right: 12,
-                    bottom: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    zIndex: 4,
-                    padding: '10px 10px',
-                    background: 'transparent',
-                  }}
-                >
-                  <div style={{ color: 'rgba(190,220,255,0.70)', fontWeight: 900, letterSpacing: 2, fontSize: 13, textShadow: '0 0 10px rgba(0,204,255,0.25)' }}>
-                    ↑/↓ · D-PAD · L-STICK = SCROLL
-                  </div>
-                  <div style={{ color: '#ffff00', fontWeight: 950, letterSpacing: 2, fontSize: 13, textShadow: '0 0 12px rgba(255,255,0,0.45)' }}>
-                    ENTER / A / START = PLAY
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -631,12 +607,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                     >
                       PLAY
                     </button>
-                  </div>
-
-                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ color: '#00ccff', fontWeight: 900, letterSpacing: 2, fontSize: hintFont, textShadow: `0 0 ${hintGlow}px rgba(0,204,255,0.35)` }}>
-                      D-PAD / L-STICK = SCROLL · A / START / ENTER = PLAY
-                    </div>
                   </div>
                 </div>
 

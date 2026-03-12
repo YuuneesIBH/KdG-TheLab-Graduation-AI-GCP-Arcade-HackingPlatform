@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import WifiResultsModal, { type WifiNetwork, buildWifiNetworkList } from './WifiResultsModal'
-import type { WifiJammerPayload, WifiJammerState } from '../../electron'
+import type {
+  GuppyStatus,
+  IrDatabaseEntry,
+  WifiApProfile,
+  WifiJammerPayload,
+  WifiJammerState,
+} from '../../shared/electron-types'
 
 const VIEW_ITEMS = [
   { key: 'home', label: 'HOME', color: '#00ff41' },
@@ -30,36 +36,10 @@ const BOOT_SEQUENCE = [
   '',
 ]
 
-type DeviceStatus = {
-  connected: boolean
-  connecting: boolean
-  autoConnect: boolean
-  portPath?: string
-  error?: string
-  lastSeenAt?: number
-}
-
-type IrDatabaseEntry = {
-  id: string
-  name: string
-  protocol: string
-  address: string
-  command: string
-  carrierKhz?: number
-  source?: string
-}
-
-type WifiApProfile = {
-  ssid: string
-  password: string
-  channel: number
-  updatedAt: string
-}
-
 type HackerMenuProps = {
   onSelect?: (key: string) => void
   onBack?: () => void
-  deviceStatus?: DeviceStatus
+  deviceStatus?: GuppyStatus
   lastDeviceLine?: string
   onNfcRead?: () => void
   onNfcSave?: () => void
@@ -1645,4 +1625,3 @@ export default function HackerMenu({
     </div>
   )
 }
-

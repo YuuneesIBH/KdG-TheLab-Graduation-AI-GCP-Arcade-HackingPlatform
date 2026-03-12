@@ -4,7 +4,6 @@ import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
 import HackerMenu from './components/guppy/HackerMenu'
-import { games } from './components/arcade/GameMenu'
 import type { GuppyStatus, IrDatabaseEntry, WifiApProfile, WifiJammerPayload, WifiJammerState } from './electron'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'

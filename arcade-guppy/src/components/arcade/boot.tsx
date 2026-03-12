@@ -1,9 +1,5 @@
-<<<<<<< HEAD:arcade-flipper/src/components/arcade/boot.tsx
 import { useEffect, useRef } from 'react'
-import { HackButton, HackTransition } from '../flipper/HackTransition'
-=======
 import { HackButton, HackTransition } from '../guppy/HackTransition'
->>>>>>> gitlab/main:arcade-guppy/src/components/arcade/boot.tsx
 
 type BootProps = {
   coins: number

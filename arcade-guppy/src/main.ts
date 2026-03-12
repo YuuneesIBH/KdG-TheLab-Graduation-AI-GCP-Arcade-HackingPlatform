@@ -1835,7 +1835,6 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
     if (gameExtension === '.exe') {
       const exeProcess = spawn(fullGamePath, [], {
         stdio: 'ignore',
-<<<<<<< HEAD:arcade-flipper/src/main.ts
         cwd: path.dirname(fullGamePath),
         env: {
           ...process.env,
@@ -1843,9 +1842,6 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
           ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
           ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
         }
-=======
-        cwd: path.dirname(fullGamePath)
->>>>>>> gitlab/main:arcade-guppy/src/main.ts
       })
 
       exeProcess.on('error', (error) => {

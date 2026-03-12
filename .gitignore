@@ -45,7 +45,12 @@ __pycache__/
 *.pyc
 *.class
 
-arcade-flipper/src/games/RetroRaceGame/.build/
-arcade-flipper/src/games/RetroRaceGame/src/nbproject/private/
+arcade-guppy/src/games/RetroRaceGame/.build/
+arcade-guppy/src/games/RetroRaceGame/src/nbproject/private/
 
 .tmp-*.js
+
+arcade-flipper/src/games/Mame_Emulator/mame.sym
+arcade-guppy/src/games/Mame_Emulator/mame.sym
+arcade-guppy/src/games/Mame_Emulator/mame.sym
+./arcade-guppy/src/games/Mame_Emulator/mame.sym

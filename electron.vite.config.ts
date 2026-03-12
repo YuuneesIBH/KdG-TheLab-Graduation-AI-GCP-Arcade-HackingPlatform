@@ -6,7 +6,7 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'arcade-flipper/src/main.ts'),
+        input: resolve(__dirname, 'arcade-guppy/src/main.ts'),
         external: ['serialport']
       }
     }
@@ -14,17 +14,18 @@ export default defineConfig({
   preload: {
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'arcade-flipper/src/preload.ts')
+        input: resolve(__dirname, 'arcade-guppy/src/preload.ts')
       }
     }
   },
   renderer: {
-    root: resolve(__dirname, 'arcade-flipper/src'),
+    root: resolve(__dirname, 'arcade-guppy/src'),
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'arcade-flipper/src/index.html')
+        input: resolve(__dirname, 'arcade-guppy/src/index.html')
       }
     },
     plugins: [react()]
   }
 })
+

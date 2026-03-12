@@ -1,5 +1,5 @@
 {
-  "name": "arcade-flipper",
+  "name": "arcade-guppy",
   "version": "1.0.0",
   "main": "out/main/main.js",
   "scripts": {
@@ -7,7 +7,7 @@
     "dev": "node scripts/run-electron-vite.js dev",
     "build": "node scripts/run-electron-vite.js build",
     "preview": "node scripts/run-electron-vite.js preview",
-    "typecheck": "tsc --noEmit -p arcade-flipper/tsconfig.json",
+    "typecheck": "tsc --noEmit -p arcade-guppy/tsconfig.json",
     "check": "npm run typecheck && npm run build",
     "test": "npm run check"
   },
@@ -31,3 +31,4 @@
     "serialport": "^12.0.0"
   }
 }
+

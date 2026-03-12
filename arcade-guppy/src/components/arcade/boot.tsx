@@ -326,7 +326,7 @@ export function BootScreen({
                   borderBottom: '3px solid #00aaff',
                   padding: '14px 20px',
                   display: 'flex',
-                  justifyContent: 'space-between',
+                  justifyContent: 'center',
                   alignItems: 'center',
                   position: 'relative',
                   boxShadow: '0 3px 15px rgba(0,136,255,0.4)'
@@ -360,30 +360,6 @@ export function BootScreen({
                     textShadow: '0 0 15px #00ccff, 3px 3px 0 #002244'
                   }}>
                     ▓▒░ SYSTEM BOOT ░▒▓
-                  </div>
-                  <button
-                    type="button"
-                    onClick={readyToStart ? onStart : undefined}
-                    disabled={!readyToStart}
-                    style={{
-                      background: 'linear-gradient(180deg, #00ff88, #00cc66)',
-                      color: '#001122',
-                      padding: '6px 16px',
-                      border: '3px solid #00ff88',
-                      fontSize: '16px',
-                      fontWeight: 'bold',
-                      letterSpacing: '2px',
-                      boxShadow: '0 0 15px rgba(0,255,136,0.5)',
-                      borderRadius: '2px',
-                      cursor: readyToStart ? 'pointer' : 'not-allowed',
-                      opacity: readyToStart ? 1 : 0.6
-                    }}
-                    aria-label="Start game menu"
-                  >
-                    START
-                  </button>
-                  <div style={{ color: '#00ff88', fontSize: '12px', letterSpacing: '2px', marginTop: '6px', textShadow: '0 0 8px #00ff88' }}>
-                    Press ENTER or A/START to start
                   </div>
                 </div>
 <div style={{

@@ -38,7 +38,6 @@ function App() {
   const [guppyLastLine, setGuppyLastLine] = useState<string>('')
   const [guppySerialLines, setGuppySerialLines] = useState<string[]>([])
   const [toolStatus, setToolStatus] = useState<string>('Ready')
-  const [lastNfcUid, setLastNfcUid] = useState<string>('')
   const [irDbEntries, setIrDbEntries] = useState<IrDatabaseEntry[]>([])
   const [wifiApProfile, setWifiApProfile] = useState<WifiApProfile | null>(null)
   const [wifiJammerState, setWifiJammerState] = useState<WifiJammerState>({ running: false })
@@ -199,12 +198,6 @@ function App() {
         const next = [...prev, `[${stamp}] ${line}`]
         return next.length > 140 ? next.slice(next.length - 140) : next
       })
-      const uidMatch = line.match(/(?:NFC_UID|UID)\s*[:=]\s*([0-9A-Fa-f:_-]+)/)
-      if (uidMatch?.[1]) {
-        const uid = uidMatch[1].toUpperCase()
-        setLastNfcUid(uid)
-        setToolStatus(`NFC UID captured: ${uid}`)
-      }
     })
 
     const unsubscribeJammerState = api.onWifiJammerState((state) => {
@@ -238,6 +231,11 @@ function App() {
       return
     }
 
+    if (key === 'nfc') {
+      setToolStatus('NFC backend removed. UI placeholder remains for the upcoming rewrite.')
+      return
+    }
+
     const result = await api.guppyRunModule(key)
     if (!result.success) {
       setToolStatus(`Module failed (${key}): ${result.message}`)
@@ -264,31 +262,13 @@ function App() {
     })
   }, [guppyStatus.connected])
 
-  const handleNfcRead = useCallback(async () => {
-    const api = window.electron
-    if (!api) {
-      const fallback: { success: boolean; message: string } = { success: false, message: 'Electron API unavailable' }
-      setToolStatus(fallback.message)
-      return fallback
-    }
-    const result = await api.guppySendCommand('NFC_READ')
-    setToolStatus(result.success ? 'NFC read command sent' : `NFC read failed: ${result.message}`)
+  const handleNfcRead = useCallback(() => {
+    setToolStatus('NFC read is unavailable. The NFC UI is being kept as a placeholder for the rewrite.')
   }, [])
 
-  const handleNfcSave = useCallback(async () => {
-    const api = window.electron
-    if (!api) return
-    if (!lastNfcUid) {
-      setToolStatus('No NFC UID captured yet')
-      return
-    }
-    const result = await api.guppySaveNfcCapture({
-      uid: lastNfcUid,
-      label: `nfcCapture-${lastNfcUid}`,
-      rawLine: guppyLastLine
-    })
-    setToolStatus(result.success ? `Saved NFC capture to ${result.message}` : `NFC save failed: ${result.message}`)
-  }, [lastNfcUid, guppyLastLine])
+  const handleNfcSave = useCallback(() => {
+    setToolStatus('NFC save is unavailable. The NFC UI is being kept as a placeholder for the rewrite.')
+  }, [])
 
   const handleIrReload = useCallback(async () => {
     const api = window.electron
@@ -419,7 +399,6 @@ function App() {
         onNfcSave={handleNfcSave}
         onIrReload={handleIrReload}
         onIrSend={handleIrSend}
-        lastNfcUid={lastNfcUid}
         irDbEntries={irDbEntries}
         toolStatus={toolStatus}
         serialLines={guppySerialLines}

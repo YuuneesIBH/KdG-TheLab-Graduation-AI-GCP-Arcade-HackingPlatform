@@ -6,7 +6,6 @@ import type {
   IpcSuccessResponse,
   IrDatabaseEntry,
   LaunchRequest,
-  NfcCapturePayload,
   WifiApProfile,
   WifiJammerPayload,
   WifiJammerState,
@@ -21,7 +20,6 @@ export type {
   IrDatabaseEntry,
   LaunchRequest,
   LaunchViewport,
-  NfcCapturePayload,
   WifiApProfile,
   WifiJammerMode,
   WifiJammerPayload,
@@ -41,7 +39,6 @@ export interface ElectronAPI {
   guppyDisconnect: () => Promise<{success: boolean, message: string}>
   guppySendCommand: (command: string) => Promise<{success: boolean, message: string}>
   guppyRunModule: (moduleKey: string) => Promise<{success: boolean, message: string}>
-  guppySaveNfcCapture: (payload: NfcCapturePayload) => Promise<{success: boolean, message: string}>
   guppyLoadIrMiniDb: () => Promise<{success: boolean, message: string, entries: IrDatabaseEntry[]}>
   guppySendIrEntry: (entry: IrDatabaseEntry) => Promise<{success: boolean, message: string}>
   guppyLoadWifiApProfile: () => Promise<{success: boolean, message: string, profile: WifiApProfile | null}>

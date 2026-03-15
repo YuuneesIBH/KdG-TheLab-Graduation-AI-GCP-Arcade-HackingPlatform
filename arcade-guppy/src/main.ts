@@ -10,7 +10,6 @@ import type {
   IrDatabaseEntry,
   LaunchRequest,
   LaunchViewport,
-  NfcCapturePayload,
   WifiApProfile,
   WifiJammerPayload,
   WifiJammerState,
@@ -306,11 +305,9 @@ function applySuperMarioNesResolution(fullGamePath: string, targetBounds: Launch
 
 const GUPPY_BAUD_RATE = 115200
 const GUPPY_SCAN_INTERVAL_MS = 3000
-const GUPPY_NFC_CAPTURE_DIR = path.join(app.getPath('userData'), 'guppy', 'nfc-captures')
 const GUPPY_WIFI_AP_PROFILE_PATH = path.join(app.getPath('userData'), 'guppy', 'wifi-ap-profile.json')
 
 const GUPPY_MODULE_COMMANDS: Record<string, string> = {
-  nfc: 'NFC_CLONE',
   badusb: 'BADUSB_INJECT',
   ir: 'IR_BLAST',
   gpio: 'GPIO_CTRL',
@@ -1024,14 +1021,6 @@ function createWindow() {
   })
 }
 
-function sanitizeFilePart(value: string) {
-  return value
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 48) || 'capture'
-}
-
 function sanitizeWifiApToken(value: string) {
   return (value ?? '').trim().replace(/\s+/g, '_')
 }
@@ -1417,35 +1406,6 @@ ipcMain.handle('guppy-run-module', async (_event, moduleKey: string) => {
     return { success: false, message: `Unknown module key: ${moduleKey}` }
   }
   return writeGuppyCommand(`RUN ${command}`)
-})
-
-ipcMain.handle('guppy-save-nfc-capture', async (_event, payload: NfcCapturePayload) => {
-  try {
-    const uid = (payload?.uid ?? '').trim()
-    if (!uid) {
-      return { success: false, message: 'Missing NFC UID' }
-    }
-
-    const now = new Date()
-    const iso = now.toISOString()
-    const stamp = iso.replace(/[:.]/g, '-')
-    const safeLabel = sanitizeFilePart((payload?.label ?? uid).trim())
-    const filename = `${stamp}_${safeLabel}.json`
-    const filePath = path.join(GUPPY_NFC_CAPTURE_DIR, filename)
-
-    fs.mkdirSync(GUPPY_NFC_CAPTURE_DIR, { recursive: true })
-    fs.writeFileSync(filePath, JSON.stringify({
-      uid,
-      label: payload?.label ?? uid,
-      capturedAt: iso,
-      source: 'guppy',
-      rawLine: payload?.rawLine ?? ''
-    }, null, 2))
-
-    return { success: true, message: filePath }
-  } catch (error: unknown) {
-    return { success: false, message: `Failed to save NFC capture: ${toErrorMessage(error)}` }
-  }
 })
 
 ipcMain.handle('guppy-load-ir-mini-db', async () => {

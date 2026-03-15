@@ -46,7 +46,6 @@ type HackerMenuProps = {
   onNfcSave?: () => void
   onIrReload?: () => void
   onIrSend?: (entryId: string) => void
-  lastNfcUid?: string
   irDbEntries?: IrDatabaseEntry[]
   toolStatus?: string
   serialLines?: string[]
@@ -183,7 +182,6 @@ export default function HackerMenu({
   onNfcSave,
   onIrReload,
   onIrSend,
-  lastNfcUid,
   irDbEntries,
   toolStatus,
   serialLines,
@@ -462,7 +460,6 @@ export default function HackerMenu({
         onNfcRead?.()
         return
       case 'nfc-save':
-        if (!lastNfcUid) return
         onNfcSave?.()
         return
       case 'ir-run':
@@ -492,7 +489,6 @@ export default function HackerMenu({
     }
   }, [
     focusedControl,
-    lastNfcUid,
     onBack,
     onClearSerialLog,
     onIrReload,
@@ -780,25 +776,8 @@ export default function HackerMenu({
       ? '#ffff00'
       : '#ff4444'
 
-  const nfcHealth = useMemo(() => {
-    const lines = serialLines ?? []
-    for (let i = lines.length - 1; i >= 0; i -= 1) {
-      const line = lines[i]
-      const match = line.match(/NFC=([A-Z_]+)/i)
-      if (match?.[1]) return match[1].toUpperCase()
-      if (/PN532 not detected/i.test(line)) return 'NO_HW'
-      if (/NFC_UID|UID/i.test(line)) return 'READY'
-    }
-    return 'UNKNOWN'
-  }, [serialLines])
-
-  const nfcLastLine = useMemo(() => {
-    const lines = serialLines ?? []
-    for (let i = lines.length - 1; i >= 0; i -= 1) {
-      if (/NFC_|UID|PN532|NFC=/i.test(lines[i])) return lines[i]
-    }
-    return 'No NFC lines yet.'
-  }, [serialLines])
+  const nfcHealth = 'REWRITE_PENDING'
+  const nfcLastLine = 'NFC backend removed. UI placeholder remains.'
 
   const irLastLine = useMemo(() => {
     const lines = serialLines ?? []
@@ -1025,7 +1004,7 @@ export default function HackerMenu({
                           NFC PAGE
                         </div>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#4b6f8a', letterSpacing: '0.2px', lineHeight: '1.45' }}>
-                          Dedicated controls for PN532 checks, card reading, and capture saving.
+                          Placeholder screen kept in place while the NFC implementation is rewritten.
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
                           <button
@@ -1048,11 +1027,10 @@ export default function HackerMenu({
                           </button>
                           <button
                             onClick={() => onNfcSave?.()}
-                            disabled={!lastNfcUid}
                             style={{
                               ...actionButtonStyle('#00ff88', isCompact),
-                              color: lastNfcUid ? '#00ff88' : '#5c8a73',
-                              cursor: lastNfcUid ? 'pointer' : 'not-allowed',
+                              color: '#00ff88',
+                              cursor: 'pointer',
                               ...focusedControlStyle(focusedControl === 'nfc-save', '#00ff88'),
                             }}
                           >
@@ -1061,7 +1039,7 @@ export default function HackerMenu({
                         </div>
                         <div style={{ border: '1px solid #0f3045', background: 'rgba(0,35,55,0.22)', padding: '10px', display: 'grid', gap: '6px' }}>
                           <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>NFC_HW::{nfcHealth}</div>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>UID::{lastNfcUid || 'none'}</div>
+                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>UID::pending rewrite</div>
                           <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4c7f95', wordBreak: 'break-word' }}>LAST::{nfcLastLine}</div>
                         </div>
                       </div>
@@ -1536,7 +1514,7 @@ export default function HackerMenu({
                           sendRawCommand()
                         }
                       }}
-                      placeholder="raw serial command (PING, HELLO, NFC_READ, RUN GPIO_CTRL)"
+                      placeholder="raw serial command (PING, HELLO, RUN GPIO_CTRL)"
                       style={{
                         background: '#020c02',
                         border: '1px solid #2b5a2b',

@@ -5,7 +5,6 @@ import type {
   GuppyStatus,
   IrDatabaseEntry,
   LaunchRequest,
-  NfcCapturePayload,
   WifiApProfile,
   WifiJammerPayload,
   WifiJammerState,
@@ -22,8 +21,6 @@ contextBridge.exposeInMainWorld('electron', {
   guppyDisconnect: () => ipcRenderer.invoke('guppy-disconnect'),
   guppySendCommand: (command: string) => ipcRenderer.invoke('guppy-send-command', command),
   guppyRunModule: (moduleKey: string) => ipcRenderer.invoke('guppy-run-module', moduleKey),
-  guppySaveNfcCapture: (payload: NfcCapturePayload) =>
-    ipcRenderer.invoke('guppy-save-nfc-capture', payload),
   guppyLoadIrMiniDb: () => ipcRenderer.invoke('guppy-load-ir-mini-db'),
   guppySendIrEntry: (entry: IrDatabaseEntry) => ipcRenderer.invoke('guppy-send-ir-entry', entry),
   guppyLoadWifiApProfile: () => ipcRenderer.invoke('guppy-load-wifi-ap-profile'),

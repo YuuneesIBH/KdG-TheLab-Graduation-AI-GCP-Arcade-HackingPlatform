@@ -8,7 +8,6 @@
     WIFI_AP_START <SSID> [PASSWORD] [CHANNEL]
     WIFI_AP_STOP
     WIFI_AP_STATUS
-    RUN NFC_CLONE
     RUN IR_BLAST
     RUN GPIO_CTRL
     RUN WIFI_AUDIT
@@ -25,28 +24,21 @@
 #include <stdio.h>
 #include <IRremoteESP8266.h>
 #include <IRsend.h>
-#include <PN532_I2C.h>
-#include <PN532.h>
 
 #include "diy_ir_mini.h"
-#include "diy_nfca_reader.h"
 static const int PICO_RX_PIN = 16;
 static const int PICO_TX_PIN = 17;
 HardwareSerial PicoSerial(1);
 static const int STATUS_LED_PIN = 2;
 static const int IR_TX_PIN = 4;
 static const int IR_RX_PIN = 34;
-static const int PN532_IRQ_PIN = 27;
-static const int PN532_RST_PIN = 26;
 static const char* DEFAULT_IR_PAYLOAD = "NEC 0x20DF 0x10EF 38";
 static const char* DEFAULT_SOFTAP_SSID = "GUPPY_LAB";
 static const uint8_t DEFAULT_SOFTAP_CHANNEL = 6;
 
 static String usbBuffer;
 static String picoBuffer;
-static String lastNfcUid = "";
 static DiyIrMini irMini(IR_TX_PIN);
-static DiyNfcAReader nfcReader(PN532_IRQ_PIN, PN532_RST_PIN);
 static bool wifiApRunning = false;
 static String wifiApSsid = "";
 static uint8_t wifiApChannel = DEFAULT_SOFTAP_CHANNEL;
@@ -465,11 +457,9 @@ bool runWifiAudit(const String& commandLabel) {
 void printReadyBanner() {
   Serial.println("GUPPY_READY");
   Serial.println("FW:esp32-bridge-v2");
-  Serial.println("CAPS:NFC_CLONE,NFC_READ,IR_BLAST,IR_SEND,GPIO_CTRL,WIFI_SCAN,WIFI_AUDIT,WIFI_AP_START,WIFI_AP_STOP,WIFI_AP_STATUS,BADUSB_INJECT,SHELL");
+  Serial.println("CAPS:IR_BLAST,IR_SEND,GPIO_CTRL,WIFI_SCAN,WIFI_AUDIT,WIFI_AP_START,WIFI_AP_STOP,WIFI_AP_STATUS,BADUSB_INJECT,SHELL");
   Serial.print("HWLIB:IR=");
-  Serial.print(irMini.isAvailable() ? "OK" : "INIT_FAIL");
-  Serial.print(",NFC=");
-  Serial.println(nfcReader.isAvailable() ? "OK" : "NO_HW");
+  Serial.println(irMini.isAvailable() ? "OK" : "INIT_FAIL");
 }
 
 void sendOk(const String& detail) {
@@ -505,31 +495,6 @@ bool parseIrPayload(
   *addressHex = String(addrBuf);
   *commandHex = String(cmdBuf);
   *carrierKhz = (count >= 4 && carrier > 0 && carrier <= 120) ? static_cast<uint16_t>(carrier) : 38;
-  return true;
-}
-
-bool runNfcRead(const String& commandLabel) {
-  String uid;
-  String detail;
-  const bool ok = nfcReader.readUid(&uid, 1200, &detail);
-
-  if (!ok) {
-    if (detail.length() > 0) {
-      Serial.print("NFC_INFO:");
-      Serial.println(detail);
-    }
-    sendErr(commandLabel);
-    return false;
-  }
-
-  lastNfcUid = uid;
-  Serial.print("NFC_UID:");
-  Serial.println(lastNfcUid);
-  if (detail.length() > 0) {
-    Serial.print("NFC_INFO:");
-    Serial.println(detail);
-  }
-  sendOk(commandLabel);
   return true;
 }
 
@@ -577,11 +542,6 @@ void runModule(const String& moduleName) {
     return;
   }
 
-  if (moduleName == "NFC_CLONE") {
-    runNfcRead("RUN NFC_CLONE");
-    return;
-  }
-
   if (moduleName == "BADUSB_INJECT") {
     sendOk("RUN BADUSB_INJECT");
     return;
@@ -605,10 +565,6 @@ void runModule(const String& moduleName) {
   sendErr("UNKNOWN_MODULE");
 }
 
-void handleNfcRead() {
-  runNfcRead("NFC_READ");
-}
-
 void handleIrSend(const String& payload) {
   runIrSend(payload, "IR_SEND");
 }
@@ -624,11 +580,6 @@ void handleUsbCommand(String cmd) {
 
   if (cmd == "PING") {
     Serial.println("PONG");
-    return;
-  }
-
-  if (cmd == "NFC_READ") {
-    handleNfcRead();
     return;
   }
 
@@ -693,17 +644,12 @@ void setup() {
   pinMode(IR_RX_PIN, INPUT);
 
   irMini.begin();
-  nfcReader.begin(&Wire, 21, 22);
 
   Serial.begin(115200);
   PicoSerial.begin(115200, SERIAL_8N1, PICO_RX_PIN, PICO_TX_PIN);
 
   delay(400);
   printReadyBanner();
-  if (!nfcReader.isAvailable()) {
-    Serial.println("NFC_INFO:PN532 not detected on I2C");
-    printI2cScanResult();
-  }
 }
 
 void loop() {

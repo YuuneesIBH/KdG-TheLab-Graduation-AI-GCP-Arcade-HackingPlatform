@@ -29,12 +29,6 @@ export type IpcMessageResponse = {
   message: string
 }
 
-export type NfcCapturePayload = {
-  uid: string
-  label?: string
-  rawLine?: string
-}
-
 export type IrDatabaseEntry = {
   id: string
   name: string

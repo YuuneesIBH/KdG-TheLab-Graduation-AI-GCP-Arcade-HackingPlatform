@@ -18,6 +18,7 @@ const VIEW_ITEMS = [
 type ViewKey = (typeof VIEW_ITEMS)[number]['key']
 type ControlId = string
 type WifiResultsMode = 'SCAN' | 'AUDIT'
+type GamepadNavDirection = 'up' | 'down' | 'left' | 'right' | null
 
 const BASE_FOCUSABLE_CONTROLS: ControlId[] = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir', 'tab-wifi']
 
@@ -244,6 +245,10 @@ export default function HackerMenu({
   const gamepadActionPressedRef = useRef(false)
   const gamepadActionArmedRef = useRef(false)
   const gamepadMountedAtRef = useRef(Date.now())
+  const gamepadNavDirectionRef = useRef<GamepadNavDirection>(null)
+  const gamepadBackPressedRef = useRef(false)
+  const gamepadPrevViewPressedRef = useRef(false)
+  const gamepadNextViewPressedRef = useRef(false)
   const isCompact = viewport.width < 1080 || viewport.height < 740
   const irEntries = useMemo(() => irDbEntries ?? [], [irDbEntries])
   const isIrStepControl = focusedControl === 'ir-prev' || focusedControl === 'ir-next'
@@ -546,6 +551,10 @@ export default function HackerMenu({
     gamepadActionPressedRef.current = false
     gamepadActionArmedRef.current = false
     gamepadMountedAtRef.current = Date.now()
+    gamepadNavDirectionRef.current = null
+    gamepadBackPressedRef.current = false
+    gamepadPrevViewPressedRef.current = false
+    gamepadNextViewPressedRef.current = false
   }, [])
 
   useEffect(() => {
@@ -676,7 +685,6 @@ export default function HackerMenu({
 
   useEffect(() => {
     let raf = 0
-    let cooldownUntil = 0
 
     const poll = () => {
       const pads = Array.from(navigator.getGamepads?.() ?? [])
@@ -704,48 +712,55 @@ export default function HackerMenu({
         const axisY = gamepad.axes[1] ?? 0
         const actionPressed = pressed(0) || pressed(9)
         const backPressed = pressed(1) || pressed(8)
+        const prevViewPressed = pressed(4)
+        const nextViewPressed = pressed(5)
+        const navDirection: GamepadNavDirection = axisY < -0.55 || pressed(12)
+          ? 'up'
+          : axisY > 0.55 || pressed(13)
+            ? 'down'
+            : axisX < -0.55 || pressed(14)
+              ? 'left'
+              : axisX > 0.55 || pressed(15)
+                ? 'right'
+                : null
 
         if (!gamepadActionArmedRef.current && !actionPressed && now - gamepadMountedAtRef.current > 220) {
           gamepadActionArmedRef.current = true
         }
 
-        if (now > cooldownUntil) {
-          if (backPressed) {
-            onBack?.()
-            cooldownUntil = now + 250
-          } else if (pressed(4)) {
-            cycleView(-1)
-            cooldownUntil = now + 220
-          } else if (pressed(5)) {
-            cycleView(1)
-            cooldownUntil = now + 220
-          } else if (axisY < -0.55 || pressed(12)) {
+        if (backPressed && !gamepadBackPressedRef.current) {
+          onBack?.()
+        } else if (prevViewPressed && !gamepadPrevViewPressedRef.current) {
+          cycleView(-1)
+        } else if (nextViewPressed && !gamepadNextViewPressedRef.current) {
+          cycleView(1)
+        } else if (navDirection !== null && navDirection !== gamepadNavDirectionRef.current) {
+          if (navDirection === 'up') {
             moveFocus(-1)
-            cooldownUntil = now + 180
-          } else if (axisY > 0.55 || pressed(13)) {
+          } else if (navDirection === 'down') {
             moveFocus(1)
-            cooldownUntil = now + 180
-          } else if (axisX < -0.55 || pressed(14)) {
+          } else if (navDirection === 'left') {
             if (isIrStepControl) {
               stepIrEntry(-1)
             } else {
               moveFocus(-1)
             }
-            cooldownUntil = now + 180
-          } else if (axisX > 0.55 || pressed(15)) {
+          } else if (navDirection === 'right') {
             if (isIrStepControl) {
               stepIrEntry(1)
             } else {
               moveFocus(1)
             }
-            cooldownUntil = now + 180
-          } else if (gamepadActionArmedRef.current && actionPressed && !gamepadActionPressedRef.current) {
-            activateFocusedControl()
-            cooldownUntil = now + 220
           }
+        } else if (gamepadActionArmedRef.current && actionPressed && !gamepadActionPressedRef.current) {
+          activateFocusedControl()
         }
 
         gamepadActionPressedRef.current = actionPressed
+        gamepadBackPressedRef.current = backPressed
+        gamepadPrevViewPressedRef.current = prevViewPressed
+        gamepadNextViewPressedRef.current = nextViewPressed
+        gamepadNavDirectionRef.current = navDirection
       }
       raf = requestAnimationFrame(poll)
     }

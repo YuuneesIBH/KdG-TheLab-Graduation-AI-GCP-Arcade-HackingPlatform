@@ -248,6 +248,7 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
   const [scanlines, setScanlines]   = useState(0)
   const rollRef                     = useRef<number | null>(null)
   const phaseRef                    = useRef(phase)
+  const activePadIndexRef           = useRef<number | null>(null)
   phaseRef.current = phase
   const trigger = () => {
     if (phaseRef.current !== 'idle') return
@@ -290,23 +291,67 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
     if (phase !== 'breach') return
     let active = true
     let armed  = false
+    let raf = 0
+    let actionWasPressed = false
 
-    const handleKey = (e: KeyboardEvent) => {
+    const complete = () => {
       if (!active || !armed) return
-      if (e.key !== 'Enter' && e.code !== 'NumpadEnter') return
-      e.stopImmediatePropagation()
       active = false
       window.removeEventListener('keydown', handleKey, true)
+      cancelAnimationFrame(raf)
       clearTimeout(armTimer)
       setPhase('done')
       onCompleteRef.current()
     }
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (!active || !armed) return
+      const key = e.key.toLowerCase()
+      const isActionKey = key === 'enter' || key === ' ' || key === 'spacebar' || ['w', 'x', 'c', 'v', 'b', 'n'].includes(key)
+      if (!isActionKey && e.code !== 'NumpadEnter') return
+      e.stopImmediatePropagation()
+      complete()
+    }
+
+    const pollGamepad = () => {
+      if (!active) return
+      const pads = Array.from(navigator.getGamepads?.() ?? [])
+        .filter((pad): pad is Gamepad => Boolean(pad && pad.connected))
+        .sort((a, b) => a.index - b.index)
+
+      if (activePadIndexRef.current === null || !pads.some((pad) => pad.index === activePadIndexRef.current)) {
+        activePadIndexRef.current = pads[0]?.index ?? null
+      }
+
+      for (const pad of pads) {
+        const axisMoved = Math.abs(pad.axes[1] ?? 0) > 0.35 || Math.abs(pad.axes[0] ?? 0) > 0.35
+        const buttonPressed = pad.buttons?.some((button) => button?.pressed)
+        if (axisMoved || buttonPressed) {
+          activePadIndexRef.current = pad.index
+          break
+        }
+      }
+
+      const gamepad = pads.find((pad) => pad.index === activePadIndexRef.current)
+      const actionPressed = Boolean(gamepad?.buttons[0]?.pressed) || Boolean(gamepad?.buttons[9]?.pressed)
+
+      if (armed && actionPressed && !actionWasPressed) {
+        complete()
+        return
+      }
+
+      actionWasPressed = actionPressed
+      raf = requestAnimationFrame(pollGamepad)
+    }
+
     window.addEventListener('keydown', handleKey, true)
     const armTimer = window.setTimeout(() => { armed = true }, 500)
+    pollGamepad()
 
     return () => {
       active = false
       clearTimeout(armTimer)
+      cancelAnimationFrame(raf)
       window.removeEventListener('keydown', handleKey, true)
     }
   }, [phase])

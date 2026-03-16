@@ -169,6 +169,10 @@ function collectWifiResultLines(lines: string[], mode: WifiResultsMode): string[
   })
 }
 
+function isMenuActionKey(key: string): boolean {
+  return key === 'enter' || key === ' ' || key === 'spacebar' || ['x', 'c', 'v', 'b', 'n'].includes(key)
+}
+
 export default function HackerMenu({
   onSelect,
   onBack,
@@ -236,6 +240,10 @@ export default function HackerMenu({
   }, [selectedScanNetwork])
 
   const serialLogRef = useRef<HTMLDivElement>(null)
+  const activeGamepadIndexRef = useRef<number | null>(null)
+  const gamepadActionPressedRef = useRef(false)
+  const gamepadActionArmedRef = useRef(false)
+  const gamepadMountedAtRef = useRef(Date.now())
   const isCompact = viewport.width < 1080 || viewport.height < 740
   const irEntries = useMemo(() => irDbEntries ?? [], [irDbEntries])
   const isIrStepControl = focusedControl === 'ir-prev' || focusedControl === 'ir-next'
@@ -534,6 +542,13 @@ export default function HackerMenu({
   }, [focusableControls])
 
   useEffect(() => {
+    activeGamepadIndexRef.current = null
+    gamepadActionPressedRef.current = false
+    gamepadActionArmedRef.current = false
+    gamepadMountedAtRef.current = Date.now()
+  }, [])
+
+  useEffect(() => {
     let index = 0
     let cancelled = false
     let timeoutId: number | null = null
@@ -604,24 +619,26 @@ export default function HackerMenu({
         if (isTextControl || target.isContentEditable) return
       }
 
-      if (e.key === 'Escape') {
+      const key = e.key.toLowerCase()
+
+      if (key === 'escape') {
         onBack?.()
         return
       }
 
-      if (e.key === 'ArrowUp') {
+      if (key === 'arrowup' || key === 'w') {
         e.preventDefault()
         moveFocus(-1)
         return
       }
 
-      if (e.key === 'ArrowDown') {
+      if (key === 'arrowdown' || key === 's') {
         e.preventDefault()
         moveFocus(1)
         return
       }
 
-      if (e.key === 'ArrowLeft') {
+      if (key === 'arrowleft' || key === 'a') {
         e.preventDefault()
         if (isIrStepControl) {
           stepIrEntry(-1)
@@ -631,7 +648,7 @@ export default function HackerMenu({
         return
       }
 
-      if (e.key === 'ArrowRight') {
+      if (key === 'arrowright' || key === 'd') {
         e.preventDefault()
         if (isIrStepControl) {
           stepIrEntry(1)
@@ -641,12 +658,13 @@ export default function HackerMenu({
         return
       }
 
-      if (e.key === '1') openView('home')
-      if (e.key === '2') openView('nfc')
-      if (e.key === '3') openView('ir')
-      if (e.key === '4') openView('wifi')
+      if (key === '1') openView('home')
+      if (key === '2') openView('nfc')
+      if (key === '3') openView('ir')
+      if (key === '4') openView('wifi')
 
-      if (e.key === 'Enter' || e.key === ' ') {
+      if (isMenuActionKey(key)) {
+        if (e.repeat) return
         e.preventDefault()
         activateFocusedControl()
       }
@@ -661,46 +679,73 @@ export default function HackerMenu({
     let cooldownUntil = 0
 
     const poll = () => {
-      const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((g) => g?.connected)
+      const pads = Array.from(navigator.getGamepads?.() ?? [])
+        .filter((g): g is Gamepad => Boolean(g && g.connected))
+        .sort((a, b) => a.index - b.index)
+
+      if (activeGamepadIndexRef.current === null || !pads.some((pad) => pad.index === activeGamepadIndexRef.current)) {
+        activeGamepadIndexRef.current = pads[0]?.index ?? null
+      }
+
+      for (const pad of pads) {
+        const axisMoved = Math.abs(pad.axes[1] ?? 0) > 0.35 || Math.abs(pad.axes[0] ?? 0) > 0.35
+        const buttonPressed = pad.buttons?.some((button) => button?.pressed)
+        if (axisMoved || buttonPressed) {
+          activeGamepadIndexRef.current = pad.index
+          break
+        }
+      }
+
+      const gamepad = pads.find((pad) => pad.index === activeGamepadIndexRef.current)
       if (gamepad) {
         const now = Date.now()
+        const pressed = (idx: number) => Boolean(gamepad.buttons[idx]?.pressed)
         const axisX = gamepad.axes[0] ?? 0
         const axisY = gamepad.axes[1] ?? 0
+        const actionPressed = pressed(0) || pressed(9)
+        const backPressed = pressed(1) || pressed(8)
+
+        if (!gamepadActionArmedRef.current && !actionPressed && now - gamepadMountedAtRef.current > 220) {
+          gamepadActionArmedRef.current = true
+        }
+
         if (now > cooldownUntil) {
-          if (gamepad.buttons[1]?.pressed) {
+          if (backPressed) {
             onBack?.()
             cooldownUntil = now + 250
-          } else if (gamepad.buttons[4]?.pressed) {
+          } else if (pressed(4)) {
             cycleView(-1)
             cooldownUntil = now + 220
-          } else if (gamepad.buttons[5]?.pressed) {
+          } else if (pressed(5)) {
             cycleView(1)
             cooldownUntil = now + 220
-          } else if (axisY < -0.55 || gamepad.buttons[12]?.pressed) {
+          } else if (axisY < -0.55 || pressed(12)) {
             moveFocus(-1)
             cooldownUntil = now + 180
-          } else if (axisY > 0.55 || gamepad.buttons[13]?.pressed) {
+          } else if (axisY > 0.55 || pressed(13)) {
             moveFocus(1)
             cooldownUntil = now + 180
-          } else if (axisX < -0.55 || gamepad.buttons[14]?.pressed) {
+          } else if (axisX < -0.55 || pressed(14)) {
             if (isIrStepControl) {
               stepIrEntry(-1)
             } else {
               moveFocus(-1)
             }
             cooldownUntil = now + 180
-          } else if (axisX > 0.55 || gamepad.buttons[15]?.pressed) {
+          } else if (axisX > 0.55 || pressed(15)) {
             if (isIrStepControl) {
               stepIrEntry(1)
             } else {
               moveFocus(1)
             }
             cooldownUntil = now + 180
-          } else if (gamepad.buttons[0]?.pressed) {
+          } else if (gamepadActionArmedRef.current && actionPressed && !gamepadActionPressedRef.current) {
             activateFocusedControl()
             cooldownUntil = now + 220
           }
         }
+
+        gamepadActionPressedRef.current = actionPressed
       }
       raf = requestAnimationFrame(poll)
     }
@@ -876,7 +921,7 @@ export default function HackerMenu({
                 gap: '8px', flexWrap: isCompact ? 'wrap' : 'nowrap',
               }}>
                 <span>root@guppy:~ - control-center [{activeView.toUpperCase()}]</span>
-                <span>DPAD/L-STICK NAV | A SELECT | B BACK | LB/RB VIEW</span>
+                <span>DPAD/L-STICK NAV | A/START SELECT | B/BACK BACK | LB/RB VIEW</span>
               </div>
 
               <div className="console-grid" style={{
@@ -1573,8 +1618,8 @@ export default function HackerMenu({
           {booted && (
             <div style={{ marginTop: '6px', display: 'flex', gap: isCompact ? '10px' : '18px', color: '#1a2a1a', fontSize: isCompact ? '11px' : '10px', letterSpacing: isCompact ? '1px' : '2px', flexWrap: 'wrap' }}>
               <span>DPAD / L-STICK: focus</span>
-              <span>A: activate</span>
-              <span>B: back</span>
+              <span>A / START: activate</span>
+              <span>B / BACK: back</span>
               <span>LB/RB: switch page</span>
               <span>FOCUS::{focusedControl}</span>
               <span style={{ marginLeft: 'auto' }}>{activeView.toUpperCase()}</span>

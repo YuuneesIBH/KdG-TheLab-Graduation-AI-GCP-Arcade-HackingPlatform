@@ -21,6 +21,7 @@ type WifiResultsMode = 'SCAN' | 'AUDIT'
 type GamepadNavDirection = 'up' | 'down' | 'left' | 'right' | null
 
 const BASE_FOCUSABLE_CONTROLS: ControlId[] = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir', 'tab-wifi']
+const HACKING_UI_SCALE = 1.5
 
 const TAB_CONTROL_BY_VIEW: Record<ViewKey, ControlId> = {
   home: 'tab-home',
@@ -247,7 +248,14 @@ export default function HackerMenu({
   const gamepadBackPressedRef = useRef(false)
   const gamepadPrevViewPressedRef = useRef(false)
   const gamepadNextViewPressedRef = useRef(false)
-  const isCompact = viewport.width < 1080 || viewport.height < 740
+  const scaledViewport = useMemo(
+    () => ({
+      width: viewport.width / HACKING_UI_SCALE,
+      height: viewport.height / HACKING_UI_SCALE,
+    }),
+    [viewport],
+  )
+  const isCompact = scaledViewport.width < 1080 || scaledViewport.height < 740
   const irEntries = useMemo(() => irDbEntries ?? [], [irDbEntries])
   const isIrStepControl = focusedControl === 'ir-prev' || focusedControl === 'ir-next'
 
@@ -818,70 +826,84 @@ export default function HackerMenu({
       : activeView === 'ir'
         ? '#ff8800'
         : '#33bbff'
+  const scaledViewportWidth = `${100 / HACKING_UI_SCALE}vw`
+  const scaledViewportHeight = `${100 / HACKING_UI_SCALE}vh`
 
   return (
     <div style={{
       width: '100vw', height: '100vh',
       background: '#000',
-      position: 'relative', overflow: isCompact ? 'auto' : 'hidden',
-      fontFamily: '"Courier New", Courier, monospace',
-      filter: glitch ? 'hue-rotate(80deg) brightness(1.3)' : 'none',
-      transition: 'filter 0.04s',
+      position: 'relative',
+      overflow: 'hidden',
     }}>
-      <MatrixBg />
-
       <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5,
-        backgroundImage: 'repeating-linear-gradient(0deg,rgba(0,0,0,0.42) 0px,rgba(0,0,0,0.42) 2px,transparent 2px,transparent 4px)',
-        transform: `translateY(${scanY}px)`, opacity: 0.7,
-      }} />
-
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 6,
-        background: 'radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.97) 100%)',
-      }} />
-
-      {glitch && <div style={{
-        position: 'absolute', left: 0, right: 0, height: '2px', zIndex: 7,
-        top: `${25 + Math.random() * 50}%`,
-        background: 'rgba(0,255,136,0.55)', mixBlendMode: 'screen',
-      }} />}
-
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
-        borderBottom: '1px solid #00ff41',
-        background: 'rgba(0,6,0,0.97)',
-        padding: isCompact ? '8px 10px' : '6px 20px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        boxShadow: '0 0 16px rgba(0,255,65,0.15)',
+        width: scaledViewportWidth,
+        height: scaledViewportHeight,
+        position: 'relative',
+        transform: `scale(${HACKING_UI_SCALE})`,
+        transformOrigin: 'top left',
+        fontFamily: '"Courier New", Courier, monospace',
+        filter: glitch ? 'hue-rotate(80deg) brightness(1.3)' : 'none',
+        transition: 'filter 0.04s',
       }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {['#ff5f57', '#ffbd2e', '#28ca41'].map((c, i) => (
-            <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: c, boxShadow: `0 0 5px ${c}` }} />
-          ))}
-        </div>
-        <span style={{ color: '#00ff41', fontSize: isCompact ? '12px' : '11px', letterSpacing: isCompact ? '2px' : '4px', textShadow: '0 0 10px #00ff41', fontWeight: 'bold' }}>
-          GUPPY - CONTROL CONSOLE
-        </span>
-        <div style={{ display: 'flex', gap: isCompact ? '8px' : '12px', alignItems: 'center', flexWrap: isCompact ? 'wrap' : 'nowrap', justifyContent: 'flex-end' }}>
-          <span style={{ color: hardwareColor, fontSize: isCompact ? '11px' : '10px', letterSpacing: '2px', textShadow: `0 0 6px ${hardwareColor}` }}>
-            {hardwareLabel}
-          </span>
-          <span style={{ color: '#00ff88', fontSize: isCompact ? '11px' : '10px', letterSpacing: '2px', textShadow: '0 0 6px #00ff88' }}>ROOT</span>
-          <button onClick={() => onReconnect?.()} style={{
-            background: 'transparent', border: '1px solid #00ccff',
-            color: '#00ccff', fontFamily: 'inherit', fontSize: isCompact ? '11px' : '10px',
-            letterSpacing: '2px', padding: '2px 8px', cursor: 'pointer',
-            ...focusedControlStyle(focusedControl === 'header-reconnect', '#00ccff'),
-          }}>RECONNECT</button>
-          <button onClick={() => onBack?.()} style={{
-            background: 'transparent', border: '1px solid #ff4444',
-            color: '#ff4444', fontFamily: 'inherit', fontSize: isCompact ? '11px' : '10px',
-            letterSpacing: '2px', padding: '2px 8px', cursor: 'pointer',
-            ...focusedControlStyle(focusedControl === 'header-exit', '#ff4444'),
-          }}>EXIT</button>
-        </div>
-      </div>
+        <div style={{
+          width: '100%', height: '100%',
+          position: 'relative', overflow: isCompact ? 'auto' : 'hidden',
+        }}>
+          <MatrixBg />
+
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5,
+            backgroundImage: 'repeating-linear-gradient(0deg,rgba(0,0,0,0.42) 0px,rgba(0,0,0,0.42) 2px,transparent 2px,transparent 4px)',
+            transform: `translateY(${scanY}px)`, opacity: 0.7,
+          }} />
+
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 6,
+            background: 'radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.97) 100%)',
+          }} />
+
+          {glitch && <div style={{
+            position: 'absolute', left: 0, right: 0, height: '2px', zIndex: 7,
+            top: `${25 + Math.random() * 50}%`,
+            background: 'rgba(0,255,136,0.55)', mixBlendMode: 'screen',
+          }} />}
+
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
+            borderBottom: '1px solid #00ff41',
+            background: 'rgba(0,6,0,0.97)',
+            padding: isCompact ? '8px 10px' : '6px 20px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            boxShadow: '0 0 16px rgba(0,255,65,0.15)',
+          }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {['#ff5f57', '#ffbd2e', '#28ca41'].map((c, i) => (
+                <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: c, boxShadow: `0 0 5px ${c}` }} />
+              ))}
+            </div>
+            <span style={{ color: '#00ff41', fontSize: isCompact ? '12px' : '11px', letterSpacing: isCompact ? '2px' : '4px', textShadow: '0 0 10px #00ff41', fontWeight: 'bold' }}>
+              GUPPY - CONTROL CONSOLE
+            </span>
+            <div style={{ display: 'flex', gap: isCompact ? '8px' : '12px', alignItems: 'center', flexWrap: isCompact ? 'wrap' : 'nowrap', justifyContent: 'flex-end' }}>
+              <span style={{ color: hardwareColor, fontSize: isCompact ? '11px' : '10px', letterSpacing: '2px', textShadow: `0 0 6px ${hardwareColor}` }}>
+                {hardwareLabel}
+              </span>
+              <span style={{ color: '#00ff88', fontSize: isCompact ? '11px' : '10px', letterSpacing: '2px', textShadow: '0 0 6px #00ff88' }}>ROOT</span>
+              <button onClick={() => onReconnect?.()} style={{
+                background: 'transparent', border: '1px solid #00ccff',
+                color: '#00ccff', fontFamily: 'inherit', fontSize: isCompact ? '11px' : '10px',
+                letterSpacing: '2px', padding: '2px 8px', cursor: 'pointer',
+                ...focusedControlStyle(focusedControl === 'header-reconnect', '#00ccff'),
+              }}>RECONNECT</button>
+              <button onClick={() => onBack?.()} style={{
+                background: 'transparent', border: '1px solid #ff4444',
+                color: '#ff4444', fontFamily: 'inherit', fontSize: isCompact ? '11px' : '10px',
+                letterSpacing: '2px', padding: '2px 8px', cursor: 'pointer',
+                ...focusedControlStyle(focusedControl === 'header-exit', '#ff4444'),
+              }}>EXIT</button>
+            </div>
+          </div>
 
       <div style={{
         position: 'absolute', inset: 0,
@@ -1621,45 +1643,47 @@ export default function HackerMenu({
         </div>
       </div>
 
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
-        borderTop: '1px solid #0a140a',
-        background: 'rgba(0,0,0,0.85)',
-        padding: isCompact ? '6px 10px' : '4px 20px',
-        display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: isCompact ? '6px' : '0px',
-      }}>
-        {['SYS::ACTIVE', `VIEW::${activeView.toUpperCase()}`, `NFC::${nfcHealth}`, `IR_DB::${irEntries.length}`, hardwareLabel].map((s) => (
-          <span key={s} style={{ color: '#0d1a0d', fontSize: isCompact ? '10px' : '9px', letterSpacing: isCompact ? '1px' : '2px' }}>{s}</span>
-        ))}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
+            borderTop: '1px solid #0a140a',
+            background: 'rgba(0,0,0,0.85)',
+            padding: isCompact ? '6px 10px' : '4px 20px',
+            display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: isCompact ? '6px' : '0px',
+          }}>
+            {['SYS::ACTIVE', `VIEW::${activeView.toUpperCase()}`, `NFC::${nfcHealth}`, `IR_DB::${irEntries.length}`, hardwareLabel].map((s) => (
+              <span key={s} style={{ color: '#0d1a0d', fontSize: isCompact ? '10px' : '9px', letterSpacing: isCompact ? '1px' : '2px' }}>{s}</span>
+            ))}
+          </div>
+
+          <WifiResultsModal
+            isOpen={showWifiResults}
+            title={wifiResultsTitle}
+            mode={wifiResultsMode}
+            results={wifiResults}
+            onClose={() => setShowWifiResults(false)}
+            isCompact={isCompact}
+            onSelectNetwork={handleWifiResultsSelect}
+          />
+
+
+          <style>{`
+            @keyframes scanrow {
+              0%   { transform: translateX(-100%); }
+              100% { transform: translateX(300%); }
+            }
+
+            @media (max-width: 1620px), (max-height: 1110px) {
+              .console-grid {
+                grid-template-columns: 1fr !important;
+              }
+              .left-pane {
+                border-right: none !important;
+                border-bottom: 1px solid #081408;
+              }
+            }
+          `}</style>
+        </div>
       </div>
-
-      <WifiResultsModal 
-        isOpen={showWifiResults}
-        title={wifiResultsTitle}
-        mode={wifiResultsMode}
-        results={wifiResults}
-        onClose={() => setShowWifiResults(false)}
-        isCompact={isCompact}
-        onSelectNetwork={handleWifiResultsSelect}
-      />
-
-
-      <style>{`
-        @keyframes scanrow {
-          0%   { transform: translateX(-100%); }
-          100% { transform: translateX(300%); }
-        }
-
-        @media (max-width: 1080px) {
-          .console-grid {
-            grid-template-columns: 1fr !important;
-          }
-          .left-pane {
-            border-right: none !important;
-            border-bottom: 1px solid #081408;
-          }
-        }
-      `}</style>
     </div>
   )
 }

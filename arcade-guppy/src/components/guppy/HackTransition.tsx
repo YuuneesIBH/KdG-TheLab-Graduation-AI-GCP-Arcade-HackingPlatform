@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { isArcadeActionInput, isArcadeConfirmButtonPressed } from '../../shared/arcade-controls'
 type Phase = 'idle' | 'crt-roll' | 'matrix' | 'breach' | 'done'
 function MatrixCanvas({ active }: { active: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -306,9 +307,7 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
 
     const handleKey = (e: KeyboardEvent) => {
       if (!active || !armed) return
-      const key = e.key.toLowerCase()
-      const isActionKey = key === 'enter' || key === ' ' || key === 'spacebar' || ['w', 'x', 'c', 'v', 'b', 'n'].includes(key)
-      if (!isActionKey && e.code !== 'NumpadEnter') return
+      if (!isArcadeActionInput(e)) return
       e.stopImmediatePropagation()
       complete()
     }
@@ -333,7 +332,7 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
       }
 
       const gamepad = pads.find((pad) => pad.index === activePadIndexRef.current)
-      const actionPressed = Boolean(gamepad?.buttons[0]?.pressed) || Boolean(gamepad?.buttons[9]?.pressed)
+      const actionPressed = isArcadeConfirmButtonPressed(gamepad)
 
       if (armed && actionPressed && !actionWasPressed) {
         complete()

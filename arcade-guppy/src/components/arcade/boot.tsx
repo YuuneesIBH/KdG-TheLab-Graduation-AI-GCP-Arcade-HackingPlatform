@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { HackButton, HackTransition } from '../guppy/HackTransition'
+import { isArcadeActionInput, isArcadeConfirmButtonPressed } from '../../shared/arcade-controls'
 
 type BootProps = {
   coins: number
@@ -42,8 +43,7 @@ export function BootScreen({
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return
-      const key = e.key.toLowerCase()
-      if (['w', 'x', 'c', 'v', 'b', 'n', 'enter'].includes(key)) {
+      if (isArcadeActionInput(e)) {
         if (readyToStart) {
           e.preventDefault()
           onStart()
@@ -79,8 +79,7 @@ export function BootScreen({
       const gamepad = pads.find((p) => p.index === activePadIndex.current)
       if (gamepad && readyToStart) {
         const now = Date.now()
-        const pressed = (idx: number) => Boolean(gamepad.buttons[idx]?.pressed)
-        if (now >= cooldownUntil && (pressed(0) || pressed(9))) {
+        if (now >= cooldownUntil && isArcadeConfirmButtonPressed(gamepad)) {
           onStart()
           cooldownUntil = now + 400
         }

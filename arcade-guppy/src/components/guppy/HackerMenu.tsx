@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import WifiResultsModal, { type WifiNetwork, buildWifiNetworkList } from './WifiResultsModal'
+import {
+  isHackerMenuActionButtonPressed,
+  isHackerMenuActionInput,
+  isHackerMenuBackButtonPressed,
+  isHackerMenuNextViewButtonPressed,
+  isHackerMenuPrevViewButtonPressed,
+} from '../../shared/arcade-controls'
 import type {
   GuppyStatus,
   IrDatabaseEntry,
@@ -168,10 +175,6 @@ function collectWifiResultLines(lines: string[], mode: WifiResultsMode): string[
     if (/^[^,\s][^,]*,\s*-?\d{1,3}(?:,\s*[^,]+){0,2}$/i.test(trimmed)) return true
     return false
   })
-}
-
-function isMenuActionKey(key: string): boolean {
-  return key === 'enter' || key === ' ' || key === 'spacebar' || ['x', 'c', 'v', 'b', 'n'].includes(key)
 }
 
 export default function HackerMenu({
@@ -676,7 +679,7 @@ export default function HackerMenu({
       if (key === '3') openView('ir')
       if (key === '4') openView('wifi')
 
-      if (isMenuActionKey(key)) {
+      if (isHackerMenuActionInput(e)) {
         if (e.repeat) return
         e.preventDefault()
         activateFocusedControl()
@@ -714,10 +717,10 @@ export default function HackerMenu({
         const pressed = (idx: number) => Boolean(gamepad.buttons[idx]?.pressed)
         const axisX = gamepad.axes[0] ?? 0
         const axisY = gamepad.axes[1] ?? 0
-        const actionPressed = pressed(0) || pressed(9)
-        const backPressed = pressed(1) || pressed(8)
-        const prevViewPressed = pressed(4)
-        const nextViewPressed = pressed(5)
+        const actionPressed = isHackerMenuActionButtonPressed(gamepad)
+        const backPressed = isHackerMenuBackButtonPressed(gamepad)
+        const prevViewPressed = isHackerMenuPrevViewButtonPressed(gamepad)
+        const nextViewPressed = isHackerMenuNextViewButtonPressed(gamepad)
         const navDirection: GamepadNavDirection = axisY < -0.55 || pressed(12)
           ? 'up'
           : axisY > 0.55 || pressed(13)

@@ -1,4 +1,5 @@
 import React from 'react'
+import { isArcadeActionInput, isArcadeConfirmButtonPressed } from '../../shared/arcade-controls'
 
 type MenuProps = {
   particles: Array<{ x: number; y: number; vx: number; vy: number; color: string; id: number }>
@@ -19,7 +20,24 @@ type GameCard = {
   year?: string
 }
 
-const isActionKey = (key: string) => ['enter', ' ', 'spacebar', 'w', 'x', 'c', 'v', 'b', 'n'].includes(key.toLowerCase())
+const panelFrameStyle: React.CSSProperties = {
+  border: '6px solid #0088ff',
+  background: '#06132a',
+  boxShadow: '0 0 32px rgba(0,136,255,0.55), inset 0 0 22px rgba(0,136,255,0.24), 6px 6px 0 rgba(0,0,0,0.5)',
+  padding: 6,
+  borderRadius: 18,
+  height: '100%',
+}
+
+const panelInnerStyle: React.CSSProperties = {
+  border: '4px solid #004488',
+  background: 'linear-gradient(180deg, #0a2040, #021020)',
+  boxShadow: 'inset 0 0 34px rgba(0,68,136,0.36)',
+  borderRadius: 14,
+  height: '100%',
+  position: 'relative',
+  overflow: 'hidden',
+}
 
 const games: GameCard[] = [
   { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
@@ -65,8 +83,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
     if (!list.some(g => g.id === selectedId)) setSelectedId(list[0]?.id ?? '')
   }, [list.length])
 
-  const focusId = selectedId
-  const focusGame = React.useMemo(() => list.find(g => g.id === focusId) ?? list[0], [list, focusId])
+  const focusGame = React.useMemo(() => list.find(g => g.id === selectedId) ?? list[0], [list, selectedId])
 
   const accent = focusGame?.accent ?? '#00ccff'
 
@@ -114,7 +131,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
       if (e.repeat) return
       if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1) }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1) }
-      if (isActionKey(e.key) || e.code === 'NumpadEnter') { e.preventDefault(); startSelected() }
+      if (isArcadeActionInput(e)) { e.preventDefault(); startSelected() }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -185,7 +202,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
         gamepadDirRef.current = dir
 
-        const fire = pressed(0) || pressed(9) // A of START
+        const fire = isArcadeConfirmButtonPressed(gamepad)
         const now = Date.now()
         // Ignore held start/select from boot screen until we see a clean release.
         if (!gamepadStartArmedRef.current) {
@@ -217,16 +234,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const infoScale = 2.5
   const titleFont = Math.round(34 * infoScale)
   const taglineFont = Math.round(17 * infoScale)
-  const playFont = Math.round(15 * infoScale)
-
   const titleGlow = Math.round(18 * infoScale)
   const titleOffset = Math.round(3 * infoScale)
   const taglineGlow = Math.round(10 * infoScale)
-
-  const playPadY = Math.round(18 * infoScale)
-  const playPadX = Math.round(30 * infoScale)
-  const playBorder = Math.max(3, Math.round(3 * infoScale))
-  const playShadow = Math.round(28 * infoScale)
 
   const barHeight = Math.round(6 * infoScale)
   const barGlow = Math.round(26 * infoScale)
@@ -378,26 +388,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         >
           <div onWheel={onWheel} style={{ position: 'relative', overflow: 'hidden' }}>
             <div
-              style={{
-              border: '6px solid #0088ff',
-              background: '#06132a',
-              boxShadow: '0 0 32px rgba(0,136,255,0.55), inset 0 0 22px rgba(0,136,255,0.24), 6px 6px 0 rgba(0,0,0,0.5)',
-                padding: 6,
-                borderRadius: 18,
-                height: '100%',
-              }}
+              style={panelFrameStyle}
             >
-              <div
-                style={{
-              border: '4px solid #004488',
-              background: 'linear-gradient(180deg, #0a2040, #021020)',
-              boxShadow: 'inset 0 0 34px rgba(0,68,136,0.36)',
-                  borderRadius: 14,
-                  height: '100%',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
+              <div style={panelInnerStyle}>
                 <div
                   style={{
                     position: 'absolute',
@@ -458,7 +451,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                     const opacity = clamp(1 - abs * 0.20, 0.22, 1)
                     const rot = clamp(offset * 3.1, -12, 12)
                     const isFocus = g.id === selectedId
-                    const isSelected = g.id === selectedId
 
                     return (
                       <div
@@ -483,9 +475,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                           background: 'rgba(0,0,0,0.35)',
                           boxShadow: isFocus
                             ? `0 0 0 1px rgba(0,0,0,0.75), 0 0 40px ${g.accent}30`
-                            : isSelected
-                              ? `0 0 22px ${g.accent}18`
-                              : 'none',
+                            : 'none',
                           filter: isFocus ? 'brightness(1.24) saturate(1.16)' : 'brightness(1.04) saturate(1)',
                           willChange: 'transform',
                         }}
@@ -512,26 +502,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
 
           <div style={{ position: 'relative', overflow: 'hidden' }}>
             <div
-              style={{
-              border: '6px solid #0088ff',
-              background: '#06132a',
-              boxShadow: '0 0 32px rgba(0,136,255,0.55), inset 0 0 22px rgba(0,136,255,0.24), 6px 6px 0 rgba(0,0,0,0.5)',
-                padding: 6,
-                borderRadius: 18,
-                height: '100%',
-              }}
+              style={panelFrameStyle}
             >
-              <div
-                style={{
-              border: '4px solid #004488',
-              background: 'linear-gradient(180deg, #0a2040, #021020)',
-              boxShadow: 'inset 0 0 34px rgba(0,68,136,0.36)',
-                  borderRadius: 14,
-                  height: '100%',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
+              <div style={panelInnerStyle}>
                 <div style={{ position: 'absolute', inset: 0 }}>
                   <img
                     src={focusGame?.image}
@@ -549,8 +522,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                 </div>
 
                 <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
-                    <div style={{ minWidth: 0, flex: '1 1 520px' }}>
+                  <div style={{ minWidth: 0 }}>
                       <div
                         style={{
                           color: '#ffffff',
@@ -586,29 +558,6 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
                       >
                         {focusGame?.tagline ?? ''}
                       </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={startSelected}
-                      style={{
-                        cursor: 'pointer',
-                        padding: `${playPadY}px ${playPadX}px`,
-                        borderRadius: 2,
-                        border: `${playBorder}px solid ${accent}`,
-                    background: `linear-gradient(180deg, ${accent}22, rgba(0,8,20,0.65))`,
-                    color: '#ffffff',
-                    fontWeight: 950,
-                    letterSpacing: 3,
-                    fontSize: playFont,
-                    boxShadow: `0 0 ${playShadow}px ${accent}33`,
-                        fontFamily: 'inherit',
-                        flex: '0 0 auto',
-                        textShadow: `${Math.round(2 * infoScale)}px ${Math.round(2 * infoScale)}px 0 rgba(0,0,0,0.6)`,
-                      }}
-                    >
-                      PLAY
-                    </button>
                   </div>
                 </div>
 

@@ -7,9 +7,9 @@ DEFAULT_SCREEN_WIDTH = 800
 DEFAULT_SCREEN_HEIGHT = 600
 SCREEN_WIDTH = DEFAULT_SCREEN_WIDTH
 SCREEN_HEIGHT = DEFAULT_SCREEN_HEIGHT
-PLAYER_SPEED = 6
+PLAYER_SPEED = 9
 BULLET_SPEED = 10
-ALIEN_SPAWN_RATE = 60
+ALIEN_SPAWN_RATE = 35
 POWERUP_SPEED = 3
 JOYSTICK_DEADZONE = 0.25
 WHITE = (255, 255, 255)
@@ -269,23 +269,23 @@ class Bullet:
         self.rect.y -= self.speed
         self.rect.x += self.angle * 2
 class Alien:
-    def __init__(self, x, alien_type=0):
+    def __init__(self, x, alien_type=0, speed_scale=1.0):
         self.type = alien_type
         self.width = 50
         self.height = 50
         self.image = self.create_alien()
         self.rect = self.image.get_rect(center=(x, -50))
         if alien_type == 0:
-            self.speed_y = random.uniform(1.5, 2.5)
+            self.speed_y = random.uniform(1.5, 2.5) * speed_scale
             self.speed_x = 0
             self.points = 10
         elif alien_type == 1:
-            self.speed_y = random.uniform(2, 3)
-            self.speed_x = random.choice([-1, 1]) * random.uniform(0.5, 1.5)
+            self.speed_y = random.uniform(2, 3) * speed_scale
+            self.speed_x = random.choice([-1, 1]) * random.uniform(0.5, 1.5) * speed_scale
             self.points = 20
         else:
-            self.speed_y = random.uniform(2.5, 3.5)
-            self.speed_x = math.sin(pygame.time.get_ticks() / 1000) * 2
+            self.speed_y = random.uniform(2.5, 3.5) * speed_scale
+            self.speed_x = math.sin(pygame.time.get_ticks() / 1000) * 2 * speed_scale
             self.points = 30
         
         self.shoot_cooldown = random.randint(60, 180)
@@ -421,20 +421,38 @@ class SpaceBattle:
         self.aliens_killed = 0
         self.spawn_rate = ALIEN_SPAWN_RATE
 
+    def handle_shoot_action(self):
+        if self.game_state == "game_over":
+            self.reset_game()
+        elif self.game_state == "playing":
+            self.player.shoot()
+
+    def create_alien(self, x):
+        rand = random.random()
+        if rand < 0.55:
+            alien_type = 0
+        elif rand < 0.82:
+            alien_type = 1
+        else:
+            alien_type = 2
+
+        speed_scale = min(2.0, 1 + (self.level - 1) * 0.08)
+        return Alien(x, alien_type, speed_scale)
+
     def spawn_alien(self):
         self.spawn_timer -= 1
         if self.spawn_timer <= 0:
-            x = random.randint(50, SCREEN_WIDTH - 50)
-            rand = random.random()
-            if rand < 0.6:
-                alien_type = 0
-            elif rand < 0.85:
-                alien_type = 1
-            else:
-                alien_type = 2
-            
-            self.aliens.append(Alien(x, alien_type))
-            self.spawn_rate = max(20, ALIEN_SPAWN_RATE - self.level * 3)
+            target_aliens = min(24, 10 + self.level * 2)
+            if len(self.aliens) < target_aliens:
+                wave_size = min(4, 2 + self.level // 3)
+                spawn_count = min(wave_size, target_aliens - len(self.aliens))
+                spawn_positions = list(range(60, SCREEN_WIDTH - 59, 70))
+                random.shuffle(spawn_positions)
+
+                for x in spawn_positions[:spawn_count]:
+                    self.aliens.append(self.create_alien(x))
+
+            self.spawn_rate = max(12, ALIEN_SPAWN_RATE - self.level * 2)
             self.spawn_timer = self.spawn_rate
 
     def move_aliens(self):
@@ -442,13 +460,10 @@ class SpaceBattle:
             alien.move()
             if alien.rect.top > SCREEN_HEIGHT:
                 self.aliens.remove(alien)
-                self.lives -= 1
-                if self.lives <= 0:
-                    self.game_state = "game_over"
 
     def alien_shoot(self):
         for alien in self.aliens:
-            if alien.can_shoot() and random.random() < 0.02:
+            if alien.can_shoot() and random.random() < 0.03:
                 bullet = AlienBullet(alien.rect.centerx, alien.rect.bottom)
                 self.alien_bullets.append(bullet)
 
@@ -567,7 +582,7 @@ class SpaceBattle:
         score_text = font_large.render(f"Final Score: {self.score}", True, YELLOW)
         level_text = font_medium.render(f"Level Reached: {self.level}", True, CYAN)
         kills_text = font_medium.render(f"Aliens Destroyed: {self.aliens_killed}", True, GREEN)
-        restart_text = font_large.render("Press R to Restart", True, WHITE)
+        restart_text = font_large.render("Press Shoot to Continue", True, WHITE)
         
         screen.blit(game_over_text, (SCREEN_WIDTH // 2 - 230, SCREEN_HEIGHT // 2 - 120))
         screen.blit(score_text, (SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT // 2 - 20))
@@ -586,6 +601,7 @@ class SpaceBattle:
         self.game_state = "playing"
         self.spawn_timer = 0
         self.aliens_killed = 0
+        self.spawn_rate = ALIEN_SPAWN_RATE
 
     def run(self):
         running = True
@@ -595,10 +611,12 @@ class SpaceBattle:
                     pygame.quit()
                     sys.exit()
                 elif event.type == pygame.KEYDOWN:
-                    if event.key in (pygame.K_SPACE, pygame.K_a) and self.game_state == "playing":
-                        self.player.shoot()
+                    if event.key in (pygame.K_SPACE, pygame.K_a):
+                        self.handle_shoot_action()
                     elif event.key == pygame.K_r and self.game_state == "game_over":
                         self.reset_game()
+                elif event.type == pygame.JOYBUTTONDOWN and event.button == 0:
+                    self.handle_shoot_action()
 
             if self.game_state == "playing":
                 keys = pygame.key.get_pressed()

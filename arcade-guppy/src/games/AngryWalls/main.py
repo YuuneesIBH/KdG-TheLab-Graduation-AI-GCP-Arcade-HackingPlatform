@@ -21,6 +21,7 @@ def parse_window_size(raw_value):
 		return None
 
 pygame.init()
+pygame.joystick.init()
 SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
 BASE_WIDTH = 288
 BASE_HEIGHT = 512
@@ -39,6 +40,17 @@ win = pygame.display.set_mode(SCREEN, display_flags)
 
 clock = pygame.time.Clock()
 FPS = 45
+PLAYER_SPEED = max(8, int(9 * scale_x))
+INITIAL_BAR_SPEED = max(5, int(5 * scale_y))
+INITIAL_BAR_FREQUENCY = 1000
+MIN_BAR_FREQUENCY = 450
+BAR_SPEED_STEP = max(1, int(1 * scale_y))
+BAR_FREQUENCY_STEP = 150
+JOYSTICK_DEADZONE = 0.25
+
+joystick = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
+if joystick:
+	joystick.init()
 
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
@@ -95,12 +107,12 @@ dodgy = Message(WIDTH // 2 - max(10, int(10 * scale_x)), int(90 * scale_y), int(
 walls = Message(WIDTH // 2 + max(20, int(20 * scale_x)), int(145 * scale_y), int(80 * scale_y), "Walls",title_font, WHITE, win)
 
 tap_to_play_font = "Fonts/DebugFreeTrial-MVdYB.otf"
-tap_to_play = Message(WIDTH // 2, int(400 * scale_y), int(32 * scale_y), "TAP TO PLAY",tap_to_play_font, WHITE, win)
-tap_to_replay = Message(WIDTH // 2, int(400 * scale_y), int(30 * scale_y), "Tap to Replay",tap_to_play_font, WHITE, win)
+tap_to_play = Message(WIDTH // 2, int(400 * scale_y), int(28 * scale_y), "PRESS SPACE / PAD A",tap_to_play_font, WHITE, win)
+tap_to_replay = Message(WIDTH // 2, int(400 * scale_y), int(26 * scale_y), "PRESS SPACE / PAD A",tap_to_play_font, WHITE, win)
 
 bar_width_list = sorted(set(max(35, int(i * scale_x)) for i in range(40, 150, 10)))
-bar_frequency = 1200
-bar_speed = 4
+bar_frequency = INITIAL_BAR_FREQUENCY
+bar_speed = INITIAL_BAR_SPEED
 touched = False
 pos = None
 home_page = True
@@ -112,6 +124,86 @@ move_left = False
 move_right = True
 prev_x = 0
 p_count = 0
+score_list = []
+
+def start_round():
+	global home_page, score_page, bg, particles, last_bar, next_bar, bar_speed, bar_frequency
+	global bird_dead, score, p_count, score_list, touched, prev_x, move_left, move_right
+
+	home_page = False
+	score_page = False
+	win_particle_group.empty()
+	bar_group.empty()
+	ball_group.empty()
+	block_group.empty()
+	destruct_group.empty()
+
+	bg = random.choice(bg_list)
+	particles = []
+	bar_speed = INITIAL_BAR_SPEED
+	bar_frequency = INITIAL_BAR_FREQUENCY
+	last_bar = pygame.time.get_ticks() - bar_frequency
+	next_bar = 0
+	bird_dead = False
+	score = 0
+	p_count = 0
+	score_list = []
+	touched = False
+	move_left = False
+	move_right = True
+
+	p.reset()
+	prev_x = p.rect.centerx
+
+	for _ in range(15):
+		x = random.randint(30, WIDTH - 30)
+		y = random.randint(60, HEIGHT - 60)
+		max = random.randint(8,16)
+		b = Block(x,y,max, win)
+		block_group.add(b)
+
+def handle_action_press():
+	if home_page or score_page:
+		start_round()
+
+def set_move_direction(direction):
+	global move_left, move_right
+
+	if direction < 0 and not move_left:
+		move_left = True
+		move_right = False
+		move_fx.play()
+	elif direction > 0 and not move_right:
+		move_right = True
+		move_left = False
+		move_fx.play()
+
+def get_horizontal_input():
+	direction = 0
+	keys = pygame.key.get_pressed()
+
+	if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+		direction -= 1
+	if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+		direction += 1
+
+	if joystick:
+		if joystick.get_numhats() > 0:
+			direction += joystick.get_hat(0)[0]
+
+		axis_x = joystick.get_axis(0)
+		if axis_x < -JOYSTICK_DEADZONE:
+			direction -= 1
+		elif axis_x > JOYSTICK_DEADZONE:
+			direction += 1
+
+	return max(-1, min(1, direction))
+
+def apply_horizontal_input():
+	direction = get_horizontal_input()
+	if direction != 0:
+		set_move_direction(direction)
+		p.move(direction * PLAYER_SPEED)
 
 running = True
 while running:
@@ -124,57 +216,45 @@ while running:
 		if event.type == pygame.KEYDOWN:
 			if event.key == pygame.K_ESCAPE:
 				running = False
+			elif event.key == pygame.K_SPACE:
+				handle_action_press()
 
-		if event.type == pygame.MOUSEBUTTONDOWN and (home_page or score_page):
-			home_page = False
-			score_page = False
-			win_particle_group.empty()
-			
-			bg = random.choice(bg_list)
-			
-			particles = []
-			last_bar = pygame.time.get_ticks() - bar_frequency
-			next_bar = 0
-			bar_speed = 4
-			bar_frequency = 1200
-			bird_dead = False
-			score = 0
-			p_count = 0
-			score_list = []
-			
-			for _ in range(15):
-				x = random.randint(30, WIDTH - 30)
-				y = random.randint(60, HEIGHT - 60)
-				max = random.randint(8,16)
-				b = Block(x,y,max, win)
-				block_group.add(b)
+		if event.type == pygame.JOYDEVICEADDED and joystick is None:
+			joystick = pygame.joystick.Joystick(event.device_index)
+			joystick.init()
 
-		if event.type == pygame.MOUSEBUTTONDOWN and not home_page:
-			if p.rect.collidepoint(event.pos):
+		if event.type == pygame.JOYDEVICEREMOVED and joystick and event.instance_id == joystick.get_instance_id():
+			joystick = None
+
+		if event.type == pygame.JOYBUTTONDOWN and event.button == 0:
+			handle_action_press()
+
+		if event.type == pygame.MOUSEBUTTONDOWN:
+			if home_page or score_page:
+				start_round()
+			elif p.rect.collidepoint(event.pos):
 				touched = True
 				x, y = event.pos
 				offset_x = p.rect.x - x
 
-		if event.type == pygame.MOUSEBUTTONUP and not home_page:
+		if event.type == pygame.MOUSEBUTTONUP and not (home_page or score_page):
 			touched = False
 
-		if event.type == pygame.MOUSEMOTION and not home_page:
+		if event.type == pygame.MOUSEMOTION and not (home_page or score_page):
 			if touched:
 				x, y = event.pos
-				if move_right and prev_x > x:
-					move_right = False
-					move_left = True
-					move_fx.play()
-				if move_left and  prev_x < x:
-					move_right = True
-					move_left = False
-					move_fx.play()
+				if prev_x > x:
+					set_move_direction(-1)
+				if prev_x < x:
+					set_move_direction(1)
 
 				prev_x = x
 				p.rect.x =  x + offset_x
+				p.clamp()
 				
 	if home_page:
 		bg = home_bg
+		apply_horizontal_input()
 		particles = generate_particles(p, particles, WHITE, win)
 		dodgy.update()
 		walls.update()
@@ -183,6 +263,7 @@ while running:
 		
 	elif score_page:
 		bg = home_bg
+		apply_horizontal_input()
 		particles = generate_particles(p, particles, WHITE, win)
 		tap_to_replay.update()
 		p.update()
@@ -256,6 +337,8 @@ while running:
 		score_card.update(score)
 		
 		if not bird_dead:
+			if not touched:
+				apply_horizontal_input()
 			particles = generate_particles(p, particles, WHITE, win)
 			p.update()
 
@@ -263,8 +346,8 @@ while running:
 			rem = score // 10
 			if rem not in score_list:
 				score_list.append(rem)
-				bar_speed += 1
-				bar_frequency -= 200
+				bar_speed += BAR_SPEED_STEP
+				bar_frequency = max(MIN_BAR_FREQUENCY, bar_frequency - BAR_FREQUENCY_STEP)
 				
 		if bird_dead and len(destruct_group) == 0:
 			score_page = True

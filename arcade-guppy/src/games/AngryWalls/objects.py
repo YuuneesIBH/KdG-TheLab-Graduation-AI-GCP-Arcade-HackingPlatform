@@ -33,6 +33,14 @@ class Player:
 		
 	def update(self):
 		self.win.blit(self.image, self.rect)
+
+	def move(self, dx):
+		self.rect.x += dx
+		self.clamp()
+
+	def clamp(self):
+		self.rect.left = max(0, self.rect.left)
+		self.rect.right = min(WIDTH, self.rect.right)
 		
 	def reset(self):
 		self.x = WIDTH // 2

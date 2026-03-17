@@ -1,27 +1,24 @@
 import pygame
 import random
-import os
 
-def parse_window_size(raw_value):
-	if not raw_value:
-		return None
+WORLD_WIDTH = 288
+WORLD_HEIGHT = 512
+DISPLAY_HEIGHT = int(WORLD_HEIGHT * 0.80)
 
-	cleaned = raw_value.strip().lower().replace(' ', '')
-	parts = cleaned.split('x' if 'x' in cleaned else ',')
-	if len(parts) != 2:
-		return None
+BIRD_WIDTH = 34
+BIRD_HEIGHT = 24
+BIRD_X = 64
+BIRD_RADIUS = 14
 
-	try:
-		width = max(320, int(parts[0]))
-		height = max(240, int(parts[1]))
-		return width, height
-	except ValueError:
-		return None
+PIPE_WIDTH = 52
+PIPE_GAP = 116
+PIPE_CAP_HEIGHT = 20
+PIPE_SPAWN_X = WORLD_WIDTH + 36
 
-SCREEN = WIDTH, HEIGHT = parse_window_size(os.environ.get('ARCADE_WINDOW_SIZE')) or (288, 512)
-SCALE_X = WIDTH / 288
-SCALE_Y = HEIGHT / 512
-display_height = 0.80 * HEIGHT
+GRAVITY = 0.38
+MAX_FALL_SPEED = 7.2
+FLAP_VELOCITY = -6.2
+
 NEON_GREEN = (0, 255, 0)
 NEON_BLUE = (0, 255, 255)
 NEON_PINK = (255, 0, 255)
@@ -29,147 +26,125 @@ NEON_YELLOW = (255, 255, 0)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
+
 class Grumpy:
-	def __init__(self, win):
-		self.win = win
+	def __init__(self, surface):
+		self.surface = surface
 		self.bird_colors = [NEON_GREEN, NEON_PINK, NEON_YELLOW, NEON_BLUE]
 		self.color = random.choice(self.bird_colors)
 		self.reset()
-	
+
 	def draw_bird(self):
-		size = max(14, int(20 * min(SCALE_X, SCALE_Y)))
-		pygame.draw.circle(self.win, self.color, 
-						 (self.rect.centerx, self.rect.centery), size)
-		pygame.draw.circle(self.win, BLACK, 
-						 (self.rect.centerx, self.rect.centery), size, 2)
-		eye_x = self.rect.centerx + max(6, int(8 * SCALE_X))
-		eye_y = self.rect.centery - max(3, int(5 * SCALE_Y))
-		pygame.draw.circle(self.win, WHITE, (eye_x, eye_y), max(3, int(5 * min(SCALE_X, SCALE_Y))))
-		pygame.draw.circle(self.win, BLACK, (eye_x, eye_y), max(2, int(3 * min(SCALE_X, SCALE_Y))))
+		body_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, self.rect.height)
+		wing_offset = -1 if self.vel < -1 else 2 if self.vel > 3 else 0
+		wing_rect = pygame.Rect(body_rect.x + 7, body_rect.y + 8 + wing_offset, 12, 8)
 		beak_points = [
-			(self.rect.centerx + max(10, int(15 * SCALE_X)), self.rect.centery),
-			(self.rect.centerx + max(16, int(25 * SCALE_X)), self.rect.centery - max(2, int(3 * SCALE_Y))),
-			(self.rect.centerx + max(16, int(25 * SCALE_X)), self.rect.centery + max(2, int(3 * SCALE_Y)))
+			(body_rect.right - 2, body_rect.centery),
+			(body_rect.right + 9, body_rect.centery - 3),
+			(body_rect.right + 9, body_rect.centery + 3),
 		]
-		pygame.draw.polygon(self.win, NEON_YELLOW, beak_points)
-		pygame.draw.polygon(self.win, BLACK, beak_points, 2)
-	
+
+		pygame.draw.ellipse(self.surface, self.color, body_rect)
+		pygame.draw.ellipse(self.surface, BLACK, body_rect, 2)
+		pygame.draw.ellipse(self.surface, NEON_YELLOW, wing_rect)
+		pygame.draw.ellipse(self.surface, BLACK, wing_rect, 2)
+		pygame.draw.polygon(self.surface, NEON_YELLOW, beak_points)
+		pygame.draw.polygon(self.surface, BLACK, beak_points, 2)
+		pygame.draw.circle(self.surface, WHITE, (body_rect.x + 22, body_rect.y + 7), 4)
+		pygame.draw.circle(self.surface, BLACK, (body_rect.x + 23, body_rect.y + 7), 2)
+
 	def update(self):
-		self.vel += 0.3
-		if self.vel >= 8:
-			self.vel = 8
-		if self.rect.bottom <= display_height:
-			self.rect.y += int(self.vel)
-		
-		if self.alive:
-			if pygame.mouse.get_pressed()[0] == 1 and not self.jumped:
-				self.jumped = True
-				self.vel = -6
-			if pygame.mouse.get_pressed()[0] == 0:
-				self.jumped = False
-			self.counter += 1
-			if self.counter > 5:
-				self.counter = 0
-		self.rect.width = max(28, int(40 * SCALE_X))
-		self.rect.height = max(28, int(40 * SCALE_Y))
-		
+		self.vel = min(MAX_FALL_SPEED, self.vel + GRAVITY)
+		self.y += self.vel
+		self.rect.y = int(round(self.y))
 		self.draw_bird()
-	
+
+	def flap(self):
+		if not self.alive:
+			return
+		self.vel = FLAP_VELOCITY
+
 	def draw_flap(self):
-		self.counter += 1
-		if self.counter > 5:
-			self.counter = 0
-		
-		if self.flap_pos <= -10 or self.flap_pos > 10:
+		if self.flap_pos <= -10 or self.flap_pos >= 10:
 			self.flap_inc *= -1
-		self.flap_pos += self.flap_inc
-		self.rect.y += self.flap_inc
-		self.rect.x = WIDTH // 2 - max(14, int(20 * SCALE_X))
-		
+		self.flap_pos += self.flap_inc * 0.65
+		self.y = self.idle_y + self.flap_pos
+		self.rect.y = int(round(self.y))
 		self.draw_bird()
-	
+
 	def reset(self):
-		self.rect = pygame.Rect(0, 0, max(28, int(40 * SCALE_X)), max(28, int(40 * SCALE_Y)))
-		self.rect.x = max(40, int(60 * SCALE_X))
-		self.rect.y = int(display_height) // 2
-		self.counter = 0
-		self.vel = 0
-		self.jumped = False
+		self.rect = pygame.Rect(BIRD_X, DISPLAY_HEIGHT // 2 - 8, BIRD_WIDTH, BIRD_HEIGHT)
+		self.y = float(self.rect.y)
+		self.idle_y = float(self.rect.y)
+		self.vel = 0.0
 		self.alive = True
-		self.theta = 0
-		self.flap_pos = 0
-		self.flap_inc = 1
+		self.flap_pos = 0.0
+		self.flap_inc = 1.0
+
 
 class Base:
-	def __init__(self, win, color):
-		self.win = win
+	def __init__(self, surface, color):
+		self.surface = surface
 		self.color = color
-		self.x1 = 0
-		self.x2 = WIDTH
-		self.y = int(display_height)
-	
+		self.x1 = 0.0
+		self.x2 = float(WORLD_WIDTH)
+		self.y = DISPLAY_HEIGHT
+
 	def update(self, speed):
 		self.x1 -= speed
 		self.x2 -= speed
-		
-		if self.x1 <= -WIDTH:
-			self.x1 = WIDTH - 5
-		if self.x2 <= -WIDTH:
-			self.x2 = WIDTH - 5
-		height = HEIGHT - self.y
-		pygame.draw.rect(self.win, self.color, (self.x1, self.y, WIDTH, height))
-		pygame.draw.rect(self.win, self.color, (self.x2, self.y, WIDTH, height))
-		pygame.draw.line(self.win, WHITE, (0, self.y), (WIDTH, self.y), 3)
-		for x in range(int(self.x1), int(self.x1) + WIDTH, 20):
-			pygame.draw.line(self.win, BLACK, (x, self.y), (x, HEIGHT), 1)
-		for x in range(int(self.x2), int(self.x2) + WIDTH, 20):
-			pygame.draw.line(self.win, BLACK, (x, self.y), (x, HEIGHT), 1)
+
+		if self.x1 <= -WORLD_WIDTH:
+			self.x1 = self.x2 + WORLD_WIDTH
+		if self.x2 <= -WORLD_WIDTH:
+			self.x2 = self.x1 + WORLD_WIDTH
+
+		height = WORLD_HEIGHT - self.y
+		for x_offset in (int(round(self.x1)), int(round(self.x2))):
+			pygame.draw.rect(self.surface, self.color, (x_offset, self.y, WORLD_WIDTH, height))
+			pygame.draw.line(self.surface, WHITE, (x_offset, self.y), (x_offset + WORLD_WIDTH, self.y), 3)
+			for x in range(x_offset, x_offset + WORLD_WIDTH, 20):
+				pygame.draw.line(self.surface, BLACK, (x, self.y), (x, WORLD_HEIGHT), 1)
+
 
 class Pipe(pygame.sprite.Sprite):
-	def __init__(self, win, y, position, color):
-		super(Pipe, self).__init__()
-		
-		self.win = win
+	def __init__(self, surface, gap_center, position, color):
+		super().__init__()
+
+		self.surface = surface
 		self.color = color
-		self.width = max(44, int(52 * SCALE_X))
-		self.height = max(220, int(320 * SCALE_Y))
-		pipe_gap = max(72, int(100 * SCALE_Y)) // 2
-		x = WIDTH
-		
-		if position == 1:
-			self.rect = pygame.Rect(x, y - pipe_gap - self.height, self.width, self.height)
-			self.is_top = True
-		elif position == -1:
-			self.rect = pygame.Rect(x, y + pipe_gap, self.width, self.height)
-			self.is_top = False
-	
+		self.is_top = position == 1
+		self.scored = False
+		self.x = float(PIPE_SPAWN_X)
+		gap_half = PIPE_GAP // 2
+
+		if self.is_top:
+			height = max(56, gap_center - gap_half)
+			self.rect = pygame.Rect(int(self.x), 0, PIPE_WIDTH, height)
+		else:
+			top = min(DISPLAY_HEIGHT - 56, gap_center + gap_half)
+			self.rect = pygame.Rect(int(self.x), top, PIPE_WIDTH, DISPLAY_HEIGHT - top)
+
 	def update(self, speed):
-		self.rect.x -= speed
+		self.x -= speed
+		self.rect.x = int(round(self.x))
 		if self.rect.right < 0:
 			self.kill()
-		pygame.draw.rect(self.win, self.color, self.rect)
-		pygame.draw.rect(self.win, BLACK, self.rect, 3)
-		inner_rect = self.rect.inflate(-10, -10)
-		pygame.draw.rect(self.win, BLACK, inner_rect, 2)
-		for y in range(self.rect.top, self.rect.bottom, 15):
-			pygame.draw.line(self.win, BLACK, 
-						   (self.rect.left, y), 
-						   (self.rect.right, y), 1)
-		if self.is_top:
-			cap_rect = pygame.Rect(self.rect.x - 3, self.rect.bottom - 20, 
-								 self.width + 6, 20)
-		else:
-			cap_rect = pygame.Rect(self.rect.x - 3, self.rect.top, 
-								 self.width + 6, 20)
-		
-		pygame.draw.rect(self.win, self.color, cap_rect)
-		pygame.draw.rect(self.win, BLACK, cap_rect, 3)
+			return
 
-class Score:
-	def __init__(self, x, y, win):
-		self.x = x
-		self.y = y
-		self.win = win
-	
-	def update(self, score):
-		pass
+		pygame.draw.rect(self.surface, self.color, self.rect)
+		pygame.draw.rect(self.surface, BLACK, self.rect, 3)
+		inner_rect = self.rect.inflate(-10, -10)
+		if inner_rect.width > 0 and inner_rect.height > 0:
+			pygame.draw.rect(self.surface, BLACK, inner_rect, 2)
+
+		for y in range(self.rect.top, self.rect.bottom, 15):
+			pygame.draw.line(self.surface, BLACK, (self.rect.left, y), (self.rect.right, y), 1)
+
+		if self.is_top:
+			cap_rect = pygame.Rect(self.rect.x - 3, self.rect.bottom - PIPE_CAP_HEIGHT, self.rect.width + 6, PIPE_CAP_HEIGHT)
+		else:
+			cap_rect = pygame.Rect(self.rect.x - 3, self.rect.top, self.rect.width + 6, PIPE_CAP_HEIGHT)
+
+		pygame.draw.rect(self.surface, self.color, cap_rect)
+		pygame.draw.rect(self.surface, BLACK, cap_rect, 3)

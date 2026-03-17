@@ -19,6 +19,8 @@ type GameCard = {
   year?: string
 }
 
+const isActionKey = (key: string) => ['enter', ' ', 'spacebar', 'w', 'x', 'c', 'v', 'b', 'n'].includes(key.toLowerCase())
+
 const games: GameCard[] = [
   { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
   { id: 'pac-man', title: 'PAC-MAN', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Eat all pellets and dodge the ghosts.', image: '../assets/TrollPacMan.png', accent: '#ffde00', executable: 'games/PacMan/pacman.py', difficulty: '★★☆', players: '1P', year: '1980' },
@@ -112,7 +114,7 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
       if (e.repeat) return
       if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1) }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1) }
-      if (e.key === 'Enter') { e.preventDefault(); startSelected() }
+      if (isActionKey(e.key) || e.code === 'NumpadEnter') { e.preventDefault(); startSelected() }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)

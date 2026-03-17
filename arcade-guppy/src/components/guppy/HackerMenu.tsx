@@ -26,9 +26,39 @@ type ViewKey = (typeof VIEW_ITEMS)[number]['key']
 type ControlId = string
 type WifiResultsMode = 'SCAN' | 'AUDIT'
 type GamepadNavDirection = 'up' | 'down' | 'left' | 'right' | null
+type WifiApPreset = {
+  id: string
+  label: string
+  description: string
+  profile: {
+    ssid: string
+    password: string
+    channel: number
+  }
+}
+type JammerPreset = {
+  id: string
+  label: string
+  description: string
+  config: {
+    packets: string
+    delay: string
+    reset: string
+    code: string
+    world: boolean
+    noBroadcast: boolean
+    verbose: boolean
+  }
+}
+type TerminalShortcut = {
+  id: ControlId
+  label: string
+  command: string
+  description: string
+  color: string
+}
 
 const BASE_FOCUSABLE_CONTROLS: ControlId[] = ['header-reconnect', 'header-exit', 'tab-home', 'tab-nfc', 'tab-ir', 'tab-wifi']
-const HACKING_UI_SCALE = 1.5
 
 const TAB_CONTROL_BY_VIEW: Record<ViewKey, ControlId> = {
   home: 'tab-home',
@@ -44,6 +74,70 @@ const BOOT_SEQUENCE = [
   '> Routing terminal and tool pages...',
   '',
 ]
+
+const WIFI_AP_FALLBACK_PRESETS: WifiApPreset[] = [
+  {
+    id: 'preset-lab-open',
+    label: 'LAB OPEN',
+    description: 'Open hotspot for walk-up testing on channel 6.',
+    profile: { ssid: 'LAB_OPEN', password: '', channel: 6 },
+  },
+  {
+    id: 'preset-lab-secure',
+    label: 'LAB SECURE',
+    description: 'Secured captive portal preset on channel 11.',
+    profile: { ssid: 'LAB_SECURE', password: 'arcade123', channel: 11 },
+  },
+  {
+    id: 'preset-guppy-link',
+    label: 'GUPPY LINK',
+    description: 'Default Guppy demo AP on channel 1.',
+    profile: { ssid: 'GUPPY_LINK', password: 'guppy123', channel: 1 },
+  },
+]
+
+const JAMMER_PRESETS: JammerPreset[] = [
+  {
+    id: 'jam-balanced',
+    label: 'BALANCED',
+    description: 'Default deauth burst with stable pacing.',
+    config: { packets: '25', delay: '1', reset: '0', code: '7', world: false, noBroadcast: false, verbose: false },
+  },
+  {
+    id: 'jam-pressure',
+    label: 'PRESSURE',
+    description: 'Heavier burst rate for short, aggressive cycles.',
+    config: { packets: '45', delay: '0.5', reset: '8', code: '7', world: false, noBroadcast: false, verbose: false },
+  },
+  {
+    id: 'jam-monitor',
+    label: 'MONITOR',
+    description: 'Slower cadence with verbose logging for debugging.',
+    config: { packets: '18', delay: '1.5', reset: '0', code: '4', world: false, noBroadcast: false, verbose: true },
+  },
+]
+
+const TERMINAL_SHORTCUTS: TerminalShortcut[] = [
+  { id: 'terminal-ping', label: 'PING', command: 'PING', description: 'Heartbeat to the bridge.', color: '#00ff88' },
+  { id: 'terminal-caps', label: 'HELLO/CAPS', command: 'HELLO', description: 'Replay the ready banner and capabilities.', color: '#66ddff' },
+  { id: 'terminal-ap-status', label: 'AP STATUS', command: 'WIFI_AP_STATUS', description: 'Check the current AP state.', color: '#ffbb55' },
+]
+
+function resolveHackingUiScale(viewport: { width: number; height: number }) {
+  if (viewport.height < 900 || viewport.width < 1500) return 1.18
+  if (viewport.height < 1150 || viewport.width < 1900) return 1.32
+  return 1.45
+}
+
+function cycleIndex(current: number, length: number, direction: 1 | -1) {
+  if (length <= 0) return 0
+  const safeIndex = current >= 0 && current < length ? current : 0
+  return (safeIndex + direction + length) % length
+}
+
+function formatWifiApSummary(profile: { ssid: string; password: string; channel: number }) {
+  return `${profile.ssid} / CH${profile.channel} / ${profile.password ? 'SECURED' : 'OPEN'}`
+}
 
 type HackerMenuProps = {
   onSelect?: (key: string) => void
@@ -206,7 +300,6 @@ export default function HackerMenu({
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
   const [activeView, setActiveView] = useState<ViewKey>('home')
   const [selectedIrId, setSelectedIrId] = useState('')
-  const [rawCommand, setRawCommand] = useState('')
   const [focusedControl, setFocusedControl] = useState<string>('tab-home')
   const [glitch, setGlitch] = useState(false)
   const [scanY, setScanY] = useState(0)
@@ -220,6 +313,9 @@ export default function HackerMenu({
   const [wifiResults, setWifiResults] = useState<string[]>([])
   const [showWifiResults, setShowWifiResults] = useState(false)
   const [wifiResultsMode, setWifiResultsMode] = useState<WifiResultsMode>('SCAN')
+  const [selectedWifiApPresetIndex, setSelectedWifiApPresetIndex] = useState(0)
+  const [selectedJammerPresetIndex, setSelectedJammerPresetIndex] = useState(0)
+  const [wifiResultSelectionIndex, setWifiResultSelectionIndex] = useState(0)
   const [jamChannel, setJamChannel] = useState('')
   const [jamAccessPoints, setJamAccessPoints] = useState('')
   const [jamStations, setJamStations] = useState('')
@@ -235,12 +331,6 @@ export default function HackerMenu({
   const wifiScanNetworks = useMemo(() => buildWifiNetworkList(wifiResults), [wifiResults])
   const wifiNetworkKey = useCallback((network: WifiNetwork) => `${network.ssid}|${network.bssid}|${network.channel}`, [])
   const selectedNetworkKey = selectedScanNetwork ? wifiNetworkKey(selectedScanNetwork) : ''
-  const stationSuggestions = useMemo(() => {
-    const values = new Set<string>()
-    values.add('ff:ff:ff:ff:ff:ff')
-    if (selectedScanNetwork?.bssid) values.add(selectedScanNetwork.bssid)
-    return Array.from(values)
-  }, [selectedScanNetwork])
 
   const serialLogRef = useRef<HTMLDivElement>(null)
   const activeGamepadIndexRef = useRef<number | null>(null)
@@ -251,15 +341,38 @@ export default function HackerMenu({
   const gamepadBackPressedRef = useRef(false)
   const gamepadPrevViewPressedRef = useRef(false)
   const gamepadNextViewPressedRef = useRef(false)
+  const hackingUiScale = useMemo(() => resolveHackingUiScale(viewport), [viewport])
   const scaledViewport = useMemo(
     () => ({
-      width: viewport.width / HACKING_UI_SCALE,
-      height: viewport.height / HACKING_UI_SCALE,
+      width: viewport.width / hackingUiScale,
+      height: viewport.height / hackingUiScale,
     }),
-    [viewport],
+    [hackingUiScale, viewport],
   )
-  const isCompact = scaledViewport.width < 1080 || scaledViewport.height < 740
+  const isDense = scaledViewport.width < 1280 || scaledViewport.height < 860
+  const isCompact = scaledViewport.width < 1140 || scaledViewport.height < 780
+  const isUltraCompact = scaledViewport.width < 1024 || scaledViewport.height < 700
   const irEntries = useMemo(() => irDbEntries ?? [], [irDbEntries])
+  const wifiApPresets = useMemo<WifiApPreset[]>(() => {
+    const presets = [...WIFI_AP_FALLBACK_PRESETS]
+    if (wifiApProfile) {
+      presets.unshift({
+        id: 'preset-saved',
+        label: 'SAVED PROFILE',
+        description: 'Persisted AP profile loaded from disk.',
+        profile: {
+          ssid: wifiApProfile.ssid,
+          password: wifiApProfile.password,
+          channel: wifiApProfile.channel,
+        },
+      })
+    }
+    return presets
+  }, [wifiApProfile])
+  const selectedWifiApPreset = wifiApPresets[selectedWifiApPresetIndex] ?? wifiApPresets[0] ?? null
+  const selectedJammerPreset = JAMMER_PRESETS[selectedJammerPresetIndex] ?? JAMMER_PRESETS[0]
+  const highlightedWifiNetwork = wifiScanNetworks[wifiResultSelectionIndex] ?? null
+  const pageSectionGap = isUltraCompact ? '6px' : isDense ? '8px' : '10px'
   const isIrStepControl = focusedControl === 'ir-prev' || focusedControl === 'ir-next'
 
   useEffect(() => {
@@ -284,21 +397,67 @@ export default function HackerMenu({
   }, [irEntries, selectedIrId])
 
   useEffect(() => {
+    setSelectedWifiApPresetIndex((current) => Math.min(current, Math.max(wifiApPresets.length - 1, 0)))
+  }, [wifiApPresets.length])
+
+  useEffect(() => {
     if (!wifiApProfile) return
-    setWifiApSsidInput(wifiApProfile.ssid ?? '')
-    setWifiApPasswordInput(wifiApProfile.password ?? '')
-    setWifiApChannelInput(String(wifiApProfile.channel ?? 6))
-    setJamAccessPoints((current) => current || wifiApProfile.ssid || '')
-    if (!jamChannel && wifiApProfile.channel) {
-      setJamChannel(String(wifiApProfile.channel))
-    }
-  }, [wifiApProfile, jamChannel])
+    setSelectedWifiApPresetIndex(0)
+  }, [wifiApProfile])
+
+  useEffect(() => {
+    if (!selectedWifiApPreset) return
+    setWifiApSsidInput(selectedWifiApPreset.profile.ssid)
+    setWifiApPasswordInput(selectedWifiApPreset.profile.password)
+    setWifiApChannelInput(String(selectedWifiApPreset.profile.channel))
+  }, [selectedWifiApPreset])
+
+  useEffect(() => {
+    const preset = selectedJammerPreset.config
+    setJamPackets(preset.packets)
+    setJamDelay(preset.delay)
+    setJamReset(preset.reset)
+    setJamCode(preset.code)
+    setJamWorld(preset.world)
+    setJamNoBroadcast(preset.noBroadcast)
+    setJamVerbose(preset.verbose)
+    setJamStations('ff:ff:ff:ff:ff:ff')
+    setJamFilters('')
+  }, [selectedJammerPreset])
+
+  useEffect(() => {
+    if (!selectedScanNetwork) return
+    setJamAccessPoints(selectedScanNetwork.bssid || selectedScanNetwork.ssid || '')
+    setJamChannel(selectedScanNetwork.channel || '')
+  }, [selectedScanNetwork])
 
   useEffect(() => {
     if (!showWifiResults) return
     const lines = serialLines ?? []
     setWifiResults(collectWifiResultLines(lines, wifiResultsMode))
   }, [serialLines, showWifiResults, wifiResultsMode])
+
+  useEffect(() => {
+    if (!showWifiResults) return
+    if (wifiScanNetworks.length === 0) {
+      if (wifiResultSelectionIndex !== 0) setWifiResultSelectionIndex(0)
+      return
+    }
+    setWifiResultSelectionIndex((current) => {
+      if (current >= 0 && current < wifiScanNetworks.length) return current
+      const targetIndex = selectedScanNetwork
+        ? wifiScanNetworks.findIndex((network) => wifiNetworkKey(network) === selectedNetworkKey)
+        : -1
+      return targetIndex >= 0 ? targetIndex : 0
+    })
+  }, [
+    showWifiResults,
+    selectedScanNetwork,
+    selectedNetworkKey,
+    wifiNetworkKey,
+    wifiResultSelectionIndex,
+    wifiScanNetworks,
+  ])
 
   const openView = useCallback((view: ViewKey) => {
     setActiveView(view)
@@ -315,6 +474,15 @@ export default function HackerMenu({
     })
   }, [irEntries])
 
+  const cycleWifiApPreset = useCallback((direction: 1 | -1) => {
+    if (wifiApPresets.length === 0) return
+    setSelectedWifiApPresetIndex((current) => cycleIndex(current, wifiApPresets.length, direction))
+  }, [wifiApPresets.length])
+
+  const cycleJammerPreset = useCallback((direction: 1 | -1) => {
+    setSelectedJammerPresetIndex((current) => cycleIndex(current, JAMMER_PRESETS.length, direction))
+  }, [])
+
   const getWifiApPayload = useCallback(() => {
     const channelRaw = Number.parseInt(wifiApChannelInput, 10)
     const channel = Number.isFinite(channelRaw) ? Math.min(Math.max(channelRaw, 1), 13) : 6
@@ -325,17 +493,27 @@ export default function HackerMenu({
     }
   }, [wifiApChannelInput, wifiApPasswordInput, wifiApSsidInput])
 
-  const sendRawCommand = useCallback(() => {
-    const trimmed = rawCommand.trim()
-    if (!trimmed) return
-    onSendRawCommand?.(trimmed)
-    setRawCommand('')
-  }, [onSendRawCommand, rawCommand])
+  const runTerminalShortcut = useCallback((command: string, label: string) => {
+    onSendRawCommand?.(command)
+    onSetToolStatus?.(`Shortcut sent: ${label}`)
+  }, [onSendRawCommand, onSetToolStatus])
+
+  const closeWifiResults = useCallback(() => {
+    setShowWifiResults(false)
+    setFocusedControl('wifi-results')
+  }, [])
+
+  const openWifiResults = useCallback(() => {
+    setWifiResultsTitle((current) => current || 'Wi-Fi Networks')
+    setShowWifiResults(true)
+    setFocusedControl('wifi-results')
+  }, [])
 
   const handleWifiScan = useCallback(() => {
     setWifiResults([])
     setWifiResultsTitle('Wi-Fi Networks')
     setWifiResultsMode('SCAN')
+    setWifiResultSelectionIndex(0)
     setShowWifiResults(true)
     onSendRawCommand?.('WIFI_SCAN')
   }, [onSendRawCommand])
@@ -346,22 +524,26 @@ export default function HackerMenu({
     setJamChannel(network.channel)
     setWifiResultsTitle(`Targeting ${network.ssid}`)
     setShowWifiResults(false)
+    setFocusedControl('jam-start')
     onSetToolStatus?.(`Selected Wi-Fi target: ${network.ssid} (${network.bssid || 'no BSSID'})`)
   }, [onSetToolStatus])
 
-  const handleNetworkDropdownChange = useCallback((key: string) => {
-    if (!key) return
-    const network = wifiScanNetworks.find((candidate) => wifiNetworkKey(candidate) === key)
-    if (network) {
-      handleWifiResultsSelect(network)
-    }
-  }, [wifiNetworkKey, wifiScanNetworks, handleWifiResultsSelect])
+  const moveWifiResultSelection = useCallback((direction: 1 | -1) => {
+    if (!showWifiResults || wifiScanNetworks.length === 0) return
+    setWifiResultSelectionIndex((current) => cycleIndex(current, wifiScanNetworks.length, direction))
+  }, [showWifiResults, wifiScanNetworks.length])
 
-  const handleStationInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setJamStations(event.target.value)
-  }, [])
+  const confirmWifiResultSelection = useCallback(() => {
+    if (!highlightedWifiNetwork) return
+    handleWifiResultsSelect(highlightedWifiNetwork)
+  }, [handleWifiResultsSelect, highlightedWifiNetwork])
 
   const handleStartJammer = useCallback(() => {
+    if (!jamAccessPoints.trim()) {
+      onSetToolStatus?.('Select a Wi-Fi target from the scan window first')
+      return
+    }
+
     const payload: WifiJammerPayload = { mode: 'auto' }
     const channelValue = Number.parseInt(jamChannel, 10)
     if (Number.isFinite(channelValue) && channelValue > 0) {
@@ -407,6 +589,7 @@ export default function HackerMenu({
     jamVerbose,
     jamWorld,
     onWifiJammerStart,
+    onSetToolStatus,
   ])
 
   const handleStopJammer = useCallback(() => {
@@ -440,6 +623,15 @@ export default function HackerMenu({
       case 'wifi-scan':
         handleWifiScan()
         return
+      case 'wifi-results':
+        openWifiResults()
+        return
+      case 'wifiap-prev':
+        cycleWifiApPreset(-1)
+        return
+      case 'wifiap-next':
+        cycleWifiApPreset(1)
+        return
       case 'wifiap-start': {
         const payload = getWifiApPayload()
         if (!payload.ssid) return
@@ -457,6 +649,12 @@ export default function HackerMenu({
       }
       case 'wifiap-load':
         onWifiApLoadProfile?.()
+        return
+      case 'jam-prev':
+        cycleJammerPreset(-1)
+        return
+      case 'jam-next':
+        cycleJammerPreset(1)
         return
       case 'jam-start':
         handleStartJammer()
@@ -489,8 +687,14 @@ export default function HackerMenu({
         if (!selectedIrId) return
         onIrSend?.(selectedIrId)
         return
-      case 'terminal-send':
-        sendRawCommand()
+      case 'terminal-ping':
+        runTerminalShortcut('PING', 'PING')
+        return
+      case 'terminal-caps':
+        runTerminalShortcut('HELLO', 'HELLO/CAPS')
+        return
+      case 'terminal-ap-status':
+        runTerminalShortcut('WIFI_AP_STATUS', 'AP STATUS')
         return
       case 'terminal-clear':
         onClearSerialLog?.()
@@ -512,11 +716,16 @@ export default function HackerMenu({
     onWifiApSaveProfile,
     onWifiApStart,
     onWifiApStop,
+    cycleJammerPreset,
+    cycleWifiApPreset,
     handleWifiScan,
+    handleStartJammer,
+    handleStopJammer,
     openView,
     getWifiApPayload,
+    openWifiResults,
+    runTerminalShortcut,
     selectedIrId,
-    sendRawCommand,
     stepIrEntry,
   ])
 
@@ -529,10 +738,10 @@ export default function HackerMenu({
     } else if (activeView === 'ir') {
       controls.push('ir-run', 'ir-reload', 'ir-prev', 'ir-next', 'ir-send')
     } else {
-      controls.push('wifi-scan', 'wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
-      controls.push('jam-start', 'jam-stop')
+      controls.push('wifi-scan', 'wifi-results', 'wifiap-prev', 'wifiap-next', 'wifiap-start', 'wifiap-stop', 'wifiap-save', 'wifiap-load')
+      controls.push('jam-prev', 'jam-next', 'jam-start', 'jam-stop')
     }
-    controls.push('terminal-send', 'terminal-clear')
+    controls.push('terminal-ping', 'terminal-caps', 'terminal-ap-status', 'terminal-clear')
     return controls
   }, [activeView])
 
@@ -637,6 +846,33 @@ export default function HackerMenu({
 
       const key = e.key.toLowerCase()
 
+      if (showWifiResults) {
+        if (key === 'escape') {
+          e.preventDefault()
+          closeWifiResults()
+          return
+        }
+
+        if (key === 'arrowup' || key === 'w' || key === 'arrowleft' || key === 'a') {
+          e.preventDefault()
+          moveWifiResultSelection(-1)
+          return
+        }
+
+        if (key === 'arrowdown' || key === 's' || key === 'arrowright' || key === 'd') {
+          e.preventDefault()
+          moveWifiResultSelection(1)
+          return
+        }
+
+        if (isHackerMenuActionInput(e)) {
+          if (e.repeat) return
+          e.preventDefault()
+          confirmWifiResultSelection()
+        }
+        return
+      }
+
       if (key === 'escape') {
         onBack?.()
         return
@@ -688,7 +924,18 @@ export default function HackerMenu({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activateFocusedControl, isIrStepControl, moveFocus, onBack, openView, stepIrEntry])
+  }, [
+    activateFocusedControl,
+    closeWifiResults,
+    confirmWifiResultSelection,
+    isIrStepControl,
+    moveFocus,
+    moveWifiResultSelection,
+    onBack,
+    openView,
+    showWifiResults,
+    stepIrEntry,
+  ])
 
   useEffect(() => {
     let raf = 0
@@ -735,7 +982,19 @@ export default function HackerMenu({
           gamepadActionArmedRef.current = true
         }
 
-        if (backPressed && !gamepadBackPressedRef.current) {
+        if (showWifiResults) {
+          if (backPressed && !gamepadBackPressedRef.current) {
+            closeWifiResults()
+          } else if (navDirection !== null && navDirection !== gamepadNavDirectionRef.current) {
+            if (navDirection === 'up' || navDirection === 'left') {
+              moveWifiResultSelection(-1)
+            } else if (navDirection === 'down' || navDirection === 'right') {
+              moveWifiResultSelection(1)
+            }
+          } else if (gamepadActionArmedRef.current && actionPressed && !gamepadActionPressedRef.current) {
+            confirmWifiResultSelection()
+          }
+        } else if (backPressed && !gamepadBackPressedRef.current) {
           onBack?.()
         } else if (prevViewPressed && !gamepadPrevViewPressedRef.current) {
           cycleView(-1)
@@ -774,7 +1033,18 @@ export default function HackerMenu({
 
     poll()
     return () => cancelAnimationFrame(raf)
-  }, [activateFocusedControl, cycleView, isIrStepControl, moveFocus, onBack, stepIrEntry])
+  }, [
+    activateFocusedControl,
+    closeWifiResults,
+    confirmWifiResultSelection,
+    cycleView,
+    isIrStepControl,
+    moveFocus,
+    moveWifiResultSelection,
+    onBack,
+    showWifiResults,
+    stepIrEntry,
+  ])
   const hardwareLabel = deviceStatus?.connected
     ? `HW::ONLINE ${deviceStatus.portPath ?? ''}`.trim()
     : deviceStatus?.connecting
@@ -810,9 +1080,17 @@ export default function HackerMenu({
   const jamStatusColor = jamStatusRunning ? '#33ff88' : '#ff6f6f'
   const jamStatusMessage = wifiJammerState?.message ?? (jamStatusRunning ? 'Jammer active' : 'Idle')
   const jamModeLabel = (wifiJammerState?.mode ?? 'firmware').toUpperCase()
-  const jamLogPreview = (wifiJammerLog ?? []).slice(-6)
+  const jamLogPreview = useMemo(
+    () => (wifiJammerLog ?? []).slice(-(isUltraCompact ? 3 : isDense ? 4 : 6)),
+    [isDense, isUltraCompact, wifiJammerLog],
+  )
 
   const selectedIrEntry = useMemo(() => irEntries.find((entry) => entry.id === selectedIrId), [irEntries, selectedIrId])
+  const serialLogPreview = useMemo(
+    () => (serialLines ?? []).slice(-(isUltraCompact ? 8 : isDense ? 10 : 14)),
+    [isDense, isUltraCompact, serialLines],
+  )
+  const bootLinesToRender = isUltraCompact ? bootLines.slice(-1) : isCompact ? bootLines.slice(-2) : bootLines
 
   const promptCommand = activeView === 'home'
     ? 'guppy status --overview'
@@ -829,8 +1107,8 @@ export default function HackerMenu({
       : activeView === 'ir'
         ? '#ff8800'
         : '#33bbff'
-  const scaledViewportWidth = `${100 / HACKING_UI_SCALE}vw`
-  const scaledViewportHeight = `${100 / HACKING_UI_SCALE}vh`
+  const scaledViewportWidth = `${100 / hackingUiScale}vw`
+  const scaledViewportHeight = `${100 / hackingUiScale}vh`
 
   return (
     <div style={{
@@ -843,15 +1121,15 @@ export default function HackerMenu({
         width: scaledViewportWidth,
         height: scaledViewportHeight,
         position: 'relative',
-        transform: `scale(${HACKING_UI_SCALE})`,
+        transform: `scale(${hackingUiScale})`,
         transformOrigin: 'top left',
         fontFamily: '"Courier New", Courier, monospace',
         filter: glitch ? 'hue-rotate(80deg) brightness(1.3)' : 'none',
         transition: 'filter 0.04s',
       }}>
-        <div style={{
+      <div style={{
           width: '100%', height: '100%',
-          position: 'relative', overflow: isCompact ? 'auto' : 'hidden',
+          position: 'relative', overflow: 'hidden',
         }}>
           <MatrixBg />
 
@@ -910,15 +1188,26 @@ export default function HackerMenu({
 
       <div style={{
         position: 'absolute', inset: 0,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: isCompact ? 'flex-start' : 'center',
-        paddingTop: isCompact ? '54px' : '48px', paddingBottom: isCompact ? '44px' : '36px',
-        overflowY: 'auto',
+        display: 'grid',
+        gridTemplateRows: booted ? 'auto minmax(0,1fr) auto' : 'auto',
+        justifyItems: 'center',
+        alignItems: 'start',
+        gap: isUltraCompact ? '4px' : isDense ? '6px' : '8px',
+        paddingTop: isUltraCompact ? '48px' : isDense ? '50px' : '48px',
+        paddingBottom: isUltraCompact ? '30px' : isDense ? '32px' : '36px',
+        overflow: 'hidden',
         zIndex: 15,
       }}>
-        <div style={{ width: 'min(1360px, 99vw)', display: 'flex', flexDirection: 'column', gap: isCompact ? '8px' : '10px' }}>
-          <div style={{ marginBottom: isCompact ? '4px' : '8px' }}>
-            {(isCompact ? bootLines.slice(-2) : bootLines).map((line, i) => (
+        <div style={{
+          width: 'min(1360px, 99vw)',
+          height: '100%',
+          minHeight: 0,
+          display: 'grid',
+          gridTemplateRows: booted ? 'auto minmax(0,1fr) auto' : 'auto',
+          gap: isDense ? '4px' : '6px',
+        }}>
+          <div style={{ marginBottom: isUltraCompact ? '2px' : isDense ? '4px' : '8px' }}>
+            {bootLinesToRender.map((line, i) => (
               <div key={i} style={{ fontSize: isCompact ? '13px' : '12px', lineHeight: isCompact ? '1.55' : '1.9', color: '#3a5a3a', letterSpacing: '0.5px' }}>
                 {line || '\u00A0'}
               </div>
@@ -931,6 +1220,10 @@ export default function HackerMenu({
               background: 'rgba(0,4,0,0.95)',
               boxShadow: '0 0 28px rgba(0,255,65,0.1), inset 0 0 40px rgba(0,0,0,0.6)',
               overflow: 'hidden',
+              minHeight: 0,
+              height: '100%',
+              display: 'grid',
+              gridTemplateRows: 'auto minmax(0,1fr) auto',
             }}>
               <div style={{
                 background: '#00ff41', color: '#000',
@@ -940,18 +1233,20 @@ export default function HackerMenu({
                 gap: '8px', flexWrap: isCompact ? 'wrap' : 'nowrap',
               }}>
                 <span>root@guppy:~ - control-center [{activeView.toUpperCase()}]</span>
-                <span>DPAD/L-STICK NAV | A/START SELECT | B/BACK BACK | LB/RB VIEW</span>
+                <span>DPAD/L-STICK NAV | A/START SELECT | B/BACK CLOSE/BACK | LB/RB VIEW</span>
               </div>
 
               <div className="console-grid" style={{
                 display: 'grid',
                 gridTemplateColumns: 'minmax(0, 1fr) minmax(360px, 430px)',
+                minHeight: 0,
+                height: '100%',
               }}>
                 <div className="left-pane" style={{
                   borderRight: '1px solid #081408',
                   display: 'flex',
                   flexDirection: 'column',
-                  minHeight: isCompact ? '0px' : '520px',
+                  minHeight: 0,
                 }}>
                   <div style={{
                     padding: isCompact ? '8px 10px 6px' : '10px 16px 8px',
@@ -974,9 +1269,9 @@ export default function HackerMenu({
                     ))}
                   </div>
 
-                  <div style={{ padding: isCompact ? '10px' : '12px 16px', flex: 1, overflowY: 'auto' }}>
+                  <div style={{ padding: isUltraCompact ? '8px' : isCompact ? '10px' : '12px 16px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     {activeView === 'home' && (
-                      <div style={{ display: 'grid', gap: isCompact ? '10px' : '12px' }}>
+                      <div style={{ display: 'grid', gap: pageSectionGap, alignContent: 'start' }}>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#00ff41', letterSpacing: '1.2px', textShadow: '0 0 8px #00ff41' }}>
                           CONTROL OVERVIEW
                         </div>
@@ -1024,395 +1319,292 @@ export default function HackerMenu({
                     )}
 
                     {activeView === 'nfc' && (
-                      <div style={{ display: 'grid', gap: isCompact ? '10px' : '10px' }}>
+                      <div style={{ display: 'grid', gap: pageSectionGap, alignContent: 'start' }}>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#00ccff', letterSpacing: '1.2px', textShadow: '0 0 8px #00ccff' }}>
                           NFC PAGE
                         </div>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#4b6f8a', letterSpacing: '0.2px', lineHeight: '1.45' }}>
                           Placeholder screen kept in place while the NFC implementation is rewritten.
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                          <button
-                            onClick={() => onSelect?.('nfc')}
-                            style={{
-                              ...actionButtonStyle('#00ccff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'nfc-run', '#00ccff'),
-                            }}
-                          >
-                            RUN NFC_CLONE
-                          </button>
-                          <button
-                            onClick={() => onNfcRead?.()}
-                            style={{
-                              ...actionButtonStyle('#00ccff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'nfc-read', '#00ccff'),
-                            }}
-                          >
-                            NFC READ UID
-                          </button>
-                          <button
-                            onClick={() => onNfcSave?.()}
-                            style={{
-                              ...actionButtonStyle('#00ff88', isCompact),
-                              color: '#00ff88',
-                              cursor: 'pointer',
-                              ...focusedControlStyle(focusedControl === 'nfc-save', '#00ff88'),
-                            }}
-                          >
-                            SAVE NFC FILE
-                          </button>
-                        </div>
-                        <div style={{ border: '1px solid #0f3045', background: 'rgba(0,35,55,0.22)', padding: '10px', display: 'grid', gap: '6px' }}>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>NFC_HW::{nfcHealth}</div>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>UID::pending rewrite</div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4c7f95', wordBreak: 'break-word' }}>LAST::{nfcLastLine}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: isUltraCompact ? '1fr' : 'minmax(0, 1.1fr) minmax(0, 0.9fr)', gap: pageSectionGap }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                            <button
+                              onClick={() => onSelect?.('nfc')}
+                              style={{
+                                ...actionButtonStyle('#00ccff', isCompact),
+                                ...focusedControlStyle(focusedControl === 'nfc-run', '#00ccff'),
+                              }}
+                            >
+                              RUN NFC_CLONE
+                            </button>
+                            <button
+                              onClick={() => onNfcRead?.()}
+                              style={{
+                                ...actionButtonStyle('#00ccff', isCompact),
+                                ...focusedControlStyle(focusedControl === 'nfc-read', '#00ccff'),
+                              }}
+                            >
+                              NFC READ UID
+                            </button>
+                            <button
+                              onClick={() => onNfcSave?.()}
+                              style={{
+                                ...actionButtonStyle('#00ff88', isCompact),
+                                color: '#00ff88',
+                                cursor: 'pointer',
+                                ...focusedControlStyle(focusedControl === 'nfc-save', '#00ff88'),
+                              }}
+                            >
+                              SAVE NFC FILE
+                            </button>
+                          </div>
+                          <div style={{ border: '1px solid #0f3045', background: 'rgba(0,35,55,0.22)', padding: isDense ? '8px' : '10px', display: 'grid', gap: '6px' }}>
+                            <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>NFC_HW::{nfcHealth}</div>
+                            <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#8fdfff' }}>UID::pending rewrite</div>
+                            <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4c7f95', wordBreak: 'break-word' }}>LAST::{nfcLastLine}</div>
+                          </div>
                         </div>
                       </div>
                     )}
 
                     {activeView === 'wifi' && (
-                      <div style={{ display: 'grid', gap: isCompact ? '10px' : '10px' }}>
+                      <div style={{ display: 'grid', gap: pageSectionGap, alignContent: 'start', minHeight: 0 }}>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#33bbff', letterSpacing: '1.2px', textShadow: '0 0 8px #33bbff' }}>
                           WIFI PAGE
                         </div>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#5e94b2', letterSpacing: '0.2px', lineHeight: '1.45' }}>
-                          Dedicated Wi-Fi controls with a separate results window for scan/audit output.
+                          Arcade-first Wi-Fi flow: scan, highlight a network, lock target, run the action.
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                          <button
-                            onClick={() => handleWifiScan()}
-                            style={{
-                              ...actionButtonStyle('#66ddff', isCompact),
-                              ...focusedControlStyle(focusedControl === 'wifi-scan', '#66ddff'),
-                            }}
-                          >
-                            WIFI SCAN
-                          </button>
-                          <button
-                            onClick={() => setShowWifiResults(true)}
-                            style={{
-                              ...actionButtonStyle('#33bbff', isCompact),
-                            }}
-                          >
-                            OPEN RESULTS WINDOW
-                          </button>
-                        </div>
-
-                        <div style={{ border: '1px solid #123346', background: 'rgba(5, 25, 40, 0.2)', padding: '10px', display: 'grid', gap: '8px' }}>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#93d7ff', letterSpacing: '1px' }}>
-                            WIFI AP PROFILE
-                          </div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5e94b2', lineHeight: '1.4' }}>
-                            Dit profiel is apart en blijft lokaal bewaard na reconnect/restart.
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(0,1fr) minmax(0,1fr) 110px', gap: '8px' }}>
-                            <input
-                              value={wifiApSsidInput}
-                              onChange={(e) => setWifiApSsidInput(e.target.value)}
-                              placeholder="SSID (zonder spaties)"
-                              style={{
-                                background: '#031019',
-                                border: '1px solid #2a5f80',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                            <input
-                              value={wifiApPasswordInput}
-                              onChange={(e) => setWifiApPasswordInput(e.target.value)}
-                              placeholder="Password (leeg = open)"
-                              style={{
-                                background: '#031019',
-                                border: '1px solid #2a5f80',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                            <input
-                              value={wifiApChannelInput}
-                              onChange={(e) => setWifiApChannelInput(e.target.value)}
-                              placeholder="Channel"
-                              inputMode="numeric"
-                              style={{
-                                background: '#031019',
-                                border: '1px solid #2a5f80',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                            <button
-                              onClick={() => {
-                                const payload = getWifiApPayload()
-                                if (!payload.ssid) return
-                                onWifiApStart?.(payload)
-                              }}
-                              style={{
-                                ...actionButtonStyle('#33bbff', isCompact),
-                                ...focusedControlStyle(focusedControl === 'wifiap-start', '#33bbff'),
-                              }}
-                            >
-                              START AP
-                            </button>
-                            <button
-                              onClick={() => onWifiApStop?.()}
-                              style={{
-                                ...actionButtonStyle('#33bbff', isCompact),
-                                ...focusedControlStyle(focusedControl === 'wifiap-stop', '#33bbff'),
-                              }}
-                            >
-                              STOP AP
-                            </button>
-                            <button
-                              onClick={() => {
-                                const payload = getWifiApPayload()
-                                if (!payload.ssid) return
-                                onWifiApSaveProfile?.(payload)
-                              }}
-                              style={{
-                                ...actionButtonStyle('#66ddff', isCompact),
-                                ...focusedControlStyle(focusedControl === 'wifiap-save', '#66ddff'),
-                              }}
-                            >
-                              SAVE PROFILE
-                            </button>
-                            <button
-                              onClick={() => onWifiApLoadProfile?.()}
-                              style={{
-                                ...actionButtonStyle('#66ddff', isCompact),
-                                ...focusedControlStyle(focusedControl === 'wifiap-load', '#66ddff'),
-                              }}
-                            >
-                              LOAD PROFILE
-                            </button>
-                          </div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4f87a7', wordBreak: 'break-word' }}>
-                            SAVED::{wifiApProfile
-                              ? `${wifiApProfile.ssid} / ch${wifiApProfile.channel} / ${wifiApProfile.password ? 'secured' : 'open'}`
-                              : 'none'}
-                          </div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4f87a7', wordBreak: 'break-word' }}>
-                            LAST::{wifiLastLine}
-                          </div>
-                        </div>
-                        <div style={{ border: '1px solid #0b2c3f', background: 'rgba(6, 21, 31, 0.45)', padding: '12px', display: 'grid', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            <div style={{ fontSize: isCompact ? '12px' : '13px', color: '#66ddff', letterSpacing: '1px' }}>WI-FI DEAUTH</div>
-                            <span style={{ fontSize: isCompact ? '11px' : '12px', color: jamStatusColor, letterSpacing: '0.8px' }}>
-                              {jamStatusRunning ? 'RUNNING' : 'STOPPED'}
-                            </span>
-                            <span style={{ fontSize: isCompact ? '11px' : '12px', color: '#8ad8ff', letterSpacing: '0.8px' }}>
-                              MODE {jamModeLabel}
-                            </span>
-                            <span style={{ fontSize: isCompact ? '11px' : '12px', color: '#aad7ff', wordBreak: 'break-word' }}>
-                              {jamStatusMessage}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#7bb5cd', lineHeight: '1.4' }}>
-                            Firmware-first flow: pick an AP from scan results and start deauth without manual monitor interface setup.
-                          </div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#a0dff7', letterSpacing: '0.5px', border: '1px solid #154050', padding: '8px' }}>
-                            TARGET::{selectedScanNetwork
-                              ? `${selectedScanNetwork.ssid} ${selectedScanNetwork.bssid ? `(${selectedScanNetwork.bssid})` : ''}`
-                              : (jamAccessPoints || 'none')} / CH{jamChannel || 'auto'}
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1fr 1fr', gap: '8px' }}>
-                            <select
-                              value={selectedNetworkKey}
-                              onChange={(event) => handleNetworkDropdownChange(event.target.value)}
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            >
-                              <option value="">Scan to populate targets</option>
-                              {wifiScanNetworks.map((network) => (
-                                <option key={wifiNetworkKey(network)} value={wifiNetworkKey(network)}>
-                                  {network.ssid || '(hidden)'} - CH{network.channel} - {network.bssid || 'no BSSID'}
-                                </option>
-                              ))}
-                            </select>
-                            <div style={{ position: 'relative' }}>
-                              <input
-                                value={jamStations}
-                                onChange={handleStationInputChange}
-                                list="jam-station-suggestions"
-                                placeholder="target station (mac or broadcast)"
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: isUltraCompact ? '1fr' : 'minmax(0, 0.98fr) minmax(0, 1.02fr)',
+                          gap: pageSectionGap,
+                          minHeight: 0,
+                          alignItems: 'start',
+                        }}>
+                          <div style={{ display: 'grid', gap: pageSectionGap, minHeight: 0 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                              <button
+                                onClick={() => handleWifiScan()}
                                 style={{
-                                  background: '#001014',
-                                  border: '1px solid #1c4f6f',
-                                  color: '#9edcff',
-                                  fontFamily: 'inherit',
-                                  fontSize: isCompact ? '12px' : '11px',
-                                  padding: '6px 8px',
-                                  width: '100%',
+                                  ...actionButtonStyle('#66ddff', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'wifi-scan', '#66ddff'),
                                 }}
-                              />
-                              <datalist id="jam-station-suggestions">
-                                {stationSuggestions.map((station) => (
-                                  <option key={station} value={station} />
-                                ))}
-                              </datalist>
+                              >
+                                WIFI SCAN
+                              </button>
+                              <button
+                                onClick={() => openWifiResults()}
+                                style={{
+                                  ...actionButtonStyle('#33bbff', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'wifi-results', '#33bbff'),
+                                }}
+                              >
+                                OPEN RESULTS WINDOW
+                              </button>
+                            </div>
+
+                            <div style={{ border: '1px solid #123346', background: 'rgba(5, 25, 40, 0.2)', padding: isDense ? '8px' : '10px', display: 'grid', gap: isDense ? '6px' : '8px' }}>
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#8ed2f8', letterSpacing: '0.8px' }}>
+                                TARGET::{selectedScanNetwork
+                                  ? `${selectedScanNetwork.ssid} ${selectedScanNetwork.bssid ? `(${selectedScanNetwork.bssid})` : ''} / CH${selectedScanNetwork.channel || 'auto'}`
+                                  : 'none selected'}
+                              </div>
+                              {!isDense && (
+                                <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#6fa7c4', lineHeight: '1.45' }}>
+                                  Gebruik `WIFI SCAN`, blader in het netwerkoverzicht met de joystick en druk op A om een target te locken.
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ border: '1px solid #123346', background: 'rgba(5, 25, 40, 0.2)', padding: isDense ? '8px' : '10px', display: 'grid', gap: isDense ? '6px' : '8px' }}>
+                              <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#93d7ff', letterSpacing: '1px' }}>
+                                WIFI AP PRESET
+                              </div>
+                              {!isDense && (
+                                <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#5e94b2', lineHeight: '1.4' }}>
+                                  Geen vrije invoer meer: kies een preset of laad het opgeslagen profiel.
+                                </div>
+                              )}
+                              <div style={{ border: '1px solid #1f5570', background: '#071f2d', padding: isDense ? '8px' : '10px', display: 'grid', gap: '4px' }}>
+                                <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#c0ebff', letterSpacing: '1px' }}>
+                                  ACTIVE::{selectedWifiApPreset?.label ?? 'NO PRESET'}
+                                </div>
+                                {!isDense && (
+                                  <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#82b8d4', lineHeight: '1.45' }}>
+                                    {selectedWifiApPreset?.description ?? 'No AP preset available.'}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#6cc6ff', wordBreak: 'break-word' }}>
+                                  PROFILE::{selectedWifiApPreset ? formatWifiApSummary(selectedWifiApPreset.profile) : 'none'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                                <button
+                                  onClick={() => cycleWifiApPreset(-1)}
+                                  style={{
+                                    ...actionButtonStyle('#66ddff', isCompact),
+                                    ...focusedControlStyle(focusedControl === 'wifiap-prev', '#66ddff'),
+                                  }}
+                                >
+                                  PREV PRESET
+                                </button>
+                                <button
+                                  onClick={() => cycleWifiApPreset(1)}
+                                  style={{
+                                    ...actionButtonStyle('#66ddff', isCompact),
+                                    ...focusedControlStyle(focusedControl === 'wifiap-next', '#66ddff'),
+                                  }}
+                                >
+                                  NEXT PRESET
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const payload = getWifiApPayload()
+                                    if (!payload.ssid) return
+                                    onWifiApStart?.(payload)
+                                  }}
+                                  style={{
+                                    ...actionButtonStyle('#33bbff', isCompact),
+                                    ...focusedControlStyle(focusedControl === 'wifiap-start', '#33bbff'),
+                                  }}
+                                >
+                                  START AP
+                                </button>
+                                <button
+                                  onClick={() => onWifiApStop?.()}
+                                  style={{
+                                    ...actionButtonStyle('#33bbff', isCompact),
+                                    ...focusedControlStyle(focusedControl === 'wifiap-stop', '#33bbff'),
+                                  }}
+                                >
+                                  STOP AP
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const payload = getWifiApPayload()
+                                    if (!payload.ssid) return
+                                    onWifiApSaveProfile?.(payload)
+                                  }}
+                                  style={{
+                                    ...actionButtonStyle('#66ddff', isCompact),
+                                    ...focusedControlStyle(focusedControl === 'wifiap-save', '#66ddff'),
+                                  }}
+                                >
+                                  SAVE AS DEFAULT
+                                </button>
+                                <button
+                                  onClick={() => onWifiApLoadProfile?.()}
+                                  style={{
+                                    ...actionButtonStyle('#66ddff', isCompact),
+                                    ...focusedControlStyle(focusedControl === 'wifiap-load', '#66ddff'),
+                                  }}
+                                >
+                                  LOAD PROFILE
+                                </button>
+                              </div>
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4f87a7', wordBreak: 'break-word' }}>
+                                SAVED::{wifiApProfile
+                                  ? formatWifiApSummary(wifiApProfile)
+                                  : 'none'}
+                              </div>
+                              {!isUltraCompact && (
+                                <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4f87a7', wordBreak: 'break-word' }}>
+                                  LAST::{wifiLastLine}
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
-                            <input
-                              value={jamChannel}
-                              onChange={(e) => setJamChannel(e.target.value)}
-                              placeholder="channel"
-                              inputMode="numeric"
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                            <input
-                              value={jamPackets}
-                              onChange={(e) => setJamPackets(e.target.value)}
-                              placeholder="packets / turn"
-                              inputMode="numeric"
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                            <input
-                              value={jamDelay}
-                              onChange={(e) => setJamDelay(e.target.value)}
-                              placeholder="delay (s)"
-                              inputMode="numeric"
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                            <input
-                              value={jamReset}
-                              onChange={(e) => setJamReset(e.target.value)}
-                              placeholder="reset after N"
-                              inputMode="numeric"
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                            <input
-                              value={jamCode}
-                              onChange={(e) => setJamCode(e.target.value)}
-                              placeholder="reason code"
-                              inputMode="numeric"
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                              }}
-                            />
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                            <input
-                              value={jamAccessPoints}
-                              onChange={(e) => setJamAccessPoints(e.target.value)}
-                              placeholder="target APs"
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                                width: '100%',
-                              }}
-                            />
-                            <input
-                              value={jamFilters}
-                              onChange={(e) => setJamFilters(e.target.value)}
-                              placeholder="filters (comma)"
-                              style={{
-                                background: '#001014',
-                                border: '1px solid #1c4f6f',
-                                color: '#9edcff',
-                                fontFamily: 'inherit',
-                                fontSize: isCompact ? '12px' : '11px',
-                                padding: '6px 8px',
-                                width: '100%',
-                              }}
-                            />
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: isCompact ? '11px' : '10px', color: '#8ac0d8' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <input type="checkbox" checked={jamWorld} onChange={(e) => setJamWorld(e.target.checked)} />
-                              WORLD
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <input type="checkbox" checked={jamNoBroadcast} onChange={(e) => setJamNoBroadcast(e.target.checked)} />
-                              NO-BROADCAST
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <input type="checkbox" checked={jamVerbose} onChange={(e) => setJamVerbose(e.target.checked)} />
-                              VERBOSE
-                            </label>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                            <button
-                              onClick={handleStartJammer}
-                              style={{
-                                ...actionButtonStyle('#33ff88', isCompact),
-                                ...focusedControlStyle(focusedControl === 'jam-start', '#33ff88'),
-                              }}
-                            >
-                              START DEAUTH
-                            </button>
-                            <button
-                              onClick={handleStopJammer}
-                              style={{
-                                ...actionButtonStyle('#ff6f6f', isCompact),
-                                ...focusedControlStyle(focusedControl === 'jam-stop', '#ff6f6f'),
-                              }}
-                            >
-                              STOP DEAUTH
-                            </button>
-                          </div>
-                          <div style={{ border: '1px solid #1b3a46', padding: '10px', display: 'grid', gap: '6px' }}>
-                            <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#93d7ff' }}>DEAUTH LOG ({jamLogPreview.length})</div>
-                            <div style={{ maxHeight: isCompact ? '120px' : '160px', overflow: 'auto', fontSize: isCompact ? '11px' : '10px', color: '#7bc6ff', lineHeight: '1.5' }}>
-                              {jamLogPreview.length === 0
-                                ? 'No log lines yet.'
-                                : jamLogPreview.map((line, index) => (
-                                    <div key={`${line}-${index}`} style={{ wordBreak: 'break-word' }}>
-                                      {line}
-                                    </div>
-                                  ))}
+
+                          <div style={{ border: '1px solid #0b2c3f', background: 'rgba(6, 21, 31, 0.45)', padding: isDense ? '8px' : '12px', display: 'grid', gap: isDense ? '8px' : '10px', minHeight: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              <div style={{ fontSize: isCompact ? '12px' : '13px', color: '#66ddff', letterSpacing: '1px' }}>WI-FI DEAUTH</div>
+                              <span style={{ fontSize: isCompact ? '11px' : '12px', color: jamStatusColor, letterSpacing: '0.8px' }}>
+                                {jamStatusRunning ? 'RUNNING' : 'STOPPED'}
+                              </span>
+                              <span style={{ fontSize: isCompact ? '11px' : '12px', color: '#8ad8ff', letterSpacing: '0.8px' }}>
+                                MODE {jamModeLabel}
+                              </span>
+                              <span style={{ fontSize: isCompact ? '11px' : '12px', color: '#aad7ff', wordBreak: 'break-word' }}>
+                                {jamStatusMessage}
+                              </span>
+                            </div>
+                            {!isDense && (
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#7bb5cd', lineHeight: '1.4' }}>
+                                Firmware-first flow: selecteer een scanresultaat en start daarna een preset zonder losse velden of checkboxes.
+                              </div>
+                            )}
+                            <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#a0dff7', letterSpacing: '0.5px', border: '1px solid #154050', padding: isDense ? '6px 8px' : '8px' }}>
+                              TARGET::{selectedScanNetwork
+                                ? `${selectedScanNetwork.ssid} ${selectedScanNetwork.bssid ? `(${selectedScanNetwork.bssid})` : ''}`
+                                : 'none'} / CH{jamChannel || 'auto'}
+                            </div>
+                            <div style={{ border: '1px solid #154050', background: '#071923', padding: isDense ? '8px' : '10px', display: 'grid', gap: '4px' }}>
+                              <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#d0eeff', letterSpacing: '1px' }}>
+                                ACTIVE::{selectedJammerPreset.label}
+                              </div>
+                              {!isDense && (
+                                <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#87b9cf', lineHeight: '1.45' }}>
+                                  {selectedJammerPreset.description}
+                                </div>
+                              )}
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#9edcff', lineHeight: '1.45', wordBreak: 'break-word' }}>
+                                PACKETS::{jamPackets} | DELAY::{jamDelay}s | RESET::{jamReset} | CODE::{jamCode}
+                              </div>
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#6db8de', lineHeight: '1.45', wordBreak: 'break-word' }}>
+                                FLAGS::{jamVerbose ? 'VERBOSE ' : ''}{jamWorld ? 'WORLD ' : ''}{jamNoBroadcast ? 'NO_BROADCAST ' : ''}{jamStations ? `STATION ${jamStations}` : 'BROADCAST DEFAULT'}
+                              </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                              <button
+                                onClick={() => cycleJammerPreset(-1)}
+                                style={{
+                                  ...actionButtonStyle('#66ddff', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'jam-prev', '#66ddff'),
+                                }}
+                              >
+                                PREV PROFILE
+                              </button>
+                              <button
+                                onClick={() => cycleJammerPreset(1)}
+                                style={{
+                                  ...actionButtonStyle('#66ddff', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'jam-next', '#66ddff'),
+                                }}
+                              >
+                                NEXT PROFILE
+                              </button>
+                              <button
+                                onClick={handleStartJammer}
+                                style={{
+                                  ...actionButtonStyle('#33ff88', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'jam-start', '#33ff88'),
+                                }}
+                              >
+                                START DEAUTH
+                              </button>
+                              <button
+                                onClick={handleStopJammer}
+                                style={{
+                                  ...actionButtonStyle('#ff6f6f', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'jam-stop', '#ff6f6f'),
+                                }}
+                              >
+                                STOP DEAUTH
+                              </button>
+                            </div>
+                            <div style={{ border: '1px solid #1b3a46', padding: isDense ? '8px' : '10px', display: 'grid', gap: '4px' }}>
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#93d7ff' }}>DEAUTH LOG ({jamLogPreview.length})</div>
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#7bc6ff', lineHeight: '1.4' }}>
+                                {jamLogPreview.length === 0
+                                  ? 'No log lines yet.'
+                                  : jamLogPreview.map((line, index) => (
+                                      <div key={`${line}-${index}`} style={{ wordBreak: 'break-word' }}>
+                                        {line}
+                                      </div>
+                                    ))}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1420,101 +1612,93 @@ export default function HackerMenu({
                     )}
 
                     {activeView === 'ir' && (
-                      <div style={{ display: 'grid', gap: isCompact ? '10px' : '10px' }}>
+                      <div style={{ display: 'grid', gap: pageSectionGap, alignContent: 'start' }}>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#ff8800', letterSpacing: '1.2px', textShadow: '0 0 8px #ff8800' }}>
                           IR PAGE
                         </div>
                         <div style={{ fontSize: isCompact ? '13px' : '12px', color: '#8a6230', letterSpacing: '0.2px', lineHeight: '1.45' }}>
                           Dedicated controls for IR database management and signal sending.
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                          <button
-                            onClick={() => onSelect?.('ir')}
-                            style={{
-                              ...actionButtonStyle('#ff8800', isCompact),
-                              ...focusedControlStyle(focusedControl === 'ir-run', '#ff8800'),
-                            }}
-                          >
-                            RUN IR_BLAST
-                          </button>
-                          <button
-                            onClick={() => onIrReload?.()}
-                            style={{
-                              ...actionButtonStyle('#ff8800', isCompact),
-                              ...focusedControlStyle(focusedControl === 'ir-reload', '#ff8800'),
-                            }}
-                          >
-                            RELOAD IR DB
-                          </button>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr 1fr' : 'auto minmax(0,1fr) auto auto', gap: '8px', alignItems: 'center' }}>
-                          <button
-                            onClick={() => stepIrEntry(-1)}
-                            style={{
-                              ...actionButtonStyle('#ff8800', isCompact),
-                              ...focusedControlStyle(focusedControl === 'ir-prev', '#ff8800'),
-                            }}
-                          >
-                            PREV
-                          </button>
-                          <select
-                            value={selectedIrId}
-                            onChange={(e) => setSelectedIrId(e.target.value)}
-                            style={{
-                              background: '#031103',
-                              border: '1px solid #ff8800',
-                              color: '#ffbb66',
-                              fontFamily: 'inherit',
-                              padding: '8px',
-                              fontSize: isCompact ? '12px' : '11px',
-                            }}
-                          >
-                            {irEntries.length === 0
-                              ? <option value="">No IR entries loaded</option>
-                              : irEntries.map((entry) => (
-                                  <option key={entry.id} value={entry.id}>
-                                    {entry.name} [{entry.protocol}]
-                                  </option>
-                                ))}
-                          </select>
-                          <button
-                            onClick={() => stepIrEntry(1)}
-                            style={{
-                              ...actionButtonStyle('#ff8800', isCompact),
-                              ...focusedControlStyle(focusedControl === 'ir-next', '#ff8800'),
-                            }}
-                          >
-                            NEXT
-                          </button>
-                          <button
-                            onClick={() => selectedIrId && onIrSend?.(selectedIrId)}
-                            disabled={!selectedIrId}
-                            style={{
-                              ...actionButtonStyle('#ff8800', isCompact),
-                              color: selectedIrId ? '#ffd9a8' : '#8a6a44',
-                              cursor: selectedIrId ? 'pointer' : 'not-allowed',
-                              opacity: selectedIrId ? 1 : 0.7,
-                              ...focusedControlStyle(focusedControl === 'ir-send', '#ff8800'),
-                            }}
-                          >
-                            SEND IR
-                          </button>
-                        </div>
-                        <div style={{ border: '1px solid #3a2107', background: 'rgba(50,25,5,0.26)', padding: '10px', display: 'grid', gap: '6px' }}>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>IR_DB::{irEntries.length} entries</div>
-                          <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>
-                            SELECTED::{selectedIrEntry ? `${selectedIrEntry.name} (${selectedIrEntry.protocol})` : 'none'}
+                        <div style={{ display: 'grid', gridTemplateColumns: isUltraCompact ? '1fr' : 'minmax(0, 1.05fr) minmax(0, 0.95fr)', gap: pageSectionGap }}>
+                          <div style={{ display: 'grid', gap: '8px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                              <button
+                                onClick={() => onSelect?.('ir')}
+                                style={{
+                                  ...actionButtonStyle('#ff8800', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'ir-run', '#ff8800'),
+                                }}
+                              >
+                                RUN IR_BLAST
+                              </button>
+                              <button
+                                onClick={() => onIrReload?.()}
+                                style={{
+                                  ...actionButtonStyle('#ff8800', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'ir-reload', '#ff8800'),
+                                }}
+                              >
+                                RELOAD IR DB
+                              </button>
+                            </div>
+                            <div style={{ border: '1px solid #5c3208', background: 'rgba(40, 18, 2, 0.45)', padding: isDense ? '8px' : '10px', display: 'grid', gap: '4px' }}>
+                              <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>
+                                ENTRY::{selectedIrEntry ? `${selectedIrEntry.name} [${selectedIrEntry.protocol}]` : 'none'}
+                              </div>
+                              <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#c39a67' }}>
+                                POSITION::{irEntries.length === 0 ? '0/0' : `${Math.max(irEntries.findIndex((entry) => entry.id === selectedIrId), 0) + 1}/${irEntries.length}`}
+                              </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', alignItems: 'center' }}>
+                              <button
+                                onClick={() => stepIrEntry(-1)}
+                                style={{
+                                  ...actionButtonStyle('#ff8800', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'ir-prev', '#ff8800'),
+                                }}
+                              >
+                                PREV
+                              </button>
+                              <button
+                                onClick={() => stepIrEntry(1)}
+                                style={{
+                                  ...actionButtonStyle('#ff8800', isCompact),
+                                  ...focusedControlStyle(focusedControl === 'ir-next', '#ff8800'),
+                                }}
+                              >
+                                NEXT
+                              </button>
+                              <button
+                                onClick={() => selectedIrId && onIrSend?.(selectedIrId)}
+                                disabled={!selectedIrId}
+                                style={{
+                                  ...actionButtonStyle('#ff8800', isCompact),
+                                  color: selectedIrId ? '#ffd9a8' : '#8a6a44',
+                                  cursor: selectedIrId ? 'pointer' : 'not-allowed',
+                                  opacity: selectedIrId ? 1 : 0.7,
+                                  ...focusedControlStyle(focusedControl === 'ir-send', '#ff8800'),
+                                }}
+                              >
+                                SEND IR
+                              </button>
+                            </div>
                           </div>
-                          <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#b38a58', wordBreak: 'break-word' }}>LAST::{irLastLine}</div>
+                          <div style={{ border: '1px solid #3a2107', background: 'rgba(50,25,5,0.26)', padding: isDense ? '8px' : '10px', display: 'grid', gap: '6px', alignContent: 'start' }}>
+                            <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>IR_DB::{irEntries.length} entries</div>
+                            <div style={{ fontSize: isCompact ? '12px' : '11px', color: '#ffd4a2' }}>
+                              SELECTED::{selectedIrEntry ? `${selectedIrEntry.name} (${selectedIrEntry.protocol})` : 'none'}
+                            </div>
+                            <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#b38a58', wordBreak: 'break-word' }}>LAST::{irLastLine}</div>
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', minHeight: isCompact ? '0px' : '520px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                   <div style={{
-                    padding: isCompact ? '8px 10px' : '10px 12px',
+                    padding: isUltraCompact ? '7px 8px' : isCompact ? '8px 10px' : '10px 12px',
                     borderBottom: '1px solid #081408',
                     color: '#7fbf7f',
                     fontSize: isCompact ? '13px' : '12px',
@@ -1523,41 +1707,25 @@ export default function HackerMenu({
                     SERIAL TERMINAL (STATIC)
                   </div>
                   <div style={{
-                    padding: isCompact ? '8px 10px' : '10px 12px',
+                    padding: isUltraCompact ? '7px 8px' : isCompact ? '8px 10px' : '10px 12px',
                     borderBottom: '1px solid #081408',
                     display: 'grid',
-                    gridTemplateColumns: isCompact ? '1fr' : '1fr auto auto',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                     gap: '8px',
                     alignItems: 'center',
                   }}>
-                    <input
-                      value={rawCommand}
-                      onChange={(e) => setRawCommand(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          sendRawCommand()
-                        }
-                      }}
-                      placeholder="raw serial command (PING, HELLO, RUN GPIO_CTRL)"
-                      style={{
-                        background: '#020c02',
-                        border: '1px solid #2b5a2b',
-                        color: '#9fe49f',
-                        fontFamily: 'inherit',
-                        fontSize: isCompact ? '13px' : '12px',
-                        padding: '6px 8px',
-                      }}
-                    />
-                    <button
-                      onClick={sendRawCommand}
-                      style={{
-                        ...actionButtonStyle('#00ff88', isCompact),
-                        ...focusedControlStyle(focusedControl === 'terminal-send', '#00ff88'),
-                      }}
-                    >
-                      SEND
-                    </button>
+                    {TERMINAL_SHORTCUTS.map((shortcut) => (
+                      <button
+                        key={shortcut.id}
+                        onClick={() => runTerminalShortcut(shortcut.command, shortcut.label)}
+                        style={{
+                          ...actionButtonStyle(shortcut.color, isCompact),
+                          ...focusedControlStyle(focusedControl === shortcut.id, shortcut.color),
+                        }}
+                      >
+                        {shortcut.label}
+                      </button>
+                    ))}
                     <button
                       onClick={() => onClearSerialLog?.()}
                       style={{
@@ -1569,22 +1737,32 @@ export default function HackerMenu({
                     </button>
                   </div>
 
+                  {!isDense && (
+                    <div style={{ padding: isCompact ? '8px 10px' : '8px 12px', borderBottom: '1px solid #081408', display: 'grid', gap: '4px' }}>
+                      {TERMINAL_SHORTCUTS.map((shortcut) => (
+                        <div key={`${shortcut.id}-desc`} style={{ fontSize: isCompact ? '11px' : '10px', color: '#4d7f4d' }}>
+                          {shortcut.label}::{shortcut.description}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div
                     ref={serialLogRef}
                     style={{
                       flex: 1,
-                      minHeight: isCompact ? '190px' : '280px',
-                      maxHeight: isCompact ? '240px' : '360px',
-                      overflowY: 'auto',
+                      minHeight: isUltraCompact ? '120px' : isDense ? '150px' : isCompact ? '190px' : '280px',
+                      maxHeight: isUltraCompact ? '160px' : isDense ? '190px' : isCompact ? '240px' : '360px',
+                      overflow: 'hidden',
                       background: '#010701',
                       borderBottom: '1px solid #103010',
-                      padding: '10px',
+                      padding: isDense ? '8px' : '10px',
                     }}
                   >
-                    {(serialLines ?? []).length === 0 ? (
+                    {serialLogPreview.length === 0 ? (
                       <div style={{ color: '#2b4a2b', fontSize: isCompact ? '12px' : '11px' }}>No serial lines yet.</div>
                     ) : (
-                      (serialLines ?? []).map((line, index) => (
+                      serialLogPreview.map((line, index) => (
                         <div key={`${index}-${line.slice(0, 24)}`} style={{ color: '#69a869', fontSize: isCompact ? '12px' : '11px', lineHeight: '1.45' }}>
                           {line}
                         </div>
@@ -1592,7 +1770,7 @@ export default function HackerMenu({
                     )}
                   </div>
 
-                  <div style={{ padding: isCompact ? '8px 10px' : '10px 12px', display: 'grid', gap: '6px' }}>
+                  <div style={{ padding: isUltraCompact ? '7px 8px' : isCompact ? '8px 10px' : '10px 12px', display: 'grid', gap: '6px' }}>
                     <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#4d7f4d', letterSpacing: '0.5px' }}>
                       TOOL::{toolStatus || 'Ready'}
                     </div>
@@ -1633,11 +1811,11 @@ export default function HackerMenu({
             </div>
           )}
 
-          {booted && (
+          {booted && !isUltraCompact && (
             <div style={{ marginTop: '6px', display: 'flex', gap: isCompact ? '10px' : '18px', color: '#1a2a1a', fontSize: isCompact ? '11px' : '10px', letterSpacing: isCompact ? '1px' : '2px', flexWrap: 'wrap' }}>
               <span>DPAD / L-STICK: focus</span>
               <span>A / START: activate</span>
-              <span>B / BACK: back</span>
+              <span>B / BACK: close modal or back</span>
               <span>LB/RB: switch page</span>
               <span>FOCUS::{focusedControl}</span>
               <span style={{ marginLeft: 'auto' }}>{activeView.toUpperCase()}</span>
@@ -1663,9 +1841,11 @@ export default function HackerMenu({
             title={wifiResultsTitle}
             mode={wifiResultsMode}
             results={wifiResults}
-            onClose={() => setShowWifiResults(false)}
+            onClose={closeWifiResults}
             isCompact={isCompact}
             onSelectNetwork={handleWifiResultsSelect}
+            selectedNetworkKey={highlightedWifiNetwork ? wifiNetworkKey(highlightedWifiNetwork) : ''}
+            targetNetworkKey={selectedNetworkKey}
           />
 
 
@@ -1675,7 +1855,7 @@ export default function HackerMenu({
               100% { transform: translateX(300%); }
             }
 
-            @media (max-width: 1620px), (max-height: 1110px) {
+            @media (max-width: 1480px) {
               .console-grid {
                 grid-template-columns: 1fr !important;
               }

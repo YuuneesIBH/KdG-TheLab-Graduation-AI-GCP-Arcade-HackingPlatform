@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type WifiResultsMode = 'SCAN' | 'AUDIT'
 
@@ -10,6 +10,8 @@ type WifiResultsModalProps = {
   onClose: () => void
   isCompact?: boolean
   onSelectNetwork?: (network: WifiNetwork) => void
+  selectedNetworkKey?: string
+  targetNetworkKey?: string
 }
 
 export type WifiNetwork = {
@@ -142,28 +144,13 @@ export default function WifiResultsModal({
   onClose,
   isCompact = false,
   onSelectNetwork,
+  selectedNetworkKey,
+  targetNetworkKey,
 }: WifiResultsModalProps) {
   const [vendorByBssid, setVendorByBssid] = useState<Record<string, string>>({})
+  const selectedRowRef = useRef<HTMLDivElement | null>(null)
 
-  const networks = useMemo(() => {
-    const parsed = results
-      .map((line) => parseNetworkLine(line))
-      .filter((entry): entry is WifiNetwork => Boolean(entry))
-
-    const deduped = new Map<string, WifiNetwork>()
-    for (const network of parsed) {
-      const key = `${network.ssid}|${network.channel}|${network.security}|${network.bssid}`
-      const existing = deduped.get(key)
-      if (!existing) {
-        deduped.set(key, network)
-        continue
-      }
-      if ((network.rssi ?? -999) > (existing.rssi ?? -999)) {
-        deduped.set(key, network)
-      }
-    }
-    return Array.from(deduped.values()).sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999))
-  }, [results])
+  const networks = useMemo(() => buildWifiNetworkList(results), [results])
 
   useEffect(() => {
     const api = window.electron
@@ -200,6 +187,20 @@ export default function WifiResultsModal({
       unknownVendors,
     }
   }, [networks, vendorByBssid])
+
+  const selectedNetwork = useMemo(
+    () => networks.find((network) => `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey) ?? null,
+    [networks, selectedNetworkKey],
+  )
+
+  const targetNetwork = useMemo(
+    () => networks.find((network) => `${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey) ?? null,
+    [networks, targetNetworkKey],
+  )
+
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [isOpen, selectedNetworkKey])
 
   if (!isOpen) return null
 
@@ -259,6 +260,9 @@ export default function WifiResultsModal({
             >
               MODE {mode}
             </div>
+            <div style={{ fontSize: textFont, color: '#8ccff0', letterSpacing: '0.8px' }}>
+              DPAD: SELECT NETWORK | A: TARGET | B: BACK
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -297,7 +301,7 @@ export default function WifiResultsModal({
                   top: 0,
                 }}
               >
-                {['SSID', 'Signal', 'Vendor', 'Security', 'Channel', 'Resilience', 'Risk', 'Action'].map((header) => (
+                {['SSID', 'Signal', 'Vendor', 'Security', 'Channel', 'Resilience', 'Risk', 'Status'].map((header) => (
                   <div key={header} style={{ padding: '10px 12px', fontSize: textFont, color: '#9edcff' }}>{header}</div>
                 ))}
               </div>
@@ -307,13 +311,26 @@ export default function WifiResultsModal({
                 networks.map((network, index) => (
                   <div
                     key={`${network.ssid}-${network.channel}-${index}`}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.9fr 1.1fr 1.5fr 1fr 0.8fr 1fr 0.9fr 0.8fr',
-                    borderBottom: '1px solid #143647',
-                    alignItems: 'center',
-                  }}
-                >
+                    ref={`${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey ? selectedRowRef : null}
+                    onClick={() => onSelectNetwork?.(network)}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1.9fr 1.1fr 1.5fr 1fr 0.8fr 1fr 0.9fr 0.8fr',
+                      borderBottom: '1px solid #143647',
+                      alignItems: 'center',
+                      cursor: onSelectNetwork ? 'pointer' : 'default',
+                      background:
+                        `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
+                          ? 'rgba(102, 221, 255, 0.12)'
+                          : `${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey
+                            ? 'rgba(51, 227, 138, 0.12)'
+                            : 'transparent',
+                      boxShadow:
+                        `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
+                          ? 'inset 0 0 0 2px rgba(102, 221, 255, 0.65)'
+                          : undefined,
+                    }}
+                  >
                     <div style={{ padding: '10px 12px', fontSize: textFont, color: '#b6e4ff', wordBreak: 'break-word' }}>
                       {network.ssid}
                       {network.bssid ? <div style={{ color: '#6f97ae', fontSize: '10px', marginTop: '4px' }}>{network.bssid}</div> : null}
@@ -329,32 +346,29 @@ export default function WifiResultsModal({
                     <div style={{ padding: '10px 12px', fontSize: textFont, color: resilienceColor(deauthResilience(network)) }}>
                       {deauthResilience(network)}
                     </div>
-                  <div style={{ padding: '10px 12px', fontSize: textFont, color: riskColor(network.risk) }}>{network.risk}</div>
-                  <div style={{ padding: '6px 12px' }}>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onSelectNetwork?.(network)
-                      }}
+                    <div style={{ padding: '10px 12px', fontSize: textFont, color: riskColor(network.risk) }}>{network.risk}</div>
+                    <div
                       style={{
-                        background: '#1c3660',
-                        border: '1px solid #66ddff',
-                        color: '#66ddff',
-                        fontFamily: 'inherit',
+                        padding: '10px 12px',
                         fontSize: isCompact ? '11px' : '12px',
-                        letterSpacing: '1px',
-                        padding: '4px 8px',
-                        cursor: onSelectNetwork ? 'pointer' : 'not-allowed',
-                        opacity: onSelectNetwork ? 1 : 0.5,
+                        color:
+                          `${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey
+                            ? '#33e38a'
+                            : `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
+                              ? '#66ddff'
+                              : '#7ca8c0',
+                        letterSpacing: '0.8px',
                       }}
-                      disabled={!onSelectNetwork}
                     >
-                      TARGET
-                    </button>
+                      {`${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey
+                        ? 'ACTIVE'
+                        : `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
+                          ? 'READY'
+                          : 'PRESS A'}
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
             </div>
           </div>
 
@@ -384,6 +398,12 @@ export default function WifiResultsModal({
               </div>
               <div style={{ border: '1px solid #1d4f67', background: '#082538', padding: '12px', fontSize: textFont }}>
                 Unknown vendors: <span style={{ color: '#e6bd45' }}>{summary.unknownVendors}</span>
+              </div>
+              <div style={{ border: '1px solid #1d4f67', background: '#082538', padding: '12px', fontSize: textFont, wordBreak: 'break-word' }}>
+                Highlighted: <span style={{ color: '#66ddff' }}>{selectedNetwork ? `${selectedNetwork.ssid} / CH${selectedNetwork.channel}` : 'none'}</span>
+              </div>
+              <div style={{ border: '1px solid #1d4f67', background: '#082538', padding: '12px', fontSize: textFont, wordBreak: 'break-word' }}>
+                Current target: <span style={{ color: '#33e38a' }}>{targetNetwork ? `${targetNetwork.ssid} / CH${targetNetwork.channel}` : 'none'}</span>
               </div>
             </div>
 

@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
 import path from 'path'
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import fs from 'fs'
 import { SerialPort } from 'serialport'
+import { ARCADE_LEAVE_MENU_ACCELERATORS } from './shared/arcade-controls'
 import type {
   AiExplainPayload,
   AiExplainResponse,
@@ -532,6 +533,67 @@ function restoreArcadeWindow() {
   mainWindow.setFullScreen(true)
 }
 
+function unregisterLeaveGameShortcuts() {
+  for (const accelerator of ARCADE_LEAVE_MENU_ACCELERATORS) {
+    globalShortcut.unregister(accelerator)
+  }
+}
+
+function registerLeaveGameShortcuts() {
+  if (!app.isReady() || !activeGameProcess) return
+
+  for (const accelerator of ARCADE_LEAVE_MENU_ACCELERATORS) {
+    if (globalShortcut.isRegistered(accelerator)) continue
+
+    const registered = globalShortcut.register(accelerator, () => {
+      if (!activeGameProcess) return
+      console.log(`[LEAVE] Global leave shortcut triggered: ${accelerator}`)
+      void stopActiveGameProcess(true)
+    })
+
+    if (!registered) {
+      console.warn(`[LEAVE] Failed to register shortcut: ${accelerator}`)
+    }
+  }
+}
+
+function waitForProcessExit(gameProcess: ChildProcess, timeoutMs: number) {
+  if (gameProcess.exitCode !== null) {
+    return Promise.resolve(true)
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const onExit = () => {
+      cleanup()
+      resolve(true)
+    }
+    const onTimeout = () => {
+      cleanup()
+      resolve(false)
+    }
+    const cleanup = () => {
+      clearTimeout(timeout)
+      gameProcess.removeListener('exit', onExit)
+    }
+
+    const timeout = setTimeout(onTimeout, timeoutMs)
+    gameProcess.once('exit', onExit)
+  })
+}
+
+function signalActiveGameProcess(gameProcess: ChildProcess, signal: NodeJS.Signals) {
+  const pid = gameProcess.pid
+  if (!pid) {
+    throw new Error('Active game process has no PID')
+  }
+
+  try {
+    process.kill(-pid, signal)
+  } catch {
+    process.kill(pid, signal)
+  }
+}
+
 function scheduleMacWindowPlacement(
   processNameQuery: string,
   targetBounds: LaunchViewport,
@@ -582,11 +644,13 @@ function scheduleMacWindowPlacement(
 
 function trackActiveGameProcess(gameProcess: ChildProcess, label: string) {
   activeGameProcess = gameProcess
+  registerLeaveGameShortcuts()
 
   gameProcess.once('exit', (code, signal) => {
     console.log(`[LAUNCH] ${label} game exited`, { code, signal })
     if (activeGameProcess === gameProcess) {
       activeGameProcess = null
+      unregisterLeaveGameShortcuts()
       restoreArcadeWindow()
       publishGameExited()
     }
@@ -596,6 +660,7 @@ function trackActiveGameProcess(gameProcess: ChildProcess, label: string) {
     console.error(`[LAUNCH] ${label} game process error:`, error)
     if (activeGameProcess === gameProcess) {
       activeGameProcess = null
+      unregisterLeaveGameShortcuts()
       restoreArcadeWindow()
     }
   })
@@ -605,18 +670,17 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
   const gameProcess = activeGameProcess
   if (!gameProcess || gameProcess.exitCode !== null || gameProcess.killed) {
     activeGameProcess = null
+    unregisterLeaveGameShortcuts()
     return { success: true, message: 'No active game process' }
-  }
-
-  const pid = gameProcess.pid
-  activeGameProcess = null
-
-  if (!pid) {
-    return { success: false, message: 'Active game process has no PID' }
   }
 
   try {
     if (process.platform === 'win32') {
+      const pid = gameProcess.pid
+      if (!pid) {
+        return { success: false, message: 'Active game process has no PID' }
+      }
+
       const args = ['/pid', String(pid), '/t']
       if (force) args.push('/f')
 
@@ -634,23 +698,53 @@ async function stopActiveGameProcess(force = false): Promise<IpcResult> {
         })
       })
 
-      if (result.success) {
+      if (result.success && activeGameProcess === gameProcess) {
+        activeGameProcess = null
+        unregisterLeaveGameShortcuts()
         restoreArcadeWindow()
         publishGameExited()
       }
       return result
     }
 
-    const signal: NodeJS.Signals = force ? 'SIGKILL' : 'SIGTERM'
-    try {
-      process.kill(-pid, signal)
-    } catch {
-      process.kill(pid, signal)
+    if (force) {
+      signalActiveGameProcess(gameProcess, 'SIGKILL')
+      const exited = await waitForProcessExit(gameProcess, 1200)
+      if (!exited) {
+        return { success: false, message: 'Game did not exit after force kill' }
+      }
+
+      if (activeGameProcess === gameProcess) {
+        activeGameProcess = null
+        unregisterLeaveGameShortcuts()
+        restoreArcadeWindow()
+        publishGameExited()
+      }
+      return { success: true, message: 'Game killed' }
     }
 
-    restoreArcadeWindow()
-    publishGameExited()
-    return { success: true, message: 'Game stop signal sent' }
+    signalActiveGameProcess(gameProcess, 'SIGTERM')
+    const exitedGracefully = await waitForProcessExit(gameProcess, 1500)
+
+    if (!exitedGracefully) {
+      signalActiveGameProcess(gameProcess, 'SIGKILL')
+      const exitedAfterKill = await waitForProcessExit(gameProcess, 1200)
+      if (!exitedAfterKill) {
+        return { success: false, message: 'Game did not exit after SIGTERM/SIGKILL' }
+      }
+    }
+
+    if (activeGameProcess === gameProcess) {
+      activeGameProcess = null
+      unregisterLeaveGameShortcuts()
+      restoreArcadeWindow()
+      publishGameExited()
+    }
+
+    return {
+      success: true,
+      message: exitedGracefully ? 'Game stopped' : 'Game forced closed'
+    }
   } catch (error: unknown) {
     return { success: false, message: `Failed to stop game: ${toErrorMessage(error)}` }
   }
@@ -1764,6 +1858,10 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 app.whenReady().then(() => {
   createWindow()
   startGuppyAutoConnect()
+})
+
+app.on('will-quit', () => {
+  unregisterLeaveGameShortcuts()
 })
 
 app.on('before-quit', async () => {

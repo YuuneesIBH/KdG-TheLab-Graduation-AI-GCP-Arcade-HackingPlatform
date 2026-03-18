@@ -1,4 +1,10 @@
 import React from 'react'
+import {
+  ARCADE_LEAVE_MENU_HOLD_MS,
+  ARCADE_LEAVE_MENU_LABEL,
+  isArcadeLeaveButtonPressed,
+  isArcadeLeaveInput,
+} from '../../shared/arcade-controls'
 import { games } from './GameMenu'
 
 type ArcadeGameProps = {
@@ -27,6 +33,9 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 
 export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: ArcadeGameProps) {
   const viewportRef = React.useRef<HTMLDivElement | null>(null)
+  const activeGamepadIndexRef = React.useRef<number | null>(null)
+  const leaveGameArmedRef = React.useRef(false)
+  const leaveGameHoldStartedAtRef = React.useRef<number | null>(null)
 
   const [status, setStatus]             = React.useState<'launching' | 'running' | 'error'>('launching')
   const [progress, setProgress]         = React.useState(0)
@@ -211,7 +220,7 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
 
   React.useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); exit() }
+      if (isArcadeLeaveInput(e)) { e.preventDefault(); exit(); return }
       if ((e.key === 'Enter' || e.key === 'r' || e.key === 'R') && status === 'error') { e.preventDefault(); launch() }
     }
     window.addEventListener('keydown', h)
@@ -222,6 +231,58 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
     const cleanup = window.electron?.onGameExit?.(() => exit())
     return () => cleanup?.()
   }, [exit])
+  React.useEffect(() => {
+    let raf = 0
+
+    const poll = () => {
+      const pads = Array.from(navigator.getGamepads?.() ?? [])
+        .filter((candidate): candidate is Gamepad => Boolean(candidate && candidate.connected))
+        .sort((a, b) => a.index - b.index)
+
+      if (activeGamepadIndexRef.current === null || !pads.some((pad) => pad.index === activeGamepadIndexRef.current)) {
+        activeGamepadIndexRef.current = pads[0]?.index ?? null
+      }
+
+      for (const pad of pads) {
+        const axisMoved = Math.abs(pad.axes[0] ?? 0) > 0.35 || Math.abs(pad.axes[1] ?? 0) > 0.35
+        const buttonPressed = pad.buttons?.some((button) => button?.pressed)
+        if (axisMoved || buttonPressed) {
+          activeGamepadIndexRef.current = pad.index
+          break
+        }
+      }
+
+      const gamepad = pads.find((pad) => pad.index === activeGamepadIndexRef.current)
+      const leavePressed = status === 'running' && isArcadeLeaveButtonPressed(gamepad)
+      const now = Date.now()
+
+      if (!leaveGameArmedRef.current) {
+        if (!leavePressed) {
+          leaveGameArmedRef.current = true
+        }
+        leaveGameHoldStartedAtRef.current = null
+        raf = requestAnimationFrame(poll)
+        return
+      }
+
+      if (leavePressed) {
+        if (leaveGameHoldStartedAtRef.current === null) {
+          leaveGameHoldStartedAtRef.current = now
+        } else if (now - leaveGameHoldStartedAtRef.current >= ARCADE_LEAVE_MENU_HOLD_MS) {
+          leaveGameArmedRef.current = false
+          leaveGameHoldStartedAtRef.current = null
+          exit()
+        }
+      } else {
+        leaveGameHoldStartedAtRef.current = null
+      }
+
+      raf = requestAnimationFrame(poll)
+    }
+
+    poll()
+    return () => cancelAnimationFrame(raf)
+  }, [exit, status])
   React.useEffect(() => {
     if (status !== 'running') {
       setHintUnlocked(false)
@@ -501,7 +562,7 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
                 </div>
               )}
               <div style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(255,217,176,0.5)', marginTop: 4 }}>
-                {status === 'launching' ? 'PRESS ESC TO ABORT' : 'PRESS ENTER / R TO RETRY'}
+                {status === 'launching' ? `PRESS ${ARCADE_LEAVE_MENU_LABEL} TO ABORT` : 'PRESS ENTER / R TO RETRY'}
               </div>
             </div>
           </div>
@@ -1084,6 +1145,25 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
             zIndex: 28
           }}>
             Y = AI HINT
+          </div>
+        )}
+        {status === 'running' && (
+          <div style={{
+            position: 'absolute',
+            bottom: 94,
+            left: 120,
+            padding: '6px 11px',
+            borderRadius: 9,
+            background: 'rgba(0,20,42,0.78)',
+            border: '1px solid rgba(114,203,255,0.45)',
+            color: '#bfe7ff',
+            fontSize: 9,
+            letterSpacing: 1.6,
+            textShadow: '0 0 8px rgba(114,203,255,0.45)',
+            pointerEvents: 'none',
+            zIndex: 28
+          }}>
+            MENU = {ARCADE_LEAVE_MENU_LABEL}
           </div>
         )}
 

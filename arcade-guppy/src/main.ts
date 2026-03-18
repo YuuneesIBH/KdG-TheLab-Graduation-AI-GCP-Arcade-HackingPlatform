@@ -308,10 +308,12 @@ function applySuperMarioNesResolution(fullGamePath: string, targetBounds: Launch
 const GUPPY_BAUD_RATE = 115200
 const GUPPY_SCAN_INTERVAL_MS = 3000
 const GUPPY_WIFI_AP_PROFILE_PATH = path.join(app.getPath('userData'), 'guppy', 'wifi-ap-profile.json')
-const WINDOWS_USB_POLL_INTERVAL_MS = 2000
-const WINDOWS_USB_SCAN_DEBOUNCE_MS = 900
+const WINDOWS_USB_POLL_INTERVAL_MS = 1000
+const WINDOWS_USB_SCAN_DEBOUNCE_MS = 1800
 const WINDOWS_WM_DEVICECHANGE = 0x0219
 const WINDOWS_DBT_DEVICEARRIVAL = 0x8000
+const WINDOWS_DBT_DEVNODES_CHANGED = 0x0007
+const WINDOWS_DBT_CONFIGCHANGED = 0x0018
 
 const GUPPY_MODULE_COMMANDS: Record<string, string> = {
   badusb: 'BADUSB_INJECT',
@@ -385,7 +387,7 @@ function normalizeWindowsDrive(value: string) {
   return match ? `${match[1]}:` : ''
 }
 
-function listWindowsDriveLettersFallback() {
+function listWindowsMountedDrives() {
   const drives = new Set<string>()
   for (let code = 65; code <= 90; code += 1) {
     const drive = `${String.fromCharCode(code)}:`
@@ -398,39 +400,6 @@ function listWindowsDriveLettersFallback() {
     }
   }
   return drives
-}
-
-function listWindowsRemovableDrives() {
-  if (process.platform !== 'win32') return new Set<string>()
-
-  try {
-    const command = [
-      '$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
-      "Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DriveType -eq 2 } | Select-Object -ExpandProperty DeviceID"
-    ].join('; ')
-    const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', command], {
-      encoding: 'utf8',
-      timeout: 2500,
-      windowsHide: true
-    })
-
-    if (result.error) {
-      throw result.error
-    }
-    if ((result.status ?? 0) !== 0) {
-      throw new Error(result.stderr?.trim() || `PowerShell exited with ${result.status ?? 'unknown'}`)
-    }
-
-    const drives = new Set<string>()
-    for (const line of result.stdout.split(/\r?\n/)) {
-      const drive = normalizeWindowsDrive(line)
-      if (drive) drives.add(drive)
-    }
-    return drives
-  } catch (error) {
-    console.warn('[USB] Falling back to drive letter probe:', toErrorMessage(error))
-    return listWindowsDriveLettersFallback()
-  }
 }
 
 async function handleWindowsUsbInserted(drives: string[], source: WindowsUsbInsertEvent['source']) {
@@ -454,7 +423,7 @@ async function handleWindowsUsbInserted(drives: string[], source: WindowsUsbInse
 async function refreshWindowsUsbSnapshot(source: WindowsUsbInsertEvent['source'], emitOnInsert: boolean) {
   if (process.platform !== 'win32') return
 
-  const currentDrives = listWindowsRemovableDrives()
+  const currentDrives = listWindowsMountedDrives()
   const insertedDrives = [...currentDrives].filter((drive) => !windowsUsbKnownDrives.has(drive))
 
   windowsUsbKnownDrives = currentDrives
@@ -1248,7 +1217,11 @@ function createWindow() {
   if (process.platform === 'win32') {
     mainWindow.hookWindowMessage(WINDOWS_WM_DEVICECHANGE, (wParam) => {
       const messageCode = readWindowsMessageCode(wParam)
-      if (messageCode !== WINDOWS_DBT_DEVICEARRIVAL) return
+      if (
+        messageCode !== WINDOWS_DBT_DEVICEARRIVAL
+        && messageCode !== WINDOWS_DBT_DEVNODES_CHANGED
+        && messageCode !== WINDOWS_DBT_CONFIGCHANGED
+      ) return
       scheduleWindowsUsbScan('devicechange')
     })
   }

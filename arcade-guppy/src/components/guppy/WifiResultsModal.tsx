@@ -12,6 +12,7 @@ type WifiResultsModalProps = {
   onSelectNetwork?: (network: WifiNetwork) => void
   selectedNetworkKey?: string
   targetNetworkKey?: string
+  isCloseSelected?: boolean
 }
 
 export type WifiNetwork = {
@@ -146,6 +147,7 @@ export default function WifiResultsModal({
   onSelectNetwork,
   selectedNetworkKey,
   targetNetworkKey,
+  isCloseSelected = false,
 }: WifiResultsModalProps) {
   const [vendorByBssid, setVendorByBssid] = useState<Record<string, string>>({})
   const selectedRowRef = useRef<HTMLDivElement | null>(null)
@@ -261,13 +263,13 @@ export default function WifiResultsModal({
               MODE {mode}
             </div>
             <div style={{ fontSize: textFont, color: '#8ccff0', letterSpacing: '0.8px' }}>
-              DPAD: SELECT NETWORK | A: TARGET | B: BACK
+              DPAD: SELECT NETWORK/CLOSE | A: TARGET/EXIT | B: BACK
             </div>
           </div>
           <button
             onClick={onClose}
             style={{
-              background: 'transparent',
+              background: isCloseSelected ? 'rgba(102, 221, 255, 0.12)' : 'transparent',
               border: '1px solid #66ddff',
               color: '#66ddff',
               fontFamily: 'inherit',
@@ -275,6 +277,8 @@ export default function WifiResultsModal({
               letterSpacing: '1px',
               padding: '6px 16px',
               cursor: 'pointer',
+              boxShadow: isCloseSelected ? '0 0 0 2px rgba(102, 221, 255, 0.65), 0 0 18px rgba(102, 221, 255, 0.24)' : 'none',
+              transform: isCloseSelected ? 'translateY(-1px)' : 'none',
             }}
           >
             CLOSE
@@ -400,7 +404,7 @@ export default function WifiResultsModal({
                 Unknown vendors: <span style={{ color: '#e6bd45' }}>{summary.unknownVendors}</span>
               </div>
               <div style={{ border: '1px solid #1d4f67', background: '#082538', padding: '12px', fontSize: textFont, wordBreak: 'break-word' }}>
-                Highlighted: <span style={{ color: '#66ddff' }}>{selectedNetwork ? `${selectedNetwork.ssid} / CH${selectedNetwork.channel}` : 'none'}</span>
+                Highlighted: <span style={{ color: '#66ddff' }}>{isCloseSelected ? 'close window' : selectedNetwork ? `${selectedNetwork.ssid} / CH${selectedNetwork.channel}` : 'none'}</span>
               </div>
               <div style={{ border: '1px solid #1d4f67', background: '#082538', padding: '12px', fontSize: textFont, wordBreak: 'break-word' }}>
                 Current target: <span style={{ color: '#33e38a' }}>{targetNetwork ? `${targetNetwork.ssid} / CH${targetNetwork.channel}` : 'none'}</span>

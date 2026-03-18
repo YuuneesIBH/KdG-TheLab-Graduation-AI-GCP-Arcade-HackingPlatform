@@ -1,6 +1,5 @@
 import React from 'react'
 import {
-  ARCADE_LEAVE_MENU_HOLD_MS,
   ARCADE_LEAVE_MENU_LABEL,
   isArcadeLeaveButtonPressed,
   isArcadeLeaveInput,
@@ -35,7 +34,7 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
   const viewportRef = React.useRef<HTMLDivElement | null>(null)
   const activeGamepadIndexRef = React.useRef<number | null>(null)
   const leaveGameArmedRef = React.useRef(false)
-  const leaveGameHoldStartedAtRef = React.useRef<number | null>(null)
+  const leaveGamePressedRef = React.useRef(false)
 
   const [status, setStatus]             = React.useState<'launching' | 'running' | 'error'>('launching')
   const [progress, setProgress]         = React.useState(0)
@@ -254,28 +253,25 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
 
       const gamepad = pads.find((pad) => pad.index === activeGamepadIndexRef.current)
       const leavePressed = status === 'running' && isArcadeLeaveButtonPressed(gamepad)
-      const now = Date.now()
 
       if (!leaveGameArmedRef.current) {
         if (!leavePressed) {
           leaveGameArmedRef.current = true
         }
-        leaveGameHoldStartedAtRef.current = null
+        leaveGamePressedRef.current = leavePressed
         raf = requestAnimationFrame(poll)
         return
       }
 
-      if (leavePressed) {
-        if (leaveGameHoldStartedAtRef.current === null) {
-          leaveGameHoldStartedAtRef.current = now
-        } else if (now - leaveGameHoldStartedAtRef.current >= ARCADE_LEAVE_MENU_HOLD_MS) {
-          leaveGameArmedRef.current = false
-          leaveGameHoldStartedAtRef.current = null
-          exit()
-        }
-      } else {
-        leaveGameHoldStartedAtRef.current = null
+      if (leavePressed && !leaveGamePressedRef.current) {
+        leaveGameArmedRef.current = false
+        leaveGamePressedRef.current = true
+        exit()
+        raf = requestAnimationFrame(poll)
+        return
       }
+
+      leaveGamePressedRef.current = leavePressed
 
       raf = requestAnimationFrame(poll)
     }

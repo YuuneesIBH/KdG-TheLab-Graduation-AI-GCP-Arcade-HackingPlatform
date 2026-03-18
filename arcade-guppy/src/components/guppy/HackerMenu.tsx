@@ -25,6 +25,7 @@ const VIEW_ITEMS = [
 type ViewKey = (typeof VIEW_ITEMS)[number]['key']
 type ControlId = string
 type WifiResultsMode = 'SCAN' | 'AUDIT'
+type WifiResultsSelectionMode = 'network' | 'close'
 type GamepadNavDirection = 'up' | 'down' | 'left' | 'right' | null
 type WifiApPreset = {
   id: string
@@ -313,6 +314,7 @@ export default function HackerMenu({
   const [wifiResults, setWifiResults] = useState<string[]>([])
   const [showWifiResults, setShowWifiResults] = useState(false)
   const [wifiResultsMode, setWifiResultsMode] = useState<WifiResultsMode>('SCAN')
+  const [wifiResultsSelectionMode, setWifiResultsSelectionMode] = useState<WifiResultsSelectionMode>('network')
   const [selectedWifiApPresetIndex, setSelectedWifiApPresetIndex] = useState(0)
   const [selectedJammerPresetIndex, setSelectedJammerPresetIndex] = useState(0)
   const [wifiResultSelectionIndex, setWifiResultSelectionIndex] = useState(0)
@@ -371,7 +373,8 @@ export default function HackerMenu({
   }, [wifiApProfile])
   const selectedWifiApPreset = wifiApPresets[selectedWifiApPresetIndex] ?? wifiApPresets[0] ?? null
   const selectedJammerPreset = JAMMER_PRESETS[selectedJammerPresetIndex] ?? JAMMER_PRESETS[0]
-  const highlightedWifiNetwork = wifiScanNetworks[wifiResultSelectionIndex] ?? null
+  const isWifiResultsCloseSelected = showWifiResults && (wifiScanNetworks.length === 0 || wifiResultsSelectionMode === 'close')
+  const highlightedWifiNetwork = isWifiResultsCloseSelected ? null : wifiScanNetworks[wifiResultSelectionIndex] ?? null
   const pageSectionGap = isUltraCompact ? '6px' : isDense ? '8px' : '10px'
   const isIrStepControl = focusedControl === 'ir-prev' || focusedControl === 'ir-next'
 
@@ -443,6 +446,7 @@ export default function HackerMenu({
       if (wifiResultSelectionIndex !== 0) setWifiResultSelectionIndex(0)
       return
     }
+    if (wifiResultsSelectionMode === 'close') return
     setWifiResultSelectionIndex((current) => {
       if (current >= 0 && current < wifiScanNetworks.length) return current
       const targetIndex = selectedScanNetwork
@@ -456,6 +460,7 @@ export default function HackerMenu({
     selectedNetworkKey,
     wifiNetworkKey,
     wifiResultSelectionIndex,
+    wifiResultsSelectionMode,
     wifiScanNetworks,
   ])
 
@@ -500,11 +505,13 @@ export default function HackerMenu({
 
   const closeWifiResults = useCallback(() => {
     setShowWifiResults(false)
+    setWifiResultsSelectionMode('network')
     setFocusedControl('wifi-results')
   }, [])
 
   const openWifiResults = useCallback(() => {
     setWifiResultsTitle((current) => current || 'Wi-Fi Networks')
+    setWifiResultsSelectionMode('network')
     setShowWifiResults(true)
     setFocusedControl('wifi-results')
   }, [])
@@ -513,6 +520,7 @@ export default function HackerMenu({
     setWifiResults([])
     setWifiResultsTitle('Wi-Fi Networks')
     setWifiResultsMode('SCAN')
+    setWifiResultsSelectionMode('network')
     setWifiResultSelectionIndex(0)
     setShowWifiResults(true)
     onSendRawCommand?.('WIFI_SCAN')
@@ -529,14 +537,39 @@ export default function HackerMenu({
   }, [onSetToolStatus])
 
   const moveWifiResultSelection = useCallback((direction: 1 | -1) => {
-    if (!showWifiResults || wifiScanNetworks.length === 0) return
-    setWifiResultSelectionIndex((current) => cycleIndex(current, wifiScanNetworks.length, direction))
-  }, [showWifiResults, wifiScanNetworks.length])
+    if (!showWifiResults) return
+    if (wifiScanNetworks.length === 0) {
+      setWifiResultsSelectionMode('close')
+      return
+    }
+    if (wifiResultsSelectionMode === 'close') {
+      setWifiResultsSelectionMode('network')
+      setWifiResultSelectionIndex(direction === -1 ? wifiScanNetworks.length - 1 : 0)
+      return
+    }
+    const safeIndex =
+      wifiResultSelectionIndex >= 0 && wifiResultSelectionIndex < wifiScanNetworks.length
+        ? wifiResultSelectionIndex
+        : 0
+    const isAtBoundary =
+      (direction === -1 && safeIndex === 0) ||
+      (direction === 1 && safeIndex === wifiScanNetworks.length - 1)
+    if (isAtBoundary) {
+      setWifiResultsSelectionMode('close')
+      setWifiResultSelectionIndex(safeIndex)
+      return
+    }
+    setWifiResultSelectionIndex(safeIndex + direction)
+  }, [showWifiResults, wifiResultSelectionIndex, wifiResultsSelectionMode, wifiScanNetworks.length])
 
   const confirmWifiResultSelection = useCallback(() => {
+    if (isWifiResultsCloseSelected) {
+      closeWifiResults()
+      return
+    }
     if (!highlightedWifiNetwork) return
     handleWifiResultsSelect(highlightedWifiNetwork)
-  }, [handleWifiResultsSelect, highlightedWifiNetwork])
+  }, [closeWifiResults, handleWifiResultsSelect, highlightedWifiNetwork, isWifiResultsCloseSelected])
 
   const handleStartJammer = useCallback(() => {
     if (!jamAccessPoints.trim()) {
@@ -1413,7 +1446,7 @@ export default function HackerMenu({
                               </div>
                               {!isDense && (
                                 <div style={{ fontSize: isCompact ? '11px' : '10px', color: '#6fa7c4', lineHeight: '1.45' }}>
-                                  Gebruik `WIFI SCAN`, blader in het netwerkoverzicht met de joystick en druk op A om een target te locken.
+                                  Gebruik `WIFI SCAN`, blader met de joystick door de netwerken of naar `CLOSE`, en druk op A om een target te locken of terug te gaan.
                                 </div>
                               )}
                             </div>
@@ -1846,6 +1879,7 @@ export default function HackerMenu({
             onSelectNetwork={handleWifiResultsSelect}
             selectedNetworkKey={highlightedWifiNetwork ? wifiNetworkKey(highlightedWifiNetwork) : ''}
             targetNetworkKey={selectedNetworkKey}
+            isCloseSelected={isWifiResultsCloseSelected}
           />
 
 

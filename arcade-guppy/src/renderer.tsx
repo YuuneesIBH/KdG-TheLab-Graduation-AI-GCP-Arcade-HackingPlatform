@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
@@ -40,6 +40,10 @@ function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const isBootScreen = screen === 'boot'
+  const previousGuppyConnectionRef = useRef<{ connected: boolean; portPath?: string }>({
+    connected: false,
+    portPath: undefined,
+  })
 
   const [guppyStatus, setGuppyStatus] = useState<GuppyStatus>(INITIAL_GUPPY_STATUS)
   const [guppyLastLine, setGuppyLastLine] = useState<string>('')
@@ -249,6 +253,33 @@ function App() {
       unsubscribeUsbInserted()
     }
   }, [])
+
+  useEffect(() => {
+    const previous = previousGuppyConnectionRef.current
+    previousGuppyConnectionRef.current = {
+      connected: guppyStatus.connected,
+      portPath: guppyStatus.portPath,
+    }
+
+    if (!guppyStatus.connected) return
+
+    const becameConnected = !previous.connected
+    const connectedOnNewPort = Boolean(
+      previous.connected
+      && guppyStatus.portPath
+      && guppyStatus.portPath !== previous.portPath
+    )
+
+    if (!becameConnected && !connectedOnNewPort) return
+
+    setSelectedGame(null)
+    setScreen('hacker-menu')
+    setToolStatus(
+      guppyStatus.portPath
+        ? `Pico connected on ${guppyStatus.portPath}. Hacker screen opened.`
+        : 'Pico connected. Hacker screen opened.'
+    )
+  }, [guppyStatus.connected, guppyStatus.portPath])
 
   const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
 
@@ -465,6 +496,7 @@ function App() {
     return (
       <MenuScreen
         particles={particles}
+        onBack={() => setScreen('boot')}
         onSelectGame={(id) => {
           setSelectedGame(id)
           setScreen('arcade-game')

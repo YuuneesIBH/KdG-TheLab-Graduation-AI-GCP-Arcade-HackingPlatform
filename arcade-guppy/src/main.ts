@@ -326,9 +326,12 @@ const GUPPY_MODULE_COMMANDS: Record<string, string> = {
 
 let mainWindow: BrowserWindow | null = null
 let activeGameProcess: ChildProcess | null = null
+let isAppQuitting = false
 let windowsUsbKnownDrives = new Set<string>()
 let windowsUsbPollTimer: NodeJS.Timeout | null = null
 let windowsUsbScanTimer: NodeJS.Timeout | null = null
+let windowsUsbWatcherProcess: ChildProcess | null = null
+const windowsUsbRecentlyHandledAt = new Map<string, number>()
 
 let guppyPort: SerialPort | null = null
 let guppyLineBuffer = ''
@@ -403,7 +406,21 @@ function listWindowsMountedDrives() {
 }
 
 async function handleWindowsUsbInserted(drives: string[], source: WindowsUsbInsertEvent['source']) {
-  if (!drives.length) return
+  const now = Date.now()
+  const normalizedDrives = drives
+    .map((drive) => normalizeWindowsDrive(drive))
+    .filter(Boolean)
+    .filter((drive, index, list) => list.indexOf(drive) === index)
+    .filter((drive) => {
+      const lastHandledAt = windowsUsbRecentlyHandledAt.get(drive) ?? 0
+      return now - lastHandledAt > 5000
+    })
+
+  if (!normalizedDrives.length) return
+
+  for (const drive of normalizedDrives) {
+    windowsUsbRecentlyHandledAt.set(drive, now)
+  }
 
   if (activeGameProcess) {
     const stopResult = await stopActiveGameProcess(true)
@@ -414,9 +431,9 @@ async function handleWindowsUsbInserted(drives: string[], source: WindowsUsbInse
 
   restoreArcadeWindow()
   publishWindowsUsbInserted({
-    drives,
+    drives: normalizedDrives,
     source,
-    detectedAt: Date.now()
+    detectedAt: now
   })
 }
 
@@ -455,6 +472,75 @@ function startWindowsUsbMonitoring() {
   }, WINDOWS_USB_POLL_INTERVAL_MS)
 }
 
+function startWindowsUsbWatcher() {
+  if (process.platform !== 'win32') return
+  if (windowsUsbWatcherProcess && windowsUsbWatcherProcess.exitCode === null) return
+
+  const script = [
+    '$ErrorActionPreference = "Stop"',
+    '$watcher = New-Object System.Management.ManagementEventWatcher "SELECT * FROM Win32_VolumeChangeEvent WHERE EventType = 2"',
+    'while ($true) {',
+    '  $event = $watcher.WaitForNextEvent()',
+    '  $drive = ""',
+    '  if ($event -and $event.Properties["DriveName"] -and $event.Properties["DriveName"].Value) {',
+    '    $drive = [string]$event.Properties["DriveName"].Value',
+    '  }',
+    '  [Console]::Out.WriteLine("USB_INSERTED|" + $drive)',
+    '}'
+  ].join(' ')
+
+  const watcher = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+
+  windowsUsbWatcherProcess = watcher
+
+  let stdoutBuffer = ''
+  watcher.stdout?.on('data', (chunk: Buffer) => {
+    stdoutBuffer += chunk.toString('utf8')
+
+    let newlineIndex = stdoutBuffer.indexOf('\n')
+    while (newlineIndex >= 0) {
+      const line = stdoutBuffer.slice(0, newlineIndex).replace(/\r/g, '').trim()
+      stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1)
+      newlineIndex = stdoutBuffer.indexOf('\n')
+
+      if (!line.startsWith('USB_INSERTED|')) continue
+
+      const drive = normalizeWindowsDrive(line.slice('USB_INSERTED|'.length))
+      if (drive) {
+        windowsUsbKnownDrives.add(drive)
+        void handleWindowsUsbInserted([drive], 'watcher')
+      } else {
+        scheduleWindowsUsbScan('watcher')
+      }
+    }
+  })
+
+  watcher.stderr?.on('data', (chunk: Buffer) => {
+    const message = chunk.toString('utf8').trim()
+    if (!message) return
+    console.warn('[USB] Windows watcher stderr:', message)
+  })
+
+  watcher.once('error', (error) => {
+    console.warn('[USB] Windows watcher failed to start:', toErrorMessage(error))
+    if (windowsUsbWatcherProcess === watcher) {
+      windowsUsbWatcherProcess = null
+    }
+  })
+
+  watcher.once('exit', (code, signal) => {
+    if (windowsUsbWatcherProcess === watcher) {
+      windowsUsbWatcherProcess = null
+    }
+    if (isAppQuitting) return
+    console.warn('[USB] Windows watcher exited:', { code, signal })
+    setTimeout(() => startWindowsUsbWatcher(), 2000)
+  })
+}
+
 function stopWindowsUsbMonitoring() {
   if (windowsUsbScanTimer) {
     clearTimeout(windowsUsbScanTimer)
@@ -464,6 +550,10 @@ function stopWindowsUsbMonitoring() {
     clearInterval(windowsUsbPollTimer)
     windowsUsbPollTimer = null
   }
+  if (windowsUsbWatcherProcess && windowsUsbWatcherProcess.exitCode === null) {
+    windowsUsbWatcherProcess.kill()
+  }
+  windowsUsbWatcherProcess = null
 }
 
 function clearGuppyCapabilities() {
@@ -1974,6 +2064,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 app.whenReady().then(() => {
   createWindow()
   startWindowsUsbMonitoring()
+  startWindowsUsbWatcher()
   startGuppyAutoConnect()
 })
 
@@ -1982,6 +2073,7 @@ app.on('will-quit', () => {
 })
 
 app.on('before-quit', async () => {
+  isAppQuitting = true
   stopWindowsUsbMonitoring()
   stopGuppyAutoConnect()
   await stopActiveGameProcess(true)

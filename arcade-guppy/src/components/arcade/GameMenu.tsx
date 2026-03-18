@@ -1,9 +1,15 @@
 import React from 'react'
-import { isArcadeActionInput, isArcadeConfirmButtonPressed } from '../../shared/arcade-controls'
+import {
+  isArcadeActionInput,
+  isArcadeConfirmButtonPressed,
+  isArcadeLeaveButtonPressed,
+  isArcadeLeaveInput,
+} from '../../shared/arcade-controls'
 
 type MenuProps = {
   particles: Array<{ x: number; y: number; vx: number; vy: number; color: string; id: number }>
   onSelectGame?: (gameId: string) => void
+  onBack?: () => void
 }
 
 type GameCard = {
@@ -55,7 +61,7 @@ const games: GameCard[] = [
 
 export { games }
 
-export function MenuScreen({ particles, onSelectGame }: MenuProps) {
+export function MenuScreen({ particles, onSelectGame, onBack }: MenuProps) {
   const [selectedId, setSelectedId] = React.useState<string>(games[0]?.id ?? '')
 
   const [crtFlicker, setCrtFlicker] = React.useState(false)
@@ -67,6 +73,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   const lastStartRef = React.useRef(0)
   const activeGamepadIndexRef = React.useRef<number | null>(null)
   const gamepadStartArmedRef = React.useRef(false)
+  const gamepadLeaveArmedRef = React.useRef(false)
+  const gamepadLeavePressedRef = React.useRef(false)
+  const gamepadLastLeaveRef = React.useRef(0)
   const menuMountedAtRef = React.useRef(Date.now())
   const [isLaunching, setIsLaunching] = React.useState(false)
 
@@ -122,7 +131,9 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
   React.useEffect(() => {
     menuMountedAtRef.current = Date.now()
     gamepadStartArmedRef.current = false
+    gamepadLeaveArmedRef.current = false
     gamepadFireRef.current = false
+    gamepadLeavePressedRef.current = false
     gamepadDirRef.current = 0
   }, [])
 
@@ -131,11 +142,12 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
       if (e.repeat) return
       if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1) }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1) }
+      if (isArcadeLeaveInput(e)) { e.preventDefault(); onBack?.(); return }
       if (isArcadeActionInput(e)) { e.preventDefault(); startSelected() }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [moveSelection, startSelected])
+  }, [moveSelection, onBack, startSelected])
 
   React.useEffect(() => {
     const t = setInterval(() => {
@@ -203,13 +215,18 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
         gamepadDirRef.current = dir
 
         const fire = isArcadeConfirmButtonPressed(gamepad)
+        const leave = isArcadeLeaveButtonPressed(gamepad)
         const now = Date.now()
         // Ignore held start/select from boot screen until we see a clean release.
-        if (!gamepadStartArmedRef.current) {
-          if (!fire && now - menuMountedAtRef.current > 220) {
+        if (!gamepadStartArmedRef.current || !gamepadLeaveArmedRef.current) {
+          if (!gamepadStartArmedRef.current && !fire && now - menuMountedAtRef.current > 220) {
             gamepadStartArmedRef.current = true
           }
+          if (!gamepadLeaveArmedRef.current && !leave && now - menuMountedAtRef.current > 220) {
+            gamepadLeaveArmedRef.current = true
+          }
           gamepadFireRef.current = fire
+          gamepadLeavePressedRef.current = leave
           raf = requestAnimationFrame(poll)
           return
         }
@@ -218,14 +235,19 @@ export function MenuScreen({ particles, onSelectGame }: MenuProps) {
           startSelected()
           gamepadLastFireRef.current = now
         }
+        if (leave && !gamepadLeavePressedRef.current && now - gamepadLastLeaveRef.current > 400) {
+          onBack?.()
+          gamepadLastLeaveRef.current = now
+        }
         gamepadFireRef.current = fire
+        gamepadLeavePressedRef.current = leave
       }
       raf = requestAnimationFrame(poll)
     }
 
     poll()
     return () => cancelAnimationFrame(raf)
-  }, [moveSelection, startSelected])
+  }, [moveSelection, onBack, startSelected])
 
   const visibleRange = 4
   const itemSpacing = 140

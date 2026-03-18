@@ -73,7 +73,7 @@ export type WifiJammerState = {
 
 export type WindowsUsbInsertEvent = {
   drives: string[]
-  source: 'devicechange' | 'poll'
+  source: 'devicechange' | 'poll' | 'watcher'
   detectedAt: number
 }
 

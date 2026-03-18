@@ -9,6 +9,7 @@ import type {
   WifiApProfile,
   WifiJammerPayload,
   WifiJammerState,
+  WindowsUsbInsertEvent,
 } from './shared/electron-types'
 
 export type {
@@ -24,6 +25,7 @@ export type {
   WifiJammerMode,
   WifiJammerPayload,
   WifiJammerState,
+  WindowsUsbInsertEvent,
 } from './shared/electron-types'
 
 type IrDbResponse = IpcMessageResponse & { entries?: IrDatabaseEntry[] }
@@ -55,6 +57,7 @@ export interface ElectronAPI {
   onGameExit: (callback: () => void) => () => void
   onWifiJammerState: (callback: (state: WifiJammerState) => void) => () => void
   onWifiJammerLog: (callback: (line: string) => void) => () => void
+  onWindowsUsbInserted: (callback: (event: WindowsUsbInsertEvent) => void) => () => void
 }
 
 declare global {

@@ -71,6 +71,12 @@ export type WifiJammerState = {
   message?: string
 }
 
+export type WindowsUsbInsertEvent = {
+  drives: string[]
+  source: 'devicechange' | 'poll'
+  detectedAt: number
+}
+
 export type AiExplainPayload = {
   gameId: string
   title: string

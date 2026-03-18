@@ -8,6 +8,7 @@ import type {
   WifiApProfile,
   WifiJammerPayload,
   WifiJammerState,
+  WindowsUsbInsertEvent,
 } from './shared/electron-types'
 
 contextBridge.exposeInMainWorld('electron', {
@@ -53,6 +54,11 @@ contextBridge.exposeInMainWorld('electron', {
     const listener = (_event: unknown, line: string) => callback(line)
     ipcRenderer.on('wifi-jammer-log', listener)
     return () => ipcRenderer.removeListener('wifi-jammer-log', listener)
+  },
+  onWindowsUsbInserted: (callback: (event: WindowsUsbInsertEvent) => void) => {
+    const listener = (_event: unknown, event: WindowsUsbInsertEvent) => callback(event)
+    ipcRenderer.on('windows-usb-inserted', listener)
+    return () => ipcRenderer.removeListener('windows-usb-inserted', listener)
   },
   onGameExit: (callback: () => void) => {
     const listener = () => callback()

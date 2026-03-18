@@ -14,6 +14,7 @@ import type {
   WifiApProfile,
   WifiJammerPayload,
   WifiJammerState,
+  WindowsUsbInsertEvent,
 } from './shared/electron-types'
 
 type PortInfo = Awaited<ReturnType<typeof SerialPort.list>>[number]
@@ -307,6 +308,10 @@ function applySuperMarioNesResolution(fullGamePath: string, targetBounds: Launch
 const GUPPY_BAUD_RATE = 115200
 const GUPPY_SCAN_INTERVAL_MS = 3000
 const GUPPY_WIFI_AP_PROFILE_PATH = path.join(app.getPath('userData'), 'guppy', 'wifi-ap-profile.json')
+const WINDOWS_USB_POLL_INTERVAL_MS = 2000
+const WINDOWS_USB_SCAN_DEBOUNCE_MS = 900
+const WINDOWS_WM_DEVICECHANGE = 0x0219
+const WINDOWS_DBT_DEVICEARRIVAL = 0x8000
 
 const GUPPY_MODULE_COMMANDS: Record<string, string> = {
   badusb: 'BADUSB_INJECT',
@@ -319,6 +324,9 @@ const GUPPY_MODULE_COMMANDS: Record<string, string> = {
 
 let mainWindow: BrowserWindow | null = null
 let activeGameProcess: ChildProcess | null = null
+let windowsUsbKnownDrives = new Set<string>()
+let windowsUsbPollTimer: NodeJS.Timeout | null = null
+let windowsUsbScanTimer: NodeJS.Timeout | null = null
 
 let guppyPort: SerialPort | null = null
 let guppyLineBuffer = ''
@@ -359,6 +367,133 @@ function sendWifiJammerLog(raw: string) {
     const trimmed = line.trim()
     if (!trimmed) continue
     mainWindow.webContents.send('wifi-jammer-log', trimmed)
+  }
+}
+
+function publishWindowsUsbInserted(event: WindowsUsbInsertEvent) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('windows-usb-inserted', event)
+}
+
+function readWindowsMessageCode(buffer: Buffer) {
+  return buffer.length >= 4 ? buffer.readUInt32LE(0) : 0
+}
+
+function normalizeWindowsDrive(value: string) {
+  const trimmed = value.trim().toUpperCase()
+  const match = trimmed.match(/^([A-Z]):?$/)
+  return match ? `${match[1]}:` : ''
+}
+
+function listWindowsDriveLettersFallback() {
+  const drives = new Set<string>()
+  for (let code = 65; code <= 90; code += 1) {
+    const drive = `${String.fromCharCode(code)}:`
+    try {
+      if (fs.existsSync(`${drive}\\`)) {
+        drives.add(drive)
+      }
+    } catch {
+      // Ignore inaccessible roots during fallback probing.
+    }
+  }
+  return drives
+}
+
+function listWindowsRemovableDrives() {
+  if (process.platform !== 'win32') return new Set<string>()
+
+  try {
+    const command = [
+      '$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
+      "Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DriveType -eq 2 } | Select-Object -ExpandProperty DeviceID"
+    ].join('; ')
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', command], {
+      encoding: 'utf8',
+      timeout: 2500,
+      windowsHide: true
+    })
+
+    if (result.error) {
+      throw result.error
+    }
+    if ((result.status ?? 0) !== 0) {
+      throw new Error(result.stderr?.trim() || `PowerShell exited with ${result.status ?? 'unknown'}`)
+    }
+
+    const drives = new Set<string>()
+    for (const line of result.stdout.split(/\r?\n/)) {
+      const drive = normalizeWindowsDrive(line)
+      if (drive) drives.add(drive)
+    }
+    return drives
+  } catch (error) {
+    console.warn('[USB] Falling back to drive letter probe:', toErrorMessage(error))
+    return listWindowsDriveLettersFallback()
+  }
+}
+
+async function handleWindowsUsbInserted(drives: string[], source: WindowsUsbInsertEvent['source']) {
+  if (!drives.length) return
+
+  if (activeGameProcess) {
+    const stopResult = await stopActiveGameProcess(true)
+    if (!stopResult.success) {
+      console.warn('[USB] Failed to stop active game after USB insert:', stopResult.message)
+    }
+  }
+
+  restoreArcadeWindow()
+  publishWindowsUsbInserted({
+    drives,
+    source,
+    detectedAt: Date.now()
+  })
+}
+
+async function refreshWindowsUsbSnapshot(source: WindowsUsbInsertEvent['source'], emitOnInsert: boolean) {
+  if (process.platform !== 'win32') return
+
+  const currentDrives = listWindowsRemovableDrives()
+  const insertedDrives = [...currentDrives].filter((drive) => !windowsUsbKnownDrives.has(drive))
+
+  windowsUsbKnownDrives = currentDrives
+
+  if (emitOnInsert && insertedDrives.length > 0) {
+    await handleWindowsUsbInserted(insertedDrives, source)
+  }
+}
+
+function scheduleWindowsUsbScan(source: WindowsUsbInsertEvent['source']) {
+  if (process.platform !== 'win32') return
+  if (windowsUsbScanTimer) {
+    clearTimeout(windowsUsbScanTimer)
+  }
+  windowsUsbScanTimer = setTimeout(() => {
+    windowsUsbScanTimer = null
+    void refreshWindowsUsbSnapshot(source, true)
+  }, WINDOWS_USB_SCAN_DEBOUNCE_MS)
+}
+
+function startWindowsUsbMonitoring() {
+  if (process.platform !== 'win32') return
+
+  void refreshWindowsUsbSnapshot('poll', false)
+
+  if (windowsUsbPollTimer) return
+  windowsUsbPollTimer = setInterval(() => {
+    void refreshWindowsUsbSnapshot('poll', true)
+  }, WINDOWS_USB_POLL_INTERVAL_MS)
+}
+
+function stopWindowsUsbMonitoring() {
+  if (windowsUsbScanTimer) {
+    clearTimeout(windowsUsbScanTimer)
+    windowsUsbScanTimer = null
+  }
+  if (windowsUsbPollTimer) {
+    clearInterval(windowsUsbPollTimer)
+    windowsUsbPollTimer = null
   }
 }
 
@@ -1110,6 +1245,14 @@ function createWindow() {
     publishWifiJammerState()
   })
 
+  if (process.platform === 'win32') {
+    mainWindow.hookWindowMessage(WINDOWS_WM_DEVICECHANGE, (wParam) => {
+      const messageCode = readWindowsMessageCode(wParam)
+      if (messageCode !== WINDOWS_DBT_DEVICEARRIVAL) return
+      scheduleWindowsUsbScan('devicechange')
+    })
+  }
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -1857,6 +2000,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
 
 app.whenReady().then(() => {
   createWindow()
+  startWindowsUsbMonitoring()
   startGuppyAutoConnect()
 })
 
@@ -1865,6 +2009,7 @@ app.on('will-quit', () => {
 })
 
 app.on('before-quit', async () => {
+  stopWindowsUsbMonitoring()
   stopGuppyAutoConnect()
   await stopActiveGameProcess(true)
   if (guppyPort?.isOpen) {

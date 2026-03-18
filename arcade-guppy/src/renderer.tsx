@@ -4,7 +4,14 @@ import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
 import HackerMenu from './components/guppy/HackerMenu'
-import type { GuppyStatus, IrDatabaseEntry, WifiApProfile, WifiJammerPayload, WifiJammerState } from './electron'
+import type {
+  GuppyStatus,
+  IrDatabaseEntry,
+  WifiApProfile,
+  WifiJammerPayload,
+  WifiJammerState,
+  WindowsUsbInsertEvent,
+} from './electron'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
 
@@ -221,6 +228,27 @@ function App() {
       unsubscribeJammerLog()
     }
   }, [setToolStatus])
+
+  useEffect(() => {
+    const api = window.electron
+    if (!api) return
+
+    const unsubscribeUsbInserted = api.onWindowsUsbInserted((event: WindowsUsbInsertEvent) => {
+      setSelectedGame(null)
+      setScreen('hacker-menu')
+
+      const driveList = event.drives.join(', ')
+      setToolStatus(
+        driveList
+          ? `USB detected on ${driveList}. Hacker screen opened.`
+          : 'USB detected. Hacker screen opened.'
+      )
+    })
+
+    return () => {
+      unsubscribeUsbInserted()
+    }
+  }, [])
 
   const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import WifiResultsModal, { type WifiNetwork, buildWifiNetworkList } from './WifiResultsModal'
+import WifiResultsModal from './WifiResultsModal'
+import { buildWifiNetworkList, type WifiNetwork, type WifiResultsMode, wifiNetworkKey } from './wifi-results'
 import {
   isHackerMenuActionButtonPressed,
   isHackerMenuActionInput,
@@ -24,7 +25,6 @@ const VIEW_ITEMS = [
 
 type ViewKey = (typeof VIEW_ITEMS)[number]['key']
 type ControlId = string
-type WifiResultsMode = 'SCAN' | 'AUDIT'
 type WifiResultsSelectionMode = 'network' | 'close'
 type GamepadNavDirection = 'up' | 'down' | 'left' | 'right' | null
 type WifiApPreset = {
@@ -331,7 +331,6 @@ export default function HackerMenu({
   const [jamVerbose, setJamVerbose] = useState(false)
   const [selectedScanNetwork, setSelectedScanNetwork] = useState<WifiNetwork | null>(null)
   const wifiScanNetworks = useMemo(() => buildWifiNetworkList(wifiResults), [wifiResults])
-  const wifiNetworkKey = useCallback((network: WifiNetwork) => `${network.ssid}|${network.bssid}|${network.channel}`, [])
   const selectedNetworkKey = selectedScanNetwork ? wifiNetworkKey(selectedScanNetwork) : ''
 
   const serialLogRef = useRef<HTMLDivElement>(null)

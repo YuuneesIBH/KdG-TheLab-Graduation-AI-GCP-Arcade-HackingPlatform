@@ -1,31 +1,45 @@
 const { spawn } = require('child_process')
 const path = require('path')
 
-const mode = process.argv[2]
-if (!mode) {
-  console.error('Missing mode. Usage: node scripts/run-electron-vite.js <dev|build|preview>')
+const validModes = new Set(['dev', 'build', 'preview'])
+
+function fail(message) {
+  console.error(`[electron-vite] ${message}`)
   process.exit(1)
 }
 
-const env = { ...process.env }
-delete env.ELECTRON_RUN_AS_NODE
+function resolveMode(argv) {
+  const mode = argv[2]
+  if (!mode || !validModes.has(mode)) {
+    fail('Missing or invalid mode. Usage: node scripts/run-electron-vite.js <dev|build|preview>')
+  }
+  return mode
+}
 
-const electronVitePkg = require.resolve('electron-vite/package.json')
-const electronViteBin = path.join(path.dirname(electronVitePkg), 'bin', 'electron-vite.js')
-const child = spawn(process.execPath, [electronViteBin, mode], {
-  stdio: 'inherit',
-  env
-})
+function resolveElectronViteBin() {
+  const electronVitePkg = require.resolve('electron-vite/package.json')
+  return path.join(path.dirname(electronVitePkg), 'bin', 'electron-vite.js')
+}
 
-child.on('error', (error) => {
-  console.error(error)
-  process.exit(1)
-})
-
-child.on('exit', (code, signal) => {
+function exitFromChild(code, signal) {
   if (signal) {
     process.kill(process.pid, signal)
     return
   }
   process.exit(code ?? 0)
+}
+
+const mode = resolveMode(process.argv)
+const env = { ...process.env }
+delete env.ELECTRON_RUN_AS_NODE
+
+const child = spawn(process.execPath, [resolveElectronViteBin(), mode], {
+  stdio: 'inherit',
+  env
 })
+
+child.on('error', (error) => {
+  fail(error instanceof Error ? error.message : String(error))
+})
+
+child.on('exit', exitFromChild)

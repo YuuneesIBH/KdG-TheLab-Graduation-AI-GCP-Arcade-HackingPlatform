@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-
-type WifiResultsMode = 'SCAN' | 'AUDIT'
+import {
+  buildWifiNetworkList,
+  deauthResilience,
+  findWifiNetworkByKey,
+  resilienceColor,
+  type WifiNetwork,
+  type WifiResultsMode,
+  wifiNetworkKey,
+} from './wifi-results'
 
 type WifiResultsModalProps = {
   isOpen: boolean
@@ -13,75 +20,6 @@ type WifiResultsModalProps = {
   selectedNetworkKey?: string
   targetNetworkKey?: string
   isCloseSelected?: boolean
-}
-
-export type WifiNetwork = {
-  ssid: string
-  rssi: number | null
-  security: string
-  channel: string
-  bssid: string
-  risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN'
-}
-
-function parseRssi(raw: string | undefined): number | null {
-  if (!raw) return null
-  const matched = raw.match(/-?\d{1,3}/)
-  if (!matched) return null
-  const value = Number.parseInt(matched[0], 10)
-  return Number.isFinite(value) ? value : null
-}
-
-export function parseNetworkLine(line: string): WifiNetwork | null {
-  const trimmed = line.trim()
-  if (!trimmed || /^TX\s+/i.test(trimmed)) return null
-
-  const csvMatch = trimmed.match(/^([^,]+),\s*(-?\d{1,3})(?:,\s*([^,]+))?(?:,\s*([^,]+))?$/)
-  if (csvMatch) {
-    const security = (csvMatch[3] ?? 'Unknown').trim()
-    return {
-      ssid: csvMatch[1].trim() || '(hidden)',
-      rssi: parseRssi(csvMatch[2]),
-      security,
-      channel: (csvMatch[4] ?? 'N/A').trim(),
-      bssid: '',
-      risk: securityToRisk(security, trimmed),
-    }
-  }
-
-  const ssidMatch = trimmed.match(/SSID\s*[:=]\s*([^|,;]+)/i)
-  const rssiMatch = trimmed.match(/RSSI\s*[:=]\s*([^|,;]+)/i)
-  const securityMatch = trimmed.match(/(?:SECURITY|AUTH|ENC)\s*[:=]\s*([^|,;]+)/i)
-  const channelMatch = trimmed.match(/(?:CHANNEL|CHAN)\s*[:=]\s*([^|,;]+)/i)
-  const bssidMatch = trimmed.match(/BSSID\s*[:=]\s*([0-9A-Fa-f:-]{17})/i)
-
-  if (!ssidMatch && !rssiMatch && !securityMatch && !channelMatch && !bssidMatch) {
-    return null
-  }
-
-  const security = (securityMatch?.[1] ?? 'Unknown').trim()
-  return {
-    ssid: (ssidMatch?.[1] ?? '(hidden)').trim(),
-    rssi: parseRssi(rssiMatch?.[1]),
-    security,
-    channel: (channelMatch?.[1] ?? 'N/A').trim(),
-    bssid: (bssidMatch?.[1] ?? '').trim().toUpperCase(),
-    risk: securityToRisk(security, trimmed),
-  }
-}
-
-export function securityToRisk(security: string, rawLine: string): WifiNetwork['risk'] {
-  const text = `${security} ${rawLine}`.toUpperCase()
-  if (text.includes('WEP') || text.includes('OPEN') || text.includes('VULN') || text.includes('CRITICAL')) {
-    return 'HIGH'
-  }
-  if (text.includes('WPA') || text.includes('WEAK') || text.includes('RISK')) {
-    return 'MEDIUM'
-  }
-  if (text.includes('WPA3') || text.includes('SECURE')) {
-    return 'LOW'
-  }
-  return 'UNKNOWN'
 }
 
 function signalLabel(rssi: number | null) {
@@ -105,36 +43,6 @@ function riskColor(risk: WifiNetwork['risk']) {
   if (risk === 'MEDIUM') return '#e6bd45'
   if (risk === 'HIGH') return '#ff6f6f'
   return '#6d8493'
-}
-
-export function deauthResilience(network: WifiNetwork): 'HIGH' | 'MEDIUM' | 'LOW' {
-  const sec = network.security.toUpperCase()
-  if (sec.includes('OPEN') || sec.includes('WEP')) return 'LOW'
-  if ((network.rssi ?? -999) < -78) return 'MEDIUM'
-  return 'HIGH'
-}
-
-export function resilienceColor(level: 'HIGH' | 'MEDIUM' | 'LOW') {
-  if (level === 'HIGH') return '#33e38a'
-  if (level === 'MEDIUM') return '#e6bd45'
-  return '#ff6f6f'
-}
-
-export function buildWifiNetworkList(lines: string[]): WifiNetwork[] {
-  const parsed = lines
-    .map((line) => parseNetworkLine(line))
-    .filter((entry): entry is WifiNetwork => Boolean(entry))
-
-  const deduped = new Map<string, WifiNetwork>()
-  for (const network of parsed) {
-    const key = `${network.ssid}|${network.channel}|${network.security}|${network.bssid}`
-    const existing = deduped.get(key)
-    if (!existing || (network.rssi ?? -999) > (existing.rssi ?? -999)) {
-      deduped.set(key, network)
-    }
-  }
-
-  return Array.from(deduped.values()).sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999))
 }
 
 export default function WifiResultsModal({
@@ -191,12 +99,12 @@ export default function WifiResultsModal({
   }, [networks, vendorByBssid])
 
   const selectedNetwork = useMemo(
-    () => networks.find((network) => `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey) ?? null,
+    () => findWifiNetworkByKey(networks, selectedNetworkKey),
     [networks, selectedNetworkKey],
   )
 
   const targetNetwork = useMemo(
-    () => networks.find((network) => `${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey) ?? null,
+    () => findWifiNetworkByKey(networks, targetNetworkKey),
     [networks, targetNetworkKey],
   )
 
@@ -312,66 +220,60 @@ export default function WifiResultsModal({
               {networks.length === 0 ? (
                 <div style={{ padding: '16px', color: '#6d8493', fontSize: textFont }}>Waiting for scan lines...</div>
               ) : (
-                networks.map((network, index) => (
-                  <div
-                    key={`${network.ssid}-${network.channel}-${index}`}
-                    ref={`${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey ? selectedRowRef : null}
-                    onClick={() => onSelectNetwork?.(network)}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1.9fr 1.1fr 1.5fr 1fr 0.8fr 1fr 0.9fr 0.8fr',
-                      borderBottom: '1px solid #143647',
-                      alignItems: 'center',
-                      cursor: onSelectNetwork ? 'pointer' : 'default',
-                      background:
-                        `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
+                networks.map((network, index) => {
+                  const networkKey = wifiNetworkKey(network)
+                  const isSelected = networkKey === selectedNetworkKey
+                  const isTarget = networkKey === targetNetworkKey
+                  const resilience = deauthResilience(network)
+
+                  return (
+                    <div
+                      key={`${networkKey}-${index}`}
+                      ref={isSelected ? selectedRowRef : null}
+                      onClick={() => onSelectNetwork?.(network)}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.9fr 1.1fr 1.5fr 1fr 0.8fr 1fr 0.9fr 0.8fr',
+                        borderBottom: '1px solid #143647',
+                        alignItems: 'center',
+                        cursor: onSelectNetwork ? 'pointer' : 'default',
+                        background: isSelected
                           ? 'rgba(102, 221, 255, 0.12)'
-                          : `${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey
+                          : isTarget
                             ? 'rgba(51, 227, 138, 0.12)'
                             : 'transparent',
-                      boxShadow:
-                        `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
-                          ? 'inset 0 0 0 2px rgba(102, 221, 255, 0.65)'
-                          : undefined,
-                    }}
-                  >
-                    <div style={{ padding: '10px 12px', fontSize: textFont, color: '#b6e4ff', wordBreak: 'break-word' }}>
-                      {network.ssid}
-                      {network.bssid ? <div style={{ color: '#6f97ae', fontSize: '10px', marginTop: '4px' }}>{network.bssid}</div> : null}
-                    </div>
-                    <div style={{ padding: '10px 12px', fontSize: textFont, color: signalColor(network.rssi) }}>
-                      {signalLabel(network.rssi)} ({network.rssi ?? 'N/A'} dBm)
-                    </div>
-                    <div style={{ padding: '10px 12px', fontSize: textFont, color: '#9edcff', wordBreak: 'break-word', maxWidth: '90px' }}>
-                      {network.bssid ? (vendorByBssid[network.bssid] ?? 'Unknown vendor') : 'Unknown vendor'}
-                    </div>
-                    <div style={{ padding: '10px 12px', fontSize: textFont, color: '#9edcff' }}>{network.security || 'Unknown'}</div>
-                    <div style={{ padding: '10px 12px', fontSize: textFont, color: '#9edcff' }}>{network.channel || 'N/A'}</div>
-                    <div style={{ padding: '10px 12px', fontSize: textFont, color: resilienceColor(deauthResilience(network)) }}>
-                      {deauthResilience(network)}
-                    </div>
-                    <div style={{ padding: '10px 12px', fontSize: textFont, color: riskColor(network.risk) }}>{network.risk}</div>
-                    <div
-                      style={{
-                        padding: '10px 12px',
-                        fontSize: isCompact ? '11px' : '12px',
-                        color:
-                          `${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey
-                            ? '#33e38a'
-                            : `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
-                              ? '#66ddff'
-                              : '#7ca8c0',
-                        letterSpacing: '0.8px',
+                        boxShadow: isSelected ? 'inset 0 0 0 2px rgba(102, 221, 255, 0.65)' : undefined,
                       }}
                     >
-                      {`${network.ssid}|${network.bssid}|${network.channel}` === targetNetworkKey
-                        ? 'ACTIVE'
-                        : `${network.ssid}|${network.bssid}|${network.channel}` === selectedNetworkKey
-                          ? 'READY'
-                          : 'PRESS A'}
+                      <div style={{ padding: '10px 12px', fontSize: textFont, color: '#b6e4ff', wordBreak: 'break-word' }}>
+                        {network.ssid}
+                        {network.bssid ? <div style={{ color: '#6f97ae', fontSize: '10px', marginTop: '4px' }}>{network.bssid}</div> : null}
+                      </div>
+                      <div style={{ padding: '10px 12px', fontSize: textFont, color: signalColor(network.rssi) }}>
+                        {signalLabel(network.rssi)} ({network.rssi ?? 'N/A'} dBm)
+                      </div>
+                      <div style={{ padding: '10px 12px', fontSize: textFont, color: '#9edcff', wordBreak: 'break-word', maxWidth: '90px' }}>
+                        {network.bssid ? (vendorByBssid[network.bssid] ?? 'Unknown vendor') : 'Unknown vendor'}
+                      </div>
+                      <div style={{ padding: '10px 12px', fontSize: textFont, color: '#9edcff' }}>{network.security || 'Unknown'}</div>
+                      <div style={{ padding: '10px 12px', fontSize: textFont, color: '#9edcff' }}>{network.channel || 'N/A'}</div>
+                      <div style={{ padding: '10px 12px', fontSize: textFont, color: resilienceColor(resilience) }}>
+                        {resilience}
+                      </div>
+                      <div style={{ padding: '10px 12px', fontSize: textFont, color: riskColor(network.risk) }}>{network.risk}</div>
+                      <div
+                        style={{
+                          padding: '10px 12px',
+                          fontSize: isCompact ? '11px' : '12px',
+                          color: isTarget ? '#33e38a' : isSelected ? '#66ddff' : '#7ca8c0',
+                          letterSpacing: '0.8px',
+                        }}
+                      >
+                        {isTarget ? 'ACTIVE' : isSelected ? 'READY' : 'PRESS A'}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>

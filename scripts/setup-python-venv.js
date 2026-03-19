@@ -7,6 +7,20 @@ const arcadeRoot = path.join(repoRoot, 'arcade-guppy')
 const venvDir = path.join(arcadeRoot, '.venv')
 const isWindows = process.platform === 'win32'
 const baselinePackages = ['pygame']
+const pipDisableVersionEnv = { PIP_DISABLE_PIP_VERSION_CHECK: '1' }
+const pipInstallArgs = ['-m', 'pip', 'install', '--disable-pip-version-check']
+const requirementsFilePattern = /^requirements(\..+)?\.txt$/i
+const skippedEntryNames = new Set(['__pycache__'])
+const bootstrapPythonCandidates = isWindows
+  ? [
+      { command: 'py', args: ['-3'] },
+      { command: 'python', args: [] },
+      { command: 'python3', args: [] }
+    ]
+  : [
+      { command: 'python3', args: [] },
+      { command: 'python', args: [] }
+    ]
 
 function log(message) {
   console.log(`[python-venv] ${message}`)
@@ -22,7 +36,7 @@ function runCommand(command, args, options = {}) {
   log(`$ ${rendered}`)
   const result = spawnSync(command, args, {
     stdio: 'inherit',
-    env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' },
+    env: { ...process.env, ...pipDisableVersionEnv },
     ...options
   })
   if (result.status !== 0) {
@@ -31,23 +45,20 @@ function runCommand(command, args, options = {}) {
 }
 
 function commandExists(command, args = ['--version']) {
-  const result = spawnSync(command, args, { stdio: 'ignore' })
-  return result.status === 0
+  try {
+    const result = spawnSync(command, args, { stdio: 'ignore' })
+    return result.status === 0
+  } catch {
+    return false
+  }
+}
+
+function runPipInstall(pythonCommand, args, options = {}) {
+  runCommand(pythonCommand, [...pipInstallArgs, ...args], options)
 }
 
 function detectBootstrapPython() {
-  const candidates = isWindows
-    ? [
-        { command: 'py', args: ['-3'] },
-        { command: 'python', args: [] },
-        { command: 'python3', args: [] }
-      ]
-    : [
-        { command: 'python3', args: [] },
-        { command: 'python', args: [] }
-      ]
-
-  for (const candidate of candidates) {
+  for (const candidate of bootstrapPythonCandidates) {
     if (commandExists(candidate.command, [...candidate.args, '--version'])) {
       return candidate
     }
@@ -82,7 +93,7 @@ function collectRequirementsFiles(baseDir) {
 
     const entries = fs.readdirSync(current, { withFileTypes: true })
     for (const entry of entries) {
-      if (entry.name === '__pycache__' || entry.name.startsWith('.')) continue
+      if (skippedEntryNames.has(entry.name) || entry.name.startsWith('.')) continue
 
       const fullPath = path.join(current, entry.name)
       if (entry.isDirectory()) {
@@ -90,7 +101,7 @@ function collectRequirementsFiles(baseDir) {
         continue
       }
 
-      if (/^requirements(\..+)?\.txt$/i.test(entry.name)) {
+      if (requirementsFilePattern.test(entry.name)) {
         collected.push(fullPath)
       }
     }
@@ -120,22 +131,19 @@ if (!venvPython) {
   fail(`Venv python not found in ${venvDir}`)
 }
 
-runCommand(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip'], { cwd: repoRoot })
-
-runCommand(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', ...baselinePackages], { cwd: repoRoot })
+runPipInstall(venvPython, ['--upgrade', 'pip'], { cwd: repoRoot })
+runPipInstall(venvPython, baselinePackages, { cwd: repoRoot })
 
 const requirementsFiles = Array.from(new Set([
   path.join(repoRoot, 'requirements.txt'),
   path.join(arcadeRoot, 'requirements.txt'),
   ...collectRequirementsFiles(path.join(arcadeRoot, 'src', 'games'))
 ]))
+  .filter((requirementsPath) => fs.existsSync(requirementsPath))
+  .sort()
 
 for (const requirementsPath of requirementsFiles) {
-  if (!fs.existsSync(requirementsPath)) {
-    continue
-  }
-  runCommand(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', '-r', requirementsPath], { cwd: repoRoot })
+  runPipInstall(venvPython, ['-r', requirementsPath], { cwd: repoRoot })
 }
 
 log(`Ready. Python launcher will use: ${venvPython}`)
-

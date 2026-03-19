@@ -4,6 +4,7 @@ import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
 import HackerMenu from './components/guppy/HackerMenu'
+import menuMusicSrc from './assets/menumusic.mp3'
 import type {
   GuppyStatus,
   IrDatabaseEntry,
@@ -36,14 +37,18 @@ const BOOT_LINES = [
   'Press ENTER or A/START to continue...',
 ]
 
+const MENU_MUSIC_VOLUME = 0.4
+
 function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const isBootScreen = screen === 'boot'
+  const shouldPlayMenuMusic = screen === 'boot' || screen === 'arcade-menu'
   const previousGuppyConnectionRef = useRef<{ connected: boolean; portPath?: string }>({
     connected: false,
     portPath: undefined,
   })
+  const menuMusicRef = useRef<HTMLAudioElement | null>(null)
 
   const [guppyStatus, setGuppyStatus] = useState<GuppyStatus>(INITIAL_GUPPY_STATUS)
   const [guppyLastLine, setGuppyLastLine] = useState<string>('')
@@ -70,6 +75,64 @@ function App() {
 
   const bootLineCount = Math.min(BOOT_LINES.length, Math.floor(time / 7))
   const progress = Math.min(100, coins * 10)
+
+  const playMenuMusic = useCallback(() => {
+    const audio = menuMusicRef.current
+    if (!audio || !audio.paused) return
+
+    const playback = audio.play()
+    if (!playback) return
+
+    playback.catch((error: unknown) => {
+      const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+      if (message.includes('interact') || message.includes('gesture') || message.includes('abort')) {
+        return
+      }
+      console.warn('[AUDIO] Menu music playback failed:', error)
+    })
+  }, [])
+
+  useEffect(() => {
+    const audio = new Audio(menuMusicSrc)
+    audio.loop = true
+    audio.preload = 'auto'
+    audio.volume = MENU_MUSIC_VOLUME
+    menuMusicRef.current = audio
+
+    return () => {
+      audio.pause()
+      audio.src = ''
+      menuMusicRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const audio = menuMusicRef.current
+    if (!audio) return
+
+    audio.loop = true
+    audio.volume = MENU_MUSIC_VOLUME
+
+    if (!shouldPlayMenuMusic) {
+      audio.pause()
+      return
+    }
+
+    const retryPlayback = () => playMenuMusic()
+    playMenuMusic()
+
+    window.addEventListener('keydown', retryPlayback)
+    window.addEventListener('pointerdown', retryPlayback)
+    window.addEventListener('touchstart', retryPlayback, { passive: true })
+    window.addEventListener('focus', retryPlayback)
+
+    return () => {
+      window.removeEventListener('keydown', retryPlayback)
+      window.removeEventListener('pointerdown', retryPlayback)
+      window.removeEventListener('touchstart', retryPlayback)
+      window.removeEventListener('focus', retryPlayback)
+    }
+  }, [playMenuMusic, shouldPlayMenuMusic])
 
   useEffect(() => {
     document.body.style.margin = '0'

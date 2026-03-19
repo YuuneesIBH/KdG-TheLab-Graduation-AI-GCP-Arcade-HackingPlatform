@@ -233,7 +233,7 @@ De standaardcatalogus staat hardcoded in `arcade-guppy/src/components/arcade/Gam
 
 | Titel | Runtime | Pad | Opmerking |
 | --- | --- | --- | --- |
-| `PONG` | Python | `games/pong.py` | klassieke 2P arcade |
+| `PONG` | Python | `games/pong.py` | 1P versus AI; start zacht en versnelt per paddle-hit |
 | `PAC-MAN` | Python | `games/PacMan/pacman.py` | gebruikt lokale assets/audio |
 | `RETRO BIRD` | Python | `games/RetroBird/main.py` | Flappy Bird-stijl |
 | `Pixel Quest Adventure` | Java JAR | `games/SuperMarioNES/Mario.jar` | resolutie wordt automatisch in `Setting.txt` geüpdatet |
@@ -266,6 +266,13 @@ Bij launches in embedded mode zet de main process deze env vars:
 - Een gamehint wordt in de achtergrond geprefetcht zodra een game draait.
 - De hint-overlay unlockt na ongeveer **20 seconden**.
 - Als er al een hint gecachet is, verschijnt die quasi direct.
+
+### Pong versus AI
+
+- `PONG` speelt standaard **tegen een AI-paddle** in plaats van pure 2P local.
+- Zonder remote endpoint gebruikt de game een lokale fallback-AI zodat de match realtime blijft.
+- Met een Ollama-compatibele Gemma endpoint op GCP kan de rechter paddle hybride bestuurd worden door remote beslissingen plus lokale smoothing.
+- De bal start bewust trager dan voordien en versnelt nu geleidelijk bij elke paddle-hit, met een lichte extra versnelling over tijd.
 
 ---
 
@@ -405,6 +412,30 @@ De UI probeert automatisch een firmware backend te gebruiken wanneer de device `
 | `OLLAMA_TIMEOUT_MS` | `45000` | timeout voor AI request |
 | `OLLAMA_KEEP_ALIVE_SEC` | `1800` | houdt het model geladen |
 
+### Pong AI runtime
+
+`arcade-guppy/src/games/pong.py` kan dezelfde remote Ollama/GCP-stack gebruiken als de hint-feature.
+
+Belangrijkste variabelen:
+
+| Variable | Default | Betekenis |
+| --- | --- | --- |
+| `PONG_AI_MODE` | `hybrid` | `local`, `hybrid` of `remote` |
+| `PONG_AI_URL` | `OLLAMA_FALLBACK_URL` of `OLLAMA_URL` | basis-URL voor de remote AI |
+| `PONG_AI_ENDPOINT` | leeg | optioneel exact endpoint; overschrijft `PONG_AI_URL` |
+| `PONG_AI_MODEL` | `OLLAMA_MODEL` of `gemma3:4b` | modelnaam voor de paddle-AI |
+| `PONG_AI_TIMEOUT_MS` | `900` | timeout per paddle-decision |
+| `PONG_AI_INTERVAL_MS` | `280` | poll-interval voor remote decisions |
+| `PONG_BALL_START_SPEED` | `6.0` | startsnelheid van de bal |
+| `PONG_BALL_HIT_ACCEL` | `1.08` | multiplicatieve boost per paddle-hit |
+| `PONG_BALL_MAX_SPEED` | `20.0` | hard cap op balsnelheid |
+
+Voorbeeld met een GCP Ollama VM:
+
+```bash
+OLLAMA_FALLBACK_URL=http://<gcp-ip>:11434 OLLAMA_MODEL=gemma3:4b npm run dev
+```
+
 ### GCP helper script
 
 `cloud_scripts/setup-gcp-ollama-vm.sh` automatiseert een eenvoudige remote Ollama VM.
@@ -539,6 +570,12 @@ Voorbeeld:
 OLLAMA_URL=http://localhost:11434 npm run dev
 ```
 
+Voor Pong tegen een remote Gemma op GCP kun je ook werken met:
+
+```bash
+OLLAMA_FALLBACK_URL=http://<gcp-ip>:11434 OLLAMA_MODEL=gemma3:4b npm run dev
+```
+
 ### 6. Optioneel: hardware aansluiten
 
 Bij een correcte ESP32 firmware probeert de app automatisch te verbinden. Je hoeft in normale gevallen geen poort manueel te selecteren.
@@ -579,6 +616,15 @@ Voor de hardware quickstart zie:
 | `OLLAMA_MODEL` | model voor AI hints |
 | `OLLAMA_TIMEOUT_MS` | request timeout |
 | `OLLAMA_KEEP_ALIVE_SEC` | model keep-alive |
+| `PONG_AI_MODE` | AI-modus voor Pong: `local`, `hybrid` of `remote` |
+| `PONG_AI_URL` | basis-URL voor remote Pong AI |
+| `PONG_AI_ENDPOINT` | exact endpoint voor remote Pong AI |
+| `PONG_AI_MODEL` | modelnaam voor de Pong-tegenstander |
+| `PONG_AI_TIMEOUT_MS` | timeout per Pong AI-call |
+| `PONG_AI_INTERVAL_MS` | poll-interval van Pong AI |
+| `PONG_BALL_START_SPEED` | startsnelheid van de Pong-bal |
+| `PONG_BALL_HIT_ACCEL` | versnelling per paddle-hit |
+| `PONG_BALL_MAX_SPEED` | max-snelheid van de Pong-bal |
 
 ---
 

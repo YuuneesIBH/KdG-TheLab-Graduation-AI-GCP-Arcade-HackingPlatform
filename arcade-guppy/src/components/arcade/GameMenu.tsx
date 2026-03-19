@@ -46,7 +46,7 @@ const panelInnerStyle: React.CSSProperties = {
 }
 
 const games: GameCard[] = [
-  { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Classic pong game.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★☆☆', players: '2P', year: '1972' },
+  { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Face a live AI paddle with a softer speed ramp.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★★☆', players: '1P vs AI', year: '1972' },
   { id: 'pac-man', title: 'PAC-MAN', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Eat all pellets and dodge the ghosts.', image: '../assets/TrollPacMan.png', accent: '#ffde00', executable: 'games/PacMan/pacman.py', difficulty: '★★☆', players: '1P', year: '1980' },
   { id: 'flappy-bird', title: 'RETRO BIRD', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Tap to flap and dodge the pipes!', image: '../assets/retrobird.png', accent: '#ff00aa', executable: 'games/RetroBird/main.py', difficulty: '★★★', players: '1P', year: '2013' },
   { id: 'mario-nes', title: 'Pixel Quest Adventure', genre: 'CONSOLE', badge: 'CONSOLE', tagline: 'Spring door de klassieke levels en versla Bowser!', image: '../assets/pixelquest_adventure.png', accent: '#ff2e2e', executable: 'games/SuperMarioNES/Mario.jar', difficulty: '★★☆', players: '1P', year: '1985' },

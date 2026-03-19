@@ -97,6 +97,97 @@ function toErrorMessage(error: unknown) {
   return String(error)
 }
 
+function envFlagEnabled(value?: string | null) {
+  if (!value) return false
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
+}
+
+function quoteForPosixShell(value: string) {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+function quoteForCmd(value: string) {
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function resolvePongAiLogPath(fullGamePath: string, env: NodeJS.ProcessEnv) {
+  const explicitPath = env.PONG_AI_LOG_PATH?.trim()
+  if (explicitPath) return path.resolve(explicitPath)
+  return path.resolve(path.dirname(fullGamePath), '..', '..', 'logs', 'pong-ai.jsonl')
+}
+
+function resolvePongConsoleLogPath(fullGamePath: string, env: NodeJS.ProcessEnv) {
+  const explicitPath = env.PONG_CONSOLE_LOG_PATH?.trim()
+  if (explicitPath) return path.resolve(explicitPath)
+  return path.resolve(path.dirname(fullGamePath), '..', '..', 'logs', 'pong-console.log')
+}
+
+function shouldOpenPongAiLogWindow(fullGamePath: string, env: NodeJS.ProcessEnv) {
+  return path.basename(fullGamePath).toLowerCase() === 'pong.py'
+    && envFlagEnabled(env.PONG_AI_LOG_WINDOW)
+}
+
+function openPongLogWindow(appRoot: string, logPath: string, title: string) {
+  const viewerScriptPath = path.join(appRoot, 'scripts', 'tail-log-file.js')
+  if (!fs.existsSync(viewerScriptPath)) {
+    console.warn(`[PONG AI] Log viewer script not found: ${viewerScriptPath}`)
+    return
+  }
+
+  const logCommand = `${quoteForPosixShell(process.execPath)} ${quoteForPosixShell(viewerScriptPath)} ${quoteForPosixShell(logPath)}`
+
+  try {
+    if (process.platform === 'win32') {
+      const windowsCommand = `set ELECTRON_RUN_AS_NODE=1 && ${quoteForCmd(process.execPath)} ${quoteForCmd(viewerScriptPath)} ${quoteForCmd(logPath)}`
+      spawn('cmd.exe', ['/d', '/k', windowsCommand], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+      }).unref()
+      return
+    }
+
+    if (process.platform === 'darwin') {
+      const script = [
+        'tell application "Terminal"',
+        `do script ${JSON.stringify(`printf '\\\\e]1;${title}\\\\a'; clear; export ELECTRON_RUN_AS_NODE=1; ${logCommand}`)}`,
+        'activate',
+        'end tell',
+      ].join('\n')
+
+      spawn('osascript', ['-e', script], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref()
+      return
+    }
+
+    console.warn(`[PONG AI] Live log window is not supported on ${process.platform}. Tail this file manually: ${logPath}`)
+  } catch (error) {
+    console.warn('[PONG AI] Failed to open live log window:', toErrorMessage(error))
+  }
+}
+
+function ensureLogFileReady(logPath: string) {
+  const directory = path.dirname(logPath)
+  fs.mkdirSync(directory, { recursive: true })
+  fs.writeFileSync(logPath, '')
+}
+
+function createPongConsoleLogStream(logPath: string) {
+  ensureLogFileReady(logPath)
+  return fs.createWriteStream(logPath, { flags: 'a' })
+}
+
+function closeLogStream(stream?: fs.WriteStream | null) {
+  if (!stream) return
+  try {
+    stream.end()
+  } catch (error) {
+    console.warn('[PONG AI] Failed to close console log stream:', toErrorMessage(error))
+  }
+}
+
 function buildAiMessages(payload: AiExplainRequest) {
   const genre = payload.genre ?? 'ARCADE'
   const difficulty = payload.difficulty ?? 'UNSET'
@@ -1868,11 +1959,12 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
         return fs.existsSync(path.join(devRoot, entry.name, 'src', 'index.html'))
       })
 
+    const appRoot = isDev ? devRoot : app.getAppPath()
     const basePath = isDev
       ? devArcadeDir
         ? path.join(devRoot, devArcadeDir.name, 'src')
         : path.join(devRoot, 'src')
-      : app.getAppPath()
+      : appRoot
 
     function resolveSafe(base: string, rel: string) {
       const cleaned = rel.replace(/^(\.\/)+/, '')
@@ -1935,35 +2027,55 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
         })()
       : defaultBounds
 
+    const launchEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
+      ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
+      ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`,
+    }
+
     const gameExtension = path.extname(gamePath).toLowerCase()
 
     if (gameExtension === '.py') {
       const pythonCmd = resolvePythonCommand(basePath)
       console.log('[LAUNCH] Python:', pythonCmd)
+      const openConsoleWindow = shouldOpenPongAiLogWindow(fullGamePath, launchEnv)
+      const pongConsoleLogPath = resolvePongConsoleLogPath(fullGamePath, launchEnv)
+      const pongConsoleLogStream = path.basename(fullGamePath).toLowerCase() === 'pong.py'
+        ? createPongConsoleLogStream(pongConsoleLogPath)
+        : null
 
       const pythonProcess = spawn(pythonCmd, [fullGamePath], {
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: path.dirname(fullGamePath),
-        env: {
-          ...process.env,
-          ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
-          ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
-          ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
-        }
+        env: launchEnv,
       })
 
       pythonProcess.stdout?.on('data', (data) => {
-        console.log('[PYTHON STDOUT]', data.toString())
+        const text = data.toString()
+        console.log('[PYTHON STDOUT]', text)
+        pongConsoleLogStream?.write(text)
       })
 
       pythonProcess.stderr?.on('data', (data) => {
-        console.error('[PYTHON STDERR]', data.toString())
+        const text = data.toString()
+        console.error('[PYTHON STDERR]', text)
+        pongConsoleLogStream?.write(text)
       })
 
       pythonProcess.on('error', (error) => {
         console.error('[LAUNCH] Python start failed:', error)
+        closeLogStream(pongConsoleLogStream)
         restoreArcadeWindow()
       })
+
+      pythonProcess.once('exit', () => {
+        closeLogStream(pongConsoleLogStream)
+      })
+
+      if (openConsoleWindow) {
+        openPongLogWindow(appRoot, pongConsoleLogPath, 'PONG Console')
+      }
 
       scheduleMacWindowPlacement('python', targetBounds, launchMode)
 
@@ -1991,12 +2103,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       const javaProcess = spawn(javaCmd, ['-jar', fullGamePath], {
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: path.dirname(fullGamePath),
-        env: {
-          ...process.env,
-          ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
-          ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
-          ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
-        }
+        env: launchEnv,
       })
 
       javaProcess.stdout?.on('data', (data) => {
@@ -2026,12 +2133,7 @@ ipcMain.handle('launch-game', async (_event, payload: string | LaunchRequest) =>
       const exeProcess = spawn(fullGamePath, [], {
         stdio: 'ignore',
         cwd: path.dirname(fullGamePath),
-        env: {
-          ...process.env,
-          ARCADE_EMBEDDED: launchMode === 'embedded' ? '1' : '0',
-          ARCADE_WINDOW_POS: `${targetBounds.x},${targetBounds.y}`,
-          ARCADE_WINDOW_SIZE: `${targetBounds.width}x${targetBounds.height}`
-        }
+        env: launchEnv,
       })
 
       exeProcess.on('error', (error) => {

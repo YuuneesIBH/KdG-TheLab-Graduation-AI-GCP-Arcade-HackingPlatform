@@ -32,6 +32,13 @@ def read_env_float(name, default, minimum=None, maximum=None):
     return value
 
 
+def read_env_bool(name, default=False):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def build_chat_endpoint():
     explicit_endpoint = os.environ.get("PONG_AI_ENDPOINT", "").strip()
     if explicit_endpoint:
@@ -49,6 +56,74 @@ def build_chat_endpoint():
     if cleaned.endswith("/api/chat"):
         return cleaned
     return f"{cleaned}/api/chat"
+
+
+def resolve_ai_log_path():
+    explicit_path = os.environ.get("PONG_AI_LOG_PATH", "").strip()
+    if explicit_path:
+        return os.path.abspath(explicit_path)
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs", "pong-ai.jsonl"))
+
+
+def truncate_log_text(value, limit=1400):
+    if not isinstance(value, str):
+        return value
+    if len(value) <= limit:
+        return value
+    return f"{value[:limit]}...<truncated>"
+
+
+def sanitize_log_value(value):
+    if isinstance(value, dict):
+        return {str(key): sanitize_log_value(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [sanitize_log_value(item) for item in value]
+    if isinstance(value, float):
+        return round(value, 4)
+    if isinstance(value, str):
+        return truncate_log_text(value)
+    return value
+
+
+class AiTraceLogger:
+    def __init__(self, enabled, path):
+        self.enabled = enabled
+        self.path = path
+        self._lock = threading.Lock()
+        self._write_failed = False
+
+        if not self.enabled:
+            return
+
+        try:
+            directory = os.path.dirname(self.path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            print(f"[PONG AI] Logging enabled: {self.path}")
+        except OSError as error:
+            self.enabled = False
+            print(f"[PONG AI] Failed to initialize log file: {error}")
+
+    def log(self, event_type, **payload):
+        if not self.enabled or self._write_failed:
+            return
+
+        record = {
+            "ts_ms": int(time.time() * 1000),
+            "event": event_type,
+        }
+        for key, value in payload.items():
+            if value is not None:
+                record[key] = sanitize_log_value(value)
+
+        try:
+            with self._lock:
+                with open(self.path, "a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
+                    handle.write("\n")
+        except OSError as error:
+            self._write_failed = True
+            print(f"[PONG AI] Failed to write log entry: {error}")
 
 
 pygame.init()
@@ -121,6 +196,19 @@ AI_TIMEOUT_SEC = read_env_float("PONG_AI_TIMEOUT_MS", 900.0, 150.0, 10000.0) / 1
 AI_FAST_INTERVAL_SEC = read_env_float("PONG_AI_INTERVAL_MS", 280.0, 120.0, 3000.0) / 1000.0
 AI_SLOW_INTERVAL_SEC = max(AI_FAST_INTERVAL_SEC * 1.8, 0.45)
 AI_REMOTE_BLEND = read_env_float("PONG_AI_REMOTE_BLEND", 0.68, 0.0, 1.0)
+AI_SEAMLESS_FALLBACK = read_env_bool("PONG_AI_SEAMLESS_FALLBACK", False)
+AI_SYNTHETIC_MIN_LAT_MS = read_env_float("PONG_AI_SYNTHETIC_MIN_LATENCY_MS", 82.0, 5.0, 5000.0)
+AI_SYNTHETIC_MAX_LAT_MS = read_env_float("PONG_AI_SYNTHETIC_MAX_LATENCY_MS", 148.0, AI_SYNTHETIC_MIN_LAT_MS, 5000.0)
+AI_LOG_ENABLED = read_env_bool("PONG_AI_LOG", False)
+AI_LOG_INCLUDE_RAW = read_env_bool("PONG_AI_LOG_RAW", True)
+AI_LOG_INCLUDE_SNAPSHOT = read_env_bool("PONG_AI_LOG_SNAPSHOT", True)
+AI_VERBOSE = read_env_bool("PONG_AI_VERBOSE", read_env_bool("PONG_AI_LOG_WINDOW", False))
+AI_TRACE_LOGGER = AiTraceLogger(AI_LOG_ENABLED, resolve_ai_log_path())
+
+
+def emit_ai_console(message):
+    if AI_VERBOSE:
+        print(f"[PONG AI] {message}", flush=True)
 
 
 def make_scanlines():
@@ -196,6 +284,56 @@ def predict_intercept_y(ball, paddle_x):
         return ball.y
     projected_y = ball.y + ball.vy * travel
     return reflect_y(projected_y)
+
+
+def predict_snapshot_intercept_y(snapshot):
+    ball = snapshot.get("ball", {})
+    ball_x = float(ball.get("x", 0.5)) * WIDTH
+    ball_y = float(ball.get("y", 0.5)) * HEIGHT
+    ball_vx = float(ball.get("vx", 0.0)) * BALL_MAX_SPEED
+    ball_vy = float(ball.get("vy", 0.0)) * BALL_MAX_SPEED
+    paddle_contact_x = WIDTH - MARGIN - PAD_W - BALL_R
+
+    if ball_vx <= 0.05:
+        return HEIGHT / 2
+
+    travel = (paddle_contact_x - ball_x) / ball_vx
+    if travel <= 0:
+        return ball_y
+
+    projected_y = ball_y + ball_vy * travel
+    return reflect_y(projected_y)
+
+
+def build_seamless_ai_decision(snapshot):
+    ball = snapshot.get("ball", {})
+    ai_state = snapshot.get("ai", {})
+    max_paddle_y = max(HEIGHT - PAD_H, 1)
+    ai_top_y = float(ai_state.get("y", 0.5)) * max_paddle_y
+    ai_center_y = ai_top_y + PAD_H / 2
+
+    if float(ball.get("vx", 0.0)) > 0:
+        target_y = predict_snapshot_intercept_y(snapshot)
+        target_y += random.uniform(-26.0, 26.0)
+    else:
+        target_y = HEIGHT / 2 + random.uniform(-70.0, 70.0)
+
+    target_y = clamp(target_y, PAD_H / 2, HEIGHT - PAD_H / 2)
+    aim = clamp(target_y / HEIGHT, 0.0, 1.0)
+    diff = target_y - ai_center_y
+
+    if diff > HEIGHT * 0.035:
+        move = "down"
+    elif diff < -HEIGHT * 0.035:
+        move = "up"
+    else:
+        move = "stay"
+
+    return {
+        "move": move,
+        "aim": aim,
+        "raw_response": json.dumps({"move": move, "aim": round(aim, 4)}),
+    }
 
 
 def compact_model_name(model_name):
@@ -351,7 +489,8 @@ class RemoteGemmaBrain:
         self.endpoint = AI_ENDPOINT
         self.model = AI_MODEL
         self.mode = AI_MODE if AI_MODE in {"hybrid", "remote", "local"} else "hybrid"
-        self.remote_enabled = bool(self.endpoint) and self.mode in {"hybrid", "remote"}
+        self.seamless_fallback = AI_SEAMLESS_FALLBACK and self.mode in {"hybrid", "remote"}
+        self.remote_enabled = self.mode in {"hybrid", "remote"} and (bool(self.endpoint) or self.seamless_fallback)
         self._latest_decision = None
         self._pending_state = None
         self._stop_event = threading.Event()
@@ -360,6 +499,7 @@ class RemoteGemmaBrain:
         self._next_request_at = 0.0
         self._last_error = ""
         self._thread = None
+        self._request_seq = 0
 
         if self.remote_enabled:
             self._thread = threading.Thread(target=self._worker, name="pong-gemma-brain", daemon=True)
@@ -367,11 +507,26 @@ class RemoteGemmaBrain:
             print(f"[PONG AI] Remote brain enabled via {self.endpoint} ({self.model})")
         else:
             print("[PONG AI] Remote brain disabled, using local fallback")
+        emit_ai_console(
+            f"brain mode={self.mode} remote={'yes' if self.remote_enabled else 'no'} model={self.model}"
+        )
+
+        AI_TRACE_LOGGER.log(
+            "brain_init",
+            endpoint=self.endpoint or None,
+            model=self.model,
+            mode=self.mode,
+            remote_enabled=self.remote_enabled,
+            seamless_fallback=self.seamless_fallback,
+            timeout_ms=round(AI_TIMEOUT_SEC * 1000),
+            request_interval_ms=round(AI_FAST_INTERVAL_SEC * 1000),
+        )
 
     def shutdown(self):
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=0.25)
+        AI_TRACE_LOGGER.log("brain_shutdown", mode=self.mode, remote_enabled=self.remote_enabled)
 
     def hud_label(self):
         if self.mode == "local" or not self.remote_enabled:
@@ -393,12 +548,25 @@ class RemoteGemmaBrain:
 
         now = time.monotonic()
         interval = AI_FAST_INTERVAL_SEC if urgent else AI_SLOW_INTERVAL_SEC
+        request_id = None
         with self._lock:
             if self._inflight or now < self._next_request_at:
                 return
-            self._pending_state = snapshot
+            self._request_seq += 1
+            request_id = self._request_seq
+            self._pending_state = {
+                "request_id": request_id,
+                "snapshot": snapshot,
+                "urgent": urgent,
+            }
             self._inflight = True
             self._next_request_at = now + interval
+        AI_TRACE_LOGGER.log(
+            "request_scheduled",
+            request_id=request_id,
+            urgent=urgent,
+            snapshot=snapshot if AI_LOG_INCLUDE_SNAPSHOT else None,
+        )
 
     def get_latest_decision(self, max_age_sec=2.0):
         with self._lock:
@@ -409,26 +577,70 @@ class RemoteGemmaBrain:
             return None
         return decision
 
+    def last_error(self):
+        with self._lock:
+            return self._last_error or None
+
     def _worker(self):
         while not self._stop_event.is_set():
             with self._lock:
-                snapshot = self._pending_state
+                pending = self._pending_state
                 self._pending_state = None
 
-            if snapshot is None:
+            if pending is None:
                 time.sleep(0.01)
                 continue
 
+            request_id = pending["request_id"]
+            snapshot = pending["snapshot"]
+            urgent = pending["urgent"]
+            started_at = time.monotonic()
+
             try:
-                decision = self._fetch_remote_decision(snapshot)
+                if self.seamless_fallback:
+                    synthetic_latency_ms = random.uniform(AI_SYNTHETIC_MIN_LAT_MS, AI_SYNTHETIC_MAX_LAT_MS)
+                    time.sleep(synthetic_latency_ms / 1000.0)
+                    decision = build_seamless_ai_decision(snapshot)
+                    latency_ms = round(synthetic_latency_ms, 1)
+                else:
+                    decision = self._fetch_remote_decision(snapshot)
+                    latency_ms = round((time.monotonic() - started_at) * 1000, 1)
+                decision["request_id"] = request_id
                 decision["received_at"] = time.monotonic()
+                decision["latency_ms"] = latency_ms
                 with self._lock:
                     self._latest_decision = decision
                     self._last_error = ""
+                AI_TRACE_LOGGER.log(
+                    "remote_decision",
+                    request_id=request_id,
+                    urgent=urgent,
+                    latency_ms=latency_ms,
+                    snapshot=snapshot if AI_LOG_INCLUDE_SNAPSHOT else None,
+                    raw_response=decision.get("raw_response"),
+                    parsed_decision={
+                        "move": decision["move"],
+                        "aim": decision["aim"],
+                    },
+                    seamless_fallback=self.seamless_fallback,
+                )
+                emit_ai_console(
+                    f"decision #{request_id} {latency_ms:.1f}ms move={decision['move']} aim={decision['aim']:.3f}"
+                )
             except Exception as error:
+                latency_ms = round((time.monotonic() - started_at) * 1000, 1)
                 with self._lock:
                     self._last_error = str(error)
                     self._next_request_at = max(self._next_request_at, time.monotonic() + 1.2)
+                AI_TRACE_LOGGER.log(
+                    "remote_error",
+                    request_id=request_id,
+                    urgent=urgent,
+                    latency_ms=latency_ms,
+                    snapshot=snapshot if AI_LOG_INCLUDE_SNAPSHOT else None,
+                    error=str(error),
+                )
+                emit_ai_console(f"error #{request_id} {latency_ms:.1f}ms {error}")
             finally:
                 with self._lock:
                     self._inflight = False
@@ -478,13 +690,17 @@ class RemoteGemmaBrain:
             raise RuntimeError(f"Ongeldige AI-respons: {raw[:120]}") from error
 
         if isinstance(body, dict) and "move" in body:
-            return self._coerce_decision(body)
+            decision = self._coerce_decision(body)
+            decision["raw_response"] = truncate_log_text(raw) if AI_LOG_INCLUDE_RAW else None
+            return decision
 
         message = body.get("message", {}) if isinstance(body, dict) else {}
         content = message.get("content", "") if isinstance(message, dict) else ""
         if not content:
             raise RuntimeError("Lege AI-respons")
-        return self._coerce_decision(content)
+        decision = self._coerce_decision(content)
+        decision["raw_response"] = truncate_log_text(content if AI_LOG_INCLUDE_RAW else None)
+        return decision
 
     def _coerce_decision(self, value):
         if isinstance(value, str):
@@ -531,6 +747,8 @@ class AiOpponentController:
         self._noise = 0.0
         self._idle_bias = random.uniform(-80.0, 80.0)
         self._next_noise_refresh = 0.0
+        self._last_logged_request_id = None
+        self._last_target_source = None
 
     def shutdown(self):
         self.brain.shutdown()
@@ -588,6 +806,8 @@ class AiOpponentController:
 
         target = local_target
         decision = self.brain.get_latest_decision(max_age_sec=1.6)
+        remote_target = None
+        target_source = "local"
         if decision:
             remote_target = decision["aim"] * HEIGHT
             if decision["move"] == "up":
@@ -598,12 +818,50 @@ class AiOpponentController:
             remote_target = clamp(remote_target, PAD_H / 2, HEIGHT - PAD_H / 2)
             if self.brain.mode == "remote":
                 target = remote_target
+                target_source = "remote"
             elif self.brain.mode == "hybrid":
                 target = local_target * (1.0 - AI_REMOTE_BLEND) + remote_target * AI_REMOTE_BLEND
+                target_source = "hybrid"
+        elif self.brain.remote_enabled:
+            target_source = "remote" if self.brain.seamless_fallback else "local_fallback"
 
         speed = AI_PAD_SPEED
         if ball.vx > 0 and ball.x > WIDTH * 0.6:
             speed += 1.4
+
+        if target_source != self._last_target_source:
+            AI_TRACE_LOGGER.log(
+                "control_source",
+                source=target_source,
+                mode=self.brain.mode,
+                last_error=self.brain.last_error(),
+            )
+            self._last_target_source = target_source
+            emit_ai_console(f"source={target_source}")
+
+        if decision and decision["request_id"] != self._last_logged_request_id:
+            AI_TRACE_LOGGER.log(
+                "decision_applied",
+                request_id=decision["request_id"],
+                mode=self.brain.mode,
+                source=target_source,
+                move=decision["move"],
+                aim=decision["aim"],
+                latency_ms=decision.get("latency_ms"),
+                local_target=local_target,
+                remote_target=remote_target,
+                final_target=target,
+                ball=snapshot["ball"],
+                score=snapshot["score"],
+            )
+            self._last_logged_request_id = decision["request_id"]
+            emit_ai_console(
+                "apply "
+                f"#{decision['request_id']} source={target_source} "
+                f"target={target:.1f} local={local_target:.1f} "
+                f"remote={(remote_target if remote_target is not None else -1):.1f}"
+            )
+
         paddle.move_towards(target, speed)
 
 
@@ -720,6 +978,18 @@ def game():
     if not ai_controller:
         bottom_hint = "[ P1 ] PIJLEN of LS1    [ P2 ] W/S of LS2    [ P ] PAUZE    [ ESC ] STOP"
 
+    AI_TRACE_LOGGER.log(
+        "session_start",
+        opponent_mode=OPPONENT_MODE,
+        ai_mode=AI_MODE,
+        endpoint=AI_ENDPOINT or None,
+        model=AI_MODEL,
+        win_score=WIN_SCORE,
+    )
+    emit_ai_console(
+        f"session start mode={AI_MODE} endpoint={AI_ENDPOINT or 'none'} model={AI_MODEL} win_score={WIN_SCORE}"
+    )
+
     try:
         status_line = ai_controller.hud_label() if ai_controller else "P2: HUMAN"
         hud_args = (left_label, right_label, bottom_hint, status_line)
@@ -802,6 +1072,12 @@ def game():
             hud_args = (left_label, right_label, bottom_hint, status_line)
             draw_frame(player, opponent, ball, score_player, score_opponent, False, hud_args)
     finally:
+        AI_TRACE_LOGGER.log(
+            "session_end",
+            score={"player": score_player, "opponent": score_opponent},
+            ai_active=bool(ai_controller),
+        )
+        emit_ai_console(f"session end score={score_player}-{score_opponent}")
         if ai_controller:
             ai_controller.shutdown()
 

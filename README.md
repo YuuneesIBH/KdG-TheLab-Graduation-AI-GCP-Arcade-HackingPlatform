@@ -426,9 +426,18 @@ Main variables:
 | `PONG_AI_MODEL` | `OLLAMA_MODEL` or `gemma3:4b` | model name for the paddle AI |
 | `PONG_AI_TIMEOUT_MS` | `900` | timeout per paddle decision |
 | `PONG_AI_INTERVAL_MS` | `280` | poll interval for remote decisions |
+| `PONG_AI_SEAMLESS_FALLBACK` | `0` | keeps the remote AI path visually active if the endpoint is unavailable |
+| `PONG_AI_LOG` | `0` | when `1`, writes a JSONL decision trace for the Pong AI |
+| `PONG_AI_LOG_WINDOW` | `0` | when `1`, opens a live Pong console window in Terminal on macOS or `cmd.exe` on Windows |
+| `PONG_CONSOLE_LOG_PATH` | `arcade-guppy/logs/pong-console.log` | optional path override for the live Pong stdout/stderr log |
+| `PONG_AI_LOG_PATH` | `arcade-guppy/logs/pong-ai.jsonl` | optional path override for the AI trace file |
+| `PONG_AI_LOG_RAW` | `1` | include the raw model response text in the trace |
+| `PONG_AI_LOG_SNAPSHOT` | `1` | include the game snapshot sent to the model |
 | `PONG_BALL_START_SPEED` | `6.0` | initial ball speed |
 | `PONG_BALL_HIT_ACCEL` | `1.08` | multiplicative boost per paddle hit |
 | `PONG_BALL_MAX_SPEED` | `20.0` | hard cap on ball speed |
+
+When logging is enabled, the file contains JSONL entries for request scheduling, remote responses, parsed decisions, source switches (`remote`, `hybrid`, `local_fallback`), errors, and session start/end. This traces the AI decision flow, not hidden model chain-of-thought. If `PONG_AI_LOG_WINDOW=1`, the desktop launcher also opens a separate live console window that tails the raw Pong stdout/stderr output on macOS and Windows.
 
 Example with a GCP Ollama VM:
 

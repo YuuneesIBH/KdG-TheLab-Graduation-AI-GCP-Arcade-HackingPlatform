@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Een fullscreen Electron arcade launcher met retro UI, lokale games, een Guppy hacker terminal, ESP32-hardware-integratie en optionele Ollama AI-hints.**
+**A fullscreen Electron arcade launcher with retro UI, local games, a Guppy hacker terminal, ESP32 hardware integration, and optional Ollama AI hints.**
 
 <br />
 
@@ -17,58 +17,58 @@
 
 ---
 
-## Wat dit project precies is
+## What this project actually is
 
-Dit project combineert **twee experiences in één desktop-app**:
+This project combines **two experiences in one desktop app**:
 
-- **Arcade mode**: boot screen, retro game carousel, embedded game viewport, fullscreen launcher-flow en AI speelhints.
-- **Guppy / hacker mode**: een terminal-achtige interface voor NFC, IR en Wi-Fi tooling via een DIY ESP32-hardware bridge.
+- **Arcade mode**: boot screen, retro game carousel, embedded game viewport, fullscreen launcher flow, and AI gameplay hints.
+- **Guppy / hacker mode**: a terminal-like interface for NFC, IR, and Wi-Fi tooling through a DIY ESP32 hardware bridge.
 
-De app draait op **Electron + React**, lanceert lokale **Python-, Java- en EXE-games**, praat via **serial** met een **ESP32 Guppy board**, en kan optioneel **Ollama** aanspreken voor korte AI-uitleg tijdens het spelen.
-
----
-
-## Wat er vandaag allemaal in zit
-
-- Fullscreen retro boot screen met CRT/glitch-effecten, gamepad support en hidden hack-to-terminal overgang.
-- Arcade menu met 11 ingebouwde menu-items en launch support voor `.py`, `.jar` en `.exe`.
-- Embedded game launch mode met viewport-data via environment variables.
-- AI hint overlay per game via Ollama, met silent prefetch en fallback-URL support.
-- Auto-detect en auto-reconnect van een DIY Guppy device via `serialport`.
-- Hacker terminal met tabs voor `HOME`, `NFC`, `IR` en `WIFI`.
-- NFC UID capture + lokale JSON-opslag.
-- IR database loader + IR send workflow via ESP32.
-- Wi-Fi scan, audit, SoftAP-profielen en firmware-first deauth/jammer flow.
-- Linux host fallback voor de Wi-Fi jammer via `packetsender.py` + `scapy`.
-- Cloud helper script om een GCP Ollama VM op te zetten.
-- ESP32 firmware, PN532 probe sketch, IR helper en NFC helper in dezelfde repo.
+The app runs on **Electron + React**, launches local **Python, Java, and EXE games**, communicates over **serial** with an **ESP32 Guppy board**, and can optionally talk to **Ollama** for short AI explanations while playing.
 
 ---
 
-## Inhoud
+## What is currently included
 
-- [Architectuur op hoog niveau](#architectuur-op-hoog-niveau)
-- [Gebruikersflow](#gebruikersflow)
+- Fullscreen retro boot screen with CRT/glitch effects, gamepad support, and a hidden hack-to-terminal transition.
+- Arcade menu with 11 built-in menu items and launch support for `.py`, `.jar`, and `.exe`.
+- Embedded game launch mode with viewport data passed through environment variables.
+- AI hint overlay per game via Ollama, with silent prefetch and fallback URL support.
+- Auto-detect and auto-reconnect for a DIY Guppy device via `serialport`.
+- Hacker terminal with tabs for `HOME`, `NFC`, `IR`, and `WIFI`.
+- NFC UID capture + local JSON storage.
+- IR database loader + IR send workflow through ESP32.
+- Wi-Fi scan, audit, SoftAP profiles, and firmware-first deauth/jammer flow.
+- Linux host fallback for the Wi-Fi jammer via `packetsender.py` + `scapy`.
+- Cloud helper script to set up a GCP Ollama VM.
+- ESP32 firmware, PN532 probe sketch, IR helper, and NFC helper in the same repo.
+
+---
+
+## Contents
+
+- [High-level architecture](#high-level-architecture)
+- [User flow](#user-flow)
 - [Repository map](#repository-map)
-- [Belangrijkste bronbestanden](#belangrijkste-bronbestanden)
-- [Gamecatalogus](#gamecatalogus)
-- [Guppy terminal en hardwarefeatures](#guppy-terminal-en-hardwarefeatures)
-- [AI en Ollama](#ai-en-ollama)
-- [Vereisten](#vereisten)
-- [Installatie en quick start](#installatie-en-quick-start)
-- [Scripts en commands](#scripts-en-commands)
+- [Key source files](#key-source-files)
+- [Game catalog](#game-catalog)
+- [Guppy terminal and hardware features](#guppy-terminal-and-hardware-features)
+- [AI and Ollama](#ai-and-ollama)
+- [Requirements](#requirements)
+- [Installation and quick start](#installation-and-quick-start)
+- [Scripts and commands](#scripts-and-commands)
 - [Environment variables](#environment-variables)
-- [Persistente data en output](#persistente-data-en-output)
-- [Nieuwe games toevoegen](#nieuwe-games-toevoegen)
-- [Platform- en runtime-notes](#platform--en-runtime-notes)
+- [Persistent data and output](#persistent-data-and-output)
+- [Adding new games](#adding-new-games)
+- [Platform and runtime notes](#platform-and-runtime-notes)
 - [Responsible use](#responsible-use)
-- [Roadmap, docs en teamcontext](#roadmap-docs-en-teamcontext)
+- [Roadmap, docs, and team context](#roadmap-docs-and-team-context)
 
 ---
 
-<a id="architectuur-op-hoog-niveau"></a>
+<a id="high-level-architecture"></a>
 
-## Architectuur op hoog niveau
+## High-level architecture
 
 ```mermaid
 flowchart LR
@@ -87,39 +87,39 @@ flowchart LR
     Serial --> Wifi["Wi-Fi scan / audit / AP / deauth"]
 ```
 
-### Runtime lagen
+### Runtime layers
 
-| Laag | Verantwoordelijkheid |
+| Layer | Responsibility |
 | --- | --- |
 | `renderer` | Boot screen, arcade UI, Guppy terminal UI, input handling, AI overlay, Wi-Fi results modal |
-| `preload` | Veilige bridge tussen renderer en Electron main via `window.electron` |
-| `main` | Window management, game launch/stop, serial auto-connect, Wi-Fi tooling, AI HTTP-calls |
-| `games` | Lokale Python-, Java- en EXE-games plus gebundelde assets |
+| `preload` | Secure bridge between renderer and Electron main through `window.electron` |
+| `main` | Window management, game launch/stop, serial auto-connect, Wi-Fi tooling, AI HTTP calls |
+| `games` | Local Python, Java, and EXE games plus bundled assets |
 | `firmware` | ESP32 bridge firmware, NFC/IR helpers, PN532 probe sketch |
 | `docs` | Hardware quickstart, AI platform blueprint, IR mini database |
-| `cloud_scripts` | Helper voor het opzetten van een GCP VM met Ollama |
+| `cloud_scripts` | Helper for setting up a GCP VM with Ollama |
 
 ---
 
-<a id="gebruikersflow"></a>
+<a id="user-flow"></a>
 
-## Gebruikersflow
+## User flow
 
 ### Arcade flow
 
-1. De app opent fullscreen in het **boot screen**.
-2. Na de progressie kun je naar het **arcade menu**.
-3. Een geselecteerde game start via Electron IPC.
-4. Tijdens een game draait de app in een **arcade cabinet shell** met launch status, exit flow en optionele AI-hint overlay.
-5. Bij afsluiten van de child process keert de app automatisch terug naar het menu.
+1. The app opens fullscreen in the **boot screen**.
+2. After the progress sequence, you can continue to the **arcade menu**.
+3. A selected game starts through Electron IPC.
+4. While a game is running, the app stays in an **arcade cabinet shell** with launch status, exit flow, and an optional AI hint overlay.
+5. When the child process exits, the app automatically returns to the menu.
 
 ### Guppy / hacker flow
 
-1. Vanuit het boot screen klik je op **HACK TERMINAL**.
-2. Er draait een visuele hack-transition.
-3. De app opent de **Guppy terminal**.
-4. De main process probeert automatisch elke paar seconden een geschikte serial device te vinden.
-5. Bij connectie worden NFC, IR, Wi-Fi en raw serial commands beschikbaar.
+1. From the boot screen, click **HACK TERMINAL**.
+2. A visual hack transition runs.
+3. The app opens the **Guppy terminal**.
+4. The main process automatically tries every few seconds to find a suitable serial device.
+5. Once connected, NFC, IR, Wi-Fi, and raw serial commands become available.
 
 ---
 
@@ -173,145 +173,145 @@ flowchart LR
         └── maclist/macs.txt
 ```
 
-### Grote gebundelde / vendored onderdelen
+### Large bundled / vendored components
 
-- `arcade-guppy/src/games/Mame_Emulator/` bevat een volledige MAME-bundle met upstream assets, docs, plugins, artwork, hashes en samples.
-- `arcade-guppy/src/games/RetroRaceGame/` bevat zowel de buildbare Java-broncode als de gebundelde `RetroRaceGame.jar`.
-- `arcade-guppy/src/games/SuperMarioNES/` bevat `Mario.jar`, native JInput libraries en settingsbestand.
-- `arcade-guppy/wifijammer-2.0/` bevat de host fallback backend voor Wi-Fi deauth/jammer workflows.
+- `arcade-guppy/src/games/Mame_Emulator/` contains a full MAME bundle with upstream assets, docs, plugins, artwork, hashes, and samples.
+- `arcade-guppy/src/games/RetroRaceGame/` contains both the buildable Java source code and the bundled `RetroRaceGame.jar`.
+- `arcade-guppy/src/games/SuperMarioNES/` contains `Mario.jar`, native JInput libraries, and a settings file.
+- `arcade-guppy/wifijammer-2.0/` contains the host fallback backend for Wi-Fi deauth/jammer workflows.
 
 ---
 
-<a id="belangrijkste-bronbestanden"></a>
+<a id="key-source-files"></a>
 
-## Belangrijkste bronbestanden
+## Key source files
 
-### Electron en renderer
+### Electron and renderer
 
-| Bestand | Rol |
+| File | Role |
 | --- | --- |
 | `arcade-guppy/src/main.ts` | Core orchestrator: browser window, fullscreen, IPC, game launch/stop, serial auto-connect, Wi-Fi tooling, AI/Ollama calls |
-| `arcade-guppy/src/preload.ts` | Exposeert `window.electron` API naar de renderer |
-| `arcade-guppy/src/renderer.tsx` | Root app-state en routing tussen boot, arcade menu, game shell en hacker menu |
-| `arcade-guppy/src/shared/electron-types.ts` | Shared types voor launch requests, Guppy status, Wi-Fi jammer payloads, AI payloads |
-| `arcade-guppy/src/electron.d.ts` | Type-definities voor de globale `window.electron` bridge |
+| `arcade-guppy/src/preload.ts` | Exposes the `window.electron` API to the renderer |
+| `arcade-guppy/src/renderer.tsx` | Root app state and routing between boot, arcade menu, game shell, and hacker menu |
+| `arcade-guppy/src/shared/electron-types.ts` | Shared types for launch requests, Guppy status, Wi-Fi jammer payloads, and AI payloads |
+| `arcade-guppy/src/electron.d.ts` | Type definitions for the global `window.electron` bridge |
 
 ### Arcade UI
 
-| Bestand | Rol |
+| File | Role |
 | --- | --- |
 | `arcade-guppy/src/components/arcade/boot.tsx` | Retro boot screen, keyboard/gamepad start, top-right hack button |
-| `arcade-guppy/src/components/arcade/GameMenu.tsx` | Gamecatalogus, wheel/carousel, keyboard/gamepad/mousewheel navigatie |
-| `arcade-guppy/src/components/arcade/ArcadeGame.tsx` | Arcade cabinet shell rond een gelanceerde game, progress overlay, exit flow, AI hints |
+| `arcade-guppy/src/components/arcade/GameMenu.tsx` | Game catalog, wheel/carousel, keyboard/gamepad/mousewheel navigation |
+| `arcade-guppy/src/components/arcade/ArcadeGame.tsx` | Arcade cabinet shell around a launched game, progress overlay, exit flow, AI hints |
 
 ### Guppy UI
 
-| Bestand | Rol |
+| File | Role |
 | --- | --- |
-| `arcade-guppy/src/components/guppy/HackTransition.tsx` | Visuele CRT/matrix breach transition naar hacker mode |
-| `arcade-guppy/src/components/guppy/HackerMenu.tsx` | HOME/NFC/IR/WIFI terminal-UI, raw serial console, Wi-Fi forms en deauth controls |
-| `arcade-guppy/src/components/guppy/WifiResultsModal.tsx` | Parseert scan/audit output, dedupliceert netwerken en toont risico-/vendorinformatie |
+| `arcade-guppy/src/components/guppy/HackTransition.tsx` | Visual CRT/matrix breach transition into hacker mode |
+| `arcade-guppy/src/components/guppy/HackerMenu.tsx` | HOME/NFC/IR/WIFI terminal UI, raw serial console, Wi-Fi forms, and deauth controls |
+| `arcade-guppy/src/components/guppy/WifiResultsModal.tsx` | Parses scan/audit output, deduplicates networks, and shows risk/vendor information |
 
-### Config en build
+### Config and build
 
-| Bestand | Rol |
+| File | Role |
 | --- | --- |
 | `package.json` | npm scripts, runtime dependencies, Electron entrypoint |
-| `electron.vite.config.ts` | buildconfig voor main, preload en renderer; `serialport` is extern voor de main build |
-| `tsconfig.json` | root TypeScript config voor ambient Electron typing |
-| `arcade-guppy/tsconfig.json` | TypeScript config voor de app-broncode inclusief JSX |
-| `scripts/run-electron-vite.js` | wrapper rond `electron-vite` die `ELECTRON_RUN_AS_NODE` reset |
-| `scripts/setup-python-venv.js` | maakt `arcade-guppy/.venv`, upgrade `pip`, installeert `pygame` en gevonden `requirements*.txt` onder de games-tree |
+| `electron.vite.config.ts` | Build config for main, preload, and renderer; `serialport` is externalized for the main build |
+| `tsconfig.json` | Root TypeScript config for ambient Electron typing |
+| `arcade-guppy/tsconfig.json` | TypeScript config for the app source code including JSX |
+| `scripts/run-electron-vite.js` | Wrapper around `electron-vite` that resets `ELECTRON_RUN_AS_NODE` |
+| `scripts/setup-python-venv.js` | Creates `arcade-guppy/.venv`, upgrades `pip`, installs `pygame`, and installs discovered `requirements*.txt` files under the games tree |
 
 ---
 
-<a id="gamecatalogus"></a>
+<a id="game-catalog"></a>
 
-## Gamecatalogus
+## Game catalog
 
-De standaardcatalogus staat hardcoded in `arcade-guppy/src/components/arcade/GameMenu.tsx`.
+The default catalog is hardcoded in `arcade-guppy/src/components/arcade/GameMenu.tsx`.
 
-| Titel | Runtime | Pad | Opmerking |
+| Title | Runtime | Path | Note |
 | --- | --- | --- | --- |
-| `PONG` | Python | `games/pong.py` | 1P versus AI; start zacht en versnelt per paddle-hit |
-| `PAC-MAN` | Python | `games/PacMan/pacman.py` | gebruikt lokale assets/audio |
-| `RETRO BIRD` | Python | `games/RetroBird/main.py` | Flappy Bird-stijl |
-| `Pixel Quest Adventure` | Java JAR | `games/SuperMarioNES/Mario.jar` | resolutie wordt automatisch in `Setting.txt` geüpdatet |
-| `EXTREME RACING` | Python | `games/CarRacingUltraMaxExtremeLevel1000/main.py` | racegame met eigen assets/audio |
-| `BLOCK STORM` | Python | `games/BlockStorm/main.py` | falling-blocks gameplay |
-| `RETRO RACE` | Java JAR | `games/RetroRaceGame/RetroRaceGame.jar` | broncode mee in repo |
-| `ANGRY WALLS` | Python | `games/AngryWalls/main.py` | dungeon/loot-stijl |
+| `PONG` | Python | `games/pong.py` | 1P versus AI; starts gently and speeds up with each paddle hit |
+| `PAC-MAN` | Python | `games/PacMan/pacman.py` | uses local assets/audio |
+| `RETRO BIRD` | Python | `games/RetroBird/main.py` | Flappy Bird style |
+| `Pixel Quest Adventure` | Java JAR | `games/SuperMarioNES/Mario.jar` | resolution is automatically updated in `Setting.txt` |
+| `EXTREME RACING` | Python | `games/CarRacingUltraMaxExtremeLevel1000/main.py` | racing game with its own assets/audio |
+| `BLOCK STORM` | Python | `games/BlockStorm/main.py` | falling-block gameplay |
+| `RETRO RACE` | Java JAR | `games/RetroRaceGame/RetroRaceGame.jar` | source code included in the repo |
+| `ANGRY WALLS` | Python | `games/AngryWalls/main.py` | dungeon/loot style |
 | `ELEMENTAL CLASH` | Python | `games/ElementalClash/src/main.py` | 2P duel |
 | `SPACE INVADER` | Python | `games/spaceinvaders.py` | space shooter |
 | `EMULATOR` | EXE | `games/Mame_Emulator/mame.exe` | Windows-native MAME executable |
 
-### Launch gedrag per extensie
+### Launch behavior per extension
 
-| Type | Hoe het wordt gestart |
+| Type | How it is launched |
 | --- | --- |
-| `.py` | via `python3` of `python`, of via `ARCADE_PYTHON`, of via `arcade-guppy/.venv` als daar `pygame` beschikbaar is |
-| `.jar` | via `java -jar`, of via `ARCADE_JAVA` / `JAVA_HOME` |
-| `.exe` | direct als child process |
+| `.py` | through `python3` or `python`, or through `ARCADE_PYTHON`, or through `arcade-guppy/.venv` if `pygame` is available there |
+| `.jar` | through `java -jar`, or through `ARCADE_JAVA` / `JAVA_HOME` |
+| `.exe` | directly as a child process |
 
-### Launch metadata die de app meegeeft
+### Launch metadata passed by the app
 
-Bij launches in embedded mode zet de main process deze env vars:
+For embedded-mode launches, the main process sets these env vars:
 
-- `ARCADE_EMBEDDED=1` of `0`
+- `ARCADE_EMBEDDED=1` or `0`
 - `ARCADE_WINDOW_POS=x,y`
 - `ARCADE_WINDOW_SIZE=widthxheight`
 
 ### In-game AI hints
 
-- Een gamehint wordt in de achtergrond geprefetcht zodra een game draait.
-- De hint-overlay unlockt na ongeveer **20 seconden**.
-- Als er al een hint gecachet is, verschijnt die quasi direct.
+- A gameplay hint is prefetched in the background as soon as a game is running.
+- The hint overlay unlocks after about **20 seconds**.
+- If a hint is already cached, it appears almost immediately.
 
 ### Pong versus AI
 
-- `PONG` speelt standaard **tegen een AI-paddle** in plaats van pure 2P local.
-- Zonder remote endpoint gebruikt de game een lokale fallback-AI zodat de match realtime blijft.
-- Met een Ollama-compatibele Gemma endpoint op GCP kan de rechter paddle hybride bestuurd worden door remote beslissingen plus lokale smoothing.
-- De bal start bewust trager dan voordien en versnelt nu geleidelijk bij elke paddle-hit, met een lichte extra versnelling over tijd.
+- `PONG` plays **against an AI paddle** by default instead of pure 2P local play.
+- Without a remote endpoint, the game uses a local fallback AI so the match remains realtime.
+- With an Ollama-compatible Gemma endpoint on GCP, the right paddle can be controlled by remote decisions plus local smoothing.
+- The ball intentionally starts slower than before and now accelerates gradually with each paddle hit, with a light extra acceleration over time.
 
 ---
 
-<a id="guppy-terminal-en-hardwarefeatures"></a>
+<a id="guppy-terminal-and-hardware-features"></a>
 
-## Guppy terminal en hardwarefeatures
+## Guppy terminal and hardware features
 
 ### UI views
 
-| View | Functie |
+| View | Function |
 | --- | --- |
-| `HOME` | hardwarestatus, laatste serial lijn, shortcuts naar NFC/IR/WIFI |
-| `NFC` | `RUN NFC_CLONE`, `NFC_READ`, UID tonen, capture opslaan als JSON |
-| `IR` | IR DB reload, entry selecteren, `IR_SEND` uitsturen |
-| `WIFI` | scan, audit, AP-profielbeheer, AP start/stop, deauth/jammer controls |
+| `HOME` | hardware status, latest serial line, shortcuts to NFC/IR/WIFI |
+| `NFC` | `RUN NFC_CLONE`, `NFC_READ`, show UID, save capture as JSON |
+| `IR` | IR DB reload, select entry, send `IR_SEND` |
+| `WIFI` | scan, audit, AP profile management, AP start/stop, deauth/jammer controls |
 
-### Wat de renderer effectief doet
+### What the renderer actually does
 
-- Luistert op realtime status-events: `guppy-status`, `guppy-line`, `wifi-jammer-state`, `wifi-jammer-log`, `game-exited`.
-- Ondersteunt keyboard en gamepad navigatie in zowel arcade als hacker mode.
-- Houdt een lokale serial log bij in de UI met rolling history.
-- Parseert NFC-, IR- en Wi-Fi status uit ruwe serial output.
+- Listens to realtime status events: `guppy-status`, `guppy-line`, `wifi-jammer-state`, `wifi-jammer-log`, `game-exited`.
+- Supports keyboard and gamepad navigation in both arcade and hacker mode.
+- Keeps a local serial log in the UI with rolling history.
+- Parses NFC, IR, and Wi-Fi status from raw serial output.
 
-### Wat de main process effectief doet
+### What the main process actually does
 
-- Scant elke **3 seconden** naar serial poorten zolang auto-connect aan staat.
-- Probeert handshakes met `HELLO` en `PING`.
-- Herkent Guppy hardware op basis van seriële metadata en handshake markers zoals:
+- Scans for serial ports every **3 seconds** while auto-connect is enabled.
+- Attempts handshakes with `HELLO` and `PING`.
+- Recognizes Guppy hardware based on serial metadata and handshake markers such as:
   - `GUPPY_READY`
   - `PONG`
   - `FW:esp32-bridge`
   - `CAPS:...`
-- Houdt capability flags bij uit de `CAPS:` lijn van de firmware.
+- Tracks capability flags from the firmware `CAPS:` line.
 
-### Bekende Guppy module-commands
+### Known Guppy module commands
 
-De app kent op protocolniveau deze module keys:
+At the protocol level, the app knows these module keys:
 
-| Module key | Verzonden command |
+| Module key | Sent command |
 | --- | --- |
 | `nfc` | `RUN NFC_CLONE` |
 | `badusb` | `RUN BADUSB_INJECT` |
@@ -321,116 +321,116 @@ De app kent op protocolniveau deze module keys:
 | `wifiap` | `RUN WIFI_AP_START` |
 | `terminal` | `RUN SHELL` |
 
-De huidige UI legt vooral de nadruk op **NFC**, **IR** en **Wi-Fi**. `BADUSB`, `GPIO` en `SHELL` zijn al als protocol/extensie aanwezig.
+The current UI mainly focuses on **NFC**, **IR**, and **Wi-Fi**. `BADUSB`, `GPIO`, and `SHELL` are already present as protocol/extension support.
 
 ### NFC
 
-- ESP32 firmware ondersteunt `NFC_READ` en `RUN NFC_CLONE`.
-- Captures worden opgeslagen als JSON met `uid`, `label`, `capturedAt`, `source` en `rawLine`.
-- De UI markeert NFC-health op basis van binnenkomende serial output zoals `NFC_UID`, `PN532 not detected` of `NFC=...`.
+- ESP32 firmware supports `NFC_READ` and `RUN NFC_CLONE`.
+- Captures are stored as JSON with `uid`, `label`, `capturedAt`, `source`, and `rawLine`.
+- The UI marks NFC health based on incoming serial output such as `NFC_UID`, `PN532 not detected`, or `NFC=...`.
 
 ### IR
 
-- De app laadt standaard `docs/ir-mini-database.json`.
-- Die database bevat momenteel **24 voorbeeldentries** voor o.a. TV, soundbar, projector, LED-strip, fan en camera remote.
-- Als die JSON ontbreekt of stuk is, valt de app terug op een **built-in fallback** met 4 NEC-samples.
-- Verzenden gebeurt via `IR_SEND <protocol> <address> <command> <carrierKhz>`.
+- The app loads `docs/ir-mini-database.json` by default.
+- That database currently contains **24 sample entries** for TV, soundbar, projector, LED strip, fan, and camera remotes, among others.
+- If that JSON is missing or broken, the app falls back to a **built-in fallback** with 4 NEC samples.
+- Sending happens via `IR_SEND <protocol> <address> <command> <carrierKhz>`.
 
 ### Wi-Fi
 
-- Scanresultaten worden geparsed uit serial output en omgezet naar een netwerkmodel met:
+- Scan results are parsed from serial output and turned into a network model with:
   - SSID
   - RSSI
   - security
   - channel
   - BSSID
   - risk score
-- De results modal enrich’t BSSID’s met vendor info uit `arcade-guppy/wifijammer-2.0/maclist/macs.txt`.
-- De vendorlijst telt momenteel **24.609** prefixregels.
+- The results modal enriches BSSIDs with vendor info from `arcade-guppy/wifijammer-2.0/maclist/macs.txt`.
+- The vendor list currently contains **24,609** prefix lines.
 
-### Wi-Fi AP profiel
+### Wi-Fi AP profile
 
-- Wordt lokaal opgeslagen en herladen bij reconnect.
-- Vereisten uit de code:
-  - SSID verplicht
+- Stored locally and reloaded on reconnect.
+- Requirements from the code:
+  - SSID required
   - SSID max 32 chars
-  - geen spaties in SSID
-  - password leeg of 8-63 chars
-  - geen spaties in password
-  - kanaal wordt geclamped tussen 1 en 13
+  - no spaces in SSID
+  - password empty or 8-63 chars
+  - no spaces in password
+  - channel is clamped between 1 and 13
 
 ### Wi-Fi deauth / jammer modes
 
-De app ondersteunt twee backends:
+The app supports two backends:
 
-| Mode | Beschrijving |
+| Mode | Description |
 | --- | --- |
-| `firmware` | aanbevolen; stuurt een start/stop command naar ESP32 indien de firmware passende `CAPS` adverteert |
-| `host` | fallback; start `arcade-guppy/wifijammer-2.0/packetsender.py` op de host |
+| `firmware` | recommended; sends a start/stop command to the ESP32 if the firmware advertises matching `CAPS` |
+| `host` | fallback; starts `arcade-guppy/wifijammer-2.0/packetsender.py` on the host |
 
-#### Firmware-first gedrag
+#### Firmware-first behavior
 
-De UI probeert automatisch een firmware backend te gebruiken wanneer de device `CAPS:` bevat zoals:
+The UI automatically tries to use a firmware backend when the device contains `CAPS:` entries such as:
 
 - `WIFI_DEAUTH_START` + `WIFI_DEAUTH_STOP`
 - `WIFI_JAMMER_START` + `WIFI_JAMMER_STOP`
 - `WIFI_JAM_START` + `WIFI_JAM_STOP`
 
-#### Host fallback gedrag
+#### Host fallback behavior
 
-- Alleen ondersteund op **Linux**.
-- Vereist minstens één interface die al in **monitor mode** staat.
-- Gebruikt `iwconfig` om die interface automatisch te detecteren.
-- Start daarna `packetsender.py` via Python.
+- Only supported on **Linux**.
+- Requires at least one interface already in **monitor mode**.
+- Uses `iwconfig` to auto-detect that interface.
+- Then starts `packetsender.py` through Python.
 
 ---
 
-<a id="ai-en-ollama"></a>
+<a id="ai-and-ollama"></a>
 
-## AI en Ollama
+## AI and Ollama
 
-### Wat de AI feature doet
+### What the AI feature does
 
-- Geeft een korte uitleg over hoe je een geselecteerde game speelt.
-- Houdt de tekst compact.
-- Gebruikt `title`, `genre`, `difficulty` en eventueel `lastEvent`.
+- Provides a short explanation of how to play a selected game.
+- Keeps the text compact.
+- Uses `title`, `genre`, `difficulty`, and optionally `lastEvent`.
 
-### Hoe de call werkt
+### How the call works
 
-1. De renderer roept `window.electron.aiExplain(...)` aan.
-2. De main process checkt eerst of Ollama bereikbaar is via `/api/tags`.
-3. Daarna wordt `/api/chat` aangeroepen met het gekozen model.
-4. Als de primaire URL faalt, kan optioneel een fallback-URL gebruikt worden.
+1. The renderer calls `window.electron.aiExplain(...)`.
+2. The main process first checks whether Ollama is reachable via `/api/tags`.
+3. It then calls `/api/chat` with the selected model.
+4. If the primary URL fails, an optional fallback URL can be used.
 
-### Standaard runtime defaults
+### Default runtime defaults
 
-| Variable | Default | Betekenis |
+| Variable | Default | Meaning |
 | --- | --- | --- |
-| `OLLAMA_URL` | `http://localhost:11434` | primaire Ollama endpoint |
-| `OLLAMA_FALLBACK_URL` | leeg | optionele fallback endpoint |
-| `OLLAMA_MODEL` | `gemma2:27b` | modelnaam |
-| `OLLAMA_TIMEOUT_MS` | `45000` | timeout voor AI request |
-| `OLLAMA_KEEP_ALIVE_SEC` | `1800` | houdt het model geladen |
+| `OLLAMA_URL` | `http://localhost:11434` | primary Ollama endpoint |
+| `OLLAMA_FALLBACK_URL` | empty | optional fallback endpoint |
+| `OLLAMA_MODEL` | `gemma2:27b` | model name |
+| `OLLAMA_TIMEOUT_MS` | `45000` | timeout for AI requests |
+| `OLLAMA_KEEP_ALIVE_SEC` | `1800` | keeps the model loaded |
 
 ### Pong AI runtime
 
-`arcade-guppy/src/games/pong.py` kan dezelfde remote Ollama/GCP-stack gebruiken als de hint-feature.
+`arcade-guppy/src/games/pong.py` can use the same remote Ollama/GCP stack as the hint feature.
 
-Belangrijkste variabelen:
+Main variables:
 
-| Variable | Default | Betekenis |
+| Variable | Default | Meaning |
 | --- | --- | --- |
-| `PONG_AI_MODE` | `hybrid` | `local`, `hybrid` of `remote` |
-| `PONG_AI_URL` | `OLLAMA_FALLBACK_URL` of `OLLAMA_URL` | basis-URL voor de remote AI |
-| `PONG_AI_ENDPOINT` | leeg | optioneel exact endpoint; overschrijft `PONG_AI_URL` |
-| `PONG_AI_MODEL` | `OLLAMA_MODEL` of `gemma3:4b` | modelnaam voor de paddle-AI |
-| `PONG_AI_TIMEOUT_MS` | `900` | timeout per paddle-decision |
-| `PONG_AI_INTERVAL_MS` | `280` | poll-interval voor remote decisions |
-| `PONG_BALL_START_SPEED` | `6.0` | startsnelheid van de bal |
-| `PONG_BALL_HIT_ACCEL` | `1.08` | multiplicatieve boost per paddle-hit |
-| `PONG_BALL_MAX_SPEED` | `20.0` | hard cap op balsnelheid |
+| `PONG_AI_MODE` | `hybrid` | `local`, `hybrid`, or `remote` |
+| `PONG_AI_URL` | `OLLAMA_FALLBACK_URL` or `OLLAMA_URL` | base URL for the remote AI |
+| `PONG_AI_ENDPOINT` | empty | optional exact endpoint; overrides `PONG_AI_URL` |
+| `PONG_AI_MODEL` | `OLLAMA_MODEL` or `gemma3:4b` | model name for the paddle AI |
+| `PONG_AI_TIMEOUT_MS` | `900` | timeout per paddle decision |
+| `PONG_AI_INTERVAL_MS` | `280` | poll interval for remote decisions |
+| `PONG_BALL_START_SPEED` | `6.0` | initial ball speed |
+| `PONG_BALL_HIT_ACCEL` | `1.08` | multiplicative boost per paddle hit |
+| `PONG_BALL_MAX_SPEED` | `20.0` | hard cap on ball speed |
 
-Voorbeeld met een GCP Ollama VM:
+Example with a GCP Ollama VM:
 
 ```bash
 OLLAMA_FALLBACK_URL=http://<gcp-ip>:11434 OLLAMA_MODEL=gemma3:4b npm run dev
@@ -438,18 +438,18 @@ OLLAMA_FALLBACK_URL=http://<gcp-ip>:11434 OLLAMA_MODEL=gemma3:4b npm run dev
 
 ### GCP helper script
 
-`cloud_scripts/setup-gcp-ollama-vm.sh` automatiseert een eenvoudige remote Ollama VM.
+`cloud_scripts/setup-gcp-ollama-vm.sh` automates a simple remote Ollama VM.
 
-Wat het script doet:
+What the script does:
 
-- zet een Ubuntu 22.04 VM op in GCP;
-- installeert Ollama;
-- opent poort `11434`;
-- beperkt firewall access standaard tot je publiek IP;
-- pulled automatisch het gekozen model;
-- ondersteunt spot instances.
+- sets up an Ubuntu 22.04 VM on GCP;
+- installs Ollama;
+- opens port `11434`;
+- restricts firewall access to your public IP by default;
+- automatically pulls the selected model;
+- supports spot instances.
 
-Belangrijkste script-variabelen:
+Main script variables:
 
 | Variable | Default |
 | --- | --- |
@@ -461,49 +461,49 @@ Belangrijkste script-variabelen:
 | `ALLOWED_CIDR` | `auto` |
 | `SPOT` | `true` |
 
-### Roadmap-document
+### Roadmap document
 
-De langere AI/multiplayer/cybervisie staat in:
+The longer AI/multiplayer/cyber vision is described in:
 
 - [docs/AI_ARCADE_PLATFORM_ARCHITECTURE.md](docs/AI_ARCADE_PLATFORM_ARCHITECTURE.md)
 
-Dat document beschrijft de **toekomstarchitectuur**, niet enkel de huidige implementatie.
+That document describes the **future architecture**, not just the current implementation.
 
 ---
 
-<a id="vereisten"></a>
+<a id="requirements"></a>
 
-## Vereisten
+## Requirements
 
 ### Core
 
 - Node.js 18+
 - npm 9+
-- Python 3.10+ of compatibel
+- Python 3.10+ or compatible
 
-### Voor alle Python-games
+### For all Python games
 
 - `pygame`
 
-### Voor Java-games
+### For Java games
 
-- een werkende Java runtime op `PATH`
-- of `JAVA_HOME`
-- of `ARCADE_JAVA`
+- a working Java runtime on `PATH`
+- or `JAVA_HOME`
+- or `ARCADE_JAVA`
 
-### Voor AI hints
+### For AI hints
 
-- een Ollama instance lokaal of remote
+- an Ollama instance, local or remote
 
-### Voor hardware mode
+### For hardware mode
 
 - ESP32 dev board
 - PN532 NFC module
 - IR TX module
 - IR RX module
-- USB serial connectie
+- USB serial connection
 
-### Voor Linux host fallback Wi-Fi backend
+### For the Linux host fallback Wi-Fi backend
 
 - Linux
 - `iwconfig`
@@ -512,9 +512,9 @@ Dat document beschrijft de **toekomstarchitectuur**, niet enkel de huidige imple
 
 ---
 
-<a id="installatie-en-quick-start"></a>
+<a id="installation-and-quick-start"></a>
 
-## Installatie en quick start
+## Installation and quick start
 
 ### 1. Node dependencies
 
@@ -522,22 +522,22 @@ Dat document beschrijft de **toekomstarchitectuur**, niet enkel de huidige imple
 npm install
 ```
 
-### 2. Python omgeving voor games
+### 2. Python environment for games
 
-Aanbevolen:
+Recommended:
 
 ```bash
 npm run setup:python
 ```
 
-Wat dit doet:
+What this does:
 
-- maakt `arcade-guppy/.venv` aan;
-- upgrade `pip`;
-- installeert `pygame`;
-- installeert gevonden `requirements*.txt` onder de gamebronboom.
+- creates `arcade-guppy/.venv`;
+- upgrades `pip`;
+- installs `pygame`;
+- installs discovered `requirements*.txt` files under the game source tree.
 
-Handmatig kan ook:
+Manual setup is also possible:
 
 ```bash
 python3 -m venv arcade-guppy/.venv
@@ -545,60 +545,60 @@ source arcade-guppy/.venv/bin/activate
 pip install pygame
 ```
 
-### 3. Extra dependency voor Linux host fallback jammer
+### 3. Extra dependency for the Linux host fallback jammer
 
-`npm run setup:python` installeert **niet** automatisch `scapy` uit `arcade-guppy/wifijammer-2.0/requirements.txt`, omdat die map buiten de gescande gameboom valt.
+`npm run setup:python` does **not** automatically install `scapy` from `arcade-guppy/wifijammer-2.0/requirements.txt`, because that directory sits outside the scanned game tree.
 
-Installeer die dus apart wanneer je de host fallback nodig hebt:
+So install it separately when you need the host fallback:
 
 ```bash
 source arcade-guppy/.venv/bin/activate
 pip install -r arcade-guppy/wifijammer-2.0/requirements.txt
 ```
 
-### 4. Start de app
+### 4. Start the app
 
 ```bash
 npm run dev
 ```
 
-### 5. Optioneel: Ollama lokaal draaien
+### 5. Optional: run Ollama locally
 
-Voorbeeld:
+Example:
 
 ```bash
 OLLAMA_URL=http://localhost:11434 npm run dev
 ```
 
-Voor Pong tegen een remote Gemma op GCP kun je ook werken met:
+For Pong against a remote Gemma model on GCP, you can also use:
 
 ```bash
 OLLAMA_FALLBACK_URL=http://<gcp-ip>:11434 OLLAMA_MODEL=gemma3:4b npm run dev
 ```
 
-### 6. Optioneel: hardware aansluiten
+### 6. Optional: connect hardware
 
-Bij een correcte ESP32 firmware probeert de app automatisch te verbinden. Je hoeft in normale gevallen geen poort manueel te selecteren.
+With correct ESP32 firmware, the app will try to connect automatically. In normal cases, you do not need to select a port manually.
 
-Voor de hardware quickstart zie:
+For the hardware quickstart, see:
 
 - [docs/DIYGUPPY_QUICKSTART.md](docs/DIYGUPPY_QUICKSTART.md)
 
 ---
 
-<a id="scripts-en-commands"></a>
+<a id="scripts-and-commands"></a>
 
-## Scripts en commands
+## Scripts and commands
 
-| Command | Wat het doet |
+| Command | What it does |
 | --- | --- |
-| `npm run dev` | start Electron + Vite in development mode |
-| `npm run build` | buildt main, preload en renderer naar `out/` |
-| `npm run preview` | preview van de gebuilde Electron app |
+| `npm run dev` | starts Electron + Vite in development mode |
+| `npm run build` | builds main, preload, and renderer into `out/` |
+| `npm run preview` | previews the built Electron app |
 | `npm run typecheck` | `tsc --noEmit -p arcade-guppy/tsconfig.json` |
 | `npm run check` | typecheck + build |
-| `npm run test` | alias van `npm run check` |
-| `npm run setup:python` | maakt/updated `arcade-guppy/.venv` en installeert Python dependencies |
+| `npm run test` | alias of `npm run check` |
+| `npm run setup:python` | creates/updates `arcade-guppy/.venv` and installs Python dependencies |
 
 ---
 
@@ -606,63 +606,63 @@ Voor de hardware quickstart zie:
 
 ## Environment variables
 
-| Variable | Gebruik |
+| Variable | Usage |
 | --- | --- |
-| `ARCADE_PYTHON` | forceert de Python interpreter voor `.py` launches |
-| `ARCADE_JAVA` | forceert de Java binary voor `.jar` launches |
-| `JAVA_HOME` | fallback voor Java detectie |
-| `OLLAMA_URL` | primaire Ollama endpoint |
-| `OLLAMA_FALLBACK_URL` | optionele fallback endpoint |
-| `OLLAMA_MODEL` | model voor AI hints |
+| `ARCADE_PYTHON` | forces the Python interpreter for `.py` launches |
+| `ARCADE_JAVA` | forces the Java binary for `.jar` launches |
+| `JAVA_HOME` | fallback for Java detection |
+| `OLLAMA_URL` | primary Ollama endpoint |
+| `OLLAMA_FALLBACK_URL` | optional fallback endpoint |
+| `OLLAMA_MODEL` | model for AI hints |
 | `OLLAMA_TIMEOUT_MS` | request timeout |
 | `OLLAMA_KEEP_ALIVE_SEC` | model keep-alive |
-| `PONG_AI_MODE` | AI-modus voor Pong: `local`, `hybrid` of `remote` |
-| `PONG_AI_URL` | basis-URL voor remote Pong AI |
-| `PONG_AI_ENDPOINT` | exact endpoint voor remote Pong AI |
-| `PONG_AI_MODEL` | modelnaam voor de Pong-tegenstander |
-| `PONG_AI_TIMEOUT_MS` | timeout per Pong AI-call |
-| `PONG_AI_INTERVAL_MS` | poll-interval van Pong AI |
-| `PONG_BALL_START_SPEED` | startsnelheid van de Pong-bal |
-| `PONG_BALL_HIT_ACCEL` | versnelling per paddle-hit |
-| `PONG_BALL_MAX_SPEED` | max-snelheid van de Pong-bal |
+| `PONG_AI_MODE` | AI mode for Pong: `local`, `hybrid`, or `remote` |
+| `PONG_AI_URL` | base URL for remote Pong AI |
+| `PONG_AI_ENDPOINT` | exact endpoint for remote Pong AI |
+| `PONG_AI_MODEL` | model name for the Pong opponent |
+| `PONG_AI_TIMEOUT_MS` | timeout per Pong AI call |
+| `PONG_AI_INTERVAL_MS` | Pong AI poll interval |
+| `PONG_BALL_START_SPEED` | starting speed of the Pong ball |
+| `PONG_BALL_HIT_ACCEL` | acceleration per paddle hit |
+| `PONG_BALL_MAX_SPEED` | max speed of the Pong ball |
 
 ---
 
-<a id="persistente-data-en-output"></a>
+<a id="persistent-data-and-output"></a>
 
-## Persistente data en output
+## Persistent data and output
 
 ### Runtime data in Electron `userData`
 
-| Bestand / map | Inhoud |
+| File / folder | Contents |
 | --- | --- |
-| `userData/guppy/nfc-captures/` | opgeslagen NFC captures als JSON |
-| `userData/guppy/wifi-ap-profile.json` | laatst bewaarde Wi-Fi AP profiel |
+| `userData/guppy/nfc-captures/` | stored NFC captures as JSON |
+| `userData/guppy/wifi-ap-profile.json` | most recently saved Wi-Fi AP profile |
 
-### Repository output / mutaties
+### Repository output / mutations
 
-| Pad | Inhoud |
+| Path | Contents |
 | --- | --- |
 | `out/` | electron-vite build output |
-| `arcade-guppy/.venv/` | lokale Python virtual environment |
-| `arcade-guppy/src/games/SuperMarioNES/Setting.txt` | wordt aangepast om de target resolutie te matchen |
+| `arcade-guppy/.venv/` | local Python virtual environment |
+| `arcade-guppy/src/games/SuperMarioNES/Setting.txt` | modified to match the target resolution |
 
 ---
 
-<a id="nieuwe-games-toevoegen"></a>
+<a id="adding-new-games"></a>
 
-## Nieuwe games toevoegen
+## Adding new games
 
-Nieuwe launchable games toevoegen gebeurt in `arcade-guppy/src/components/arcade/GameMenu.tsx`.
+Adding new launchable games happens in `arcade-guppy/src/components/arcade/GameMenu.tsx`.
 
-### Stappen
+### Steps
 
-1. Zet de gamebestanden onder `arcade-guppy/src/games/...`.
-2. Voeg een thumbnail toe onder `arcade-guppy/src/assets/...`.
-3. Voeg een nieuw object toe aan de `games` array in `GameMenu.tsx`.
-4. Gebruik een executable pad relatief vanaf `arcade-guppy/src`.
+1. Put the game files under `arcade-guppy/src/games/...`.
+2. Add a thumbnail under `arcade-guppy/src/assets/...`.
+3. Add a new object to the `games` array in `GameMenu.tsx`.
+4. Use an executable path relative to `arcade-guppy/src`.
 
-Voorbeelden:
+Examples:
 
 ```ts
 executable: 'games/MyPythonGame/main.py'
@@ -670,31 +670,31 @@ executable: 'games/MyJavaGame/game.jar'
 executable: 'games/MyNativeGame/game.exe'
 ```
 
-### Wat de launcher bewaakt
+### What the launcher enforces
 
-- Path traversal wordt geblokkeerd in `main.ts`.
-- Alleen paden binnen de app-basepath mogen gestart worden.
-- Ondersteunde extensies zijn momenteel enkel `.py`, `.jar` en `.exe`.
+- Path traversal is blocked in `main.ts`.
+- Only paths inside the app base path may be launched.
+- Supported extensions are currently only `.py`, `.jar`, and `.exe`.
 
 ---
 
-## Firmware, docs en supportbestanden
+## Firmware, docs, and support files
 
 ### ESP32 firmware
 
-Belangrijkste firmwarebestanden:
+Main firmware files:
 
-| Bestand | Rol |
+| File | Role |
 | --- | --- |
-| `firmware/esp32_guppy/esp32_guppy.ino` | hoofd-firmware voor de USB serial bridge |
+| `firmware/esp32_guppy/esp32_guppy.ino` | main firmware for the USB serial bridge |
 | `firmware/esp32_guppy/diy_ir_mini.cpp/.h` | IR sender helper |
 | `firmware/esp32_guppy/diy_nfca_reader.cpp/.h` | PN532 NFC-A reader helper |
-| `firmware/esp32_guppy/build_opt.h` | compile flag voor NFC I2C mode |
-| `firmware/esp32_guppy/pn532_hsu_probe/` | losse probe sketch voor PN532 HSU diagnose |
+| `firmware/esp32_guppy/build_opt.h` | compile flag for NFC I2C mode |
+| `firmware/esp32_guppy/pn532_hsu_probe/` | separate probe sketch for PN532 HSU diagnostics |
 
-### Default wiring uit de huidige firmware
+### Default wiring from the current firmware
 
-| ESP32 pin | Functie |
+| ESP32 pin | Function |
 | --- | --- |
 | `GPIO21` | PN532 `SDA` |
 | `GPIO22` | PN532 `SCL` |
@@ -702,8 +702,8 @@ Belangrijkste firmwarebestanden:
 | `GPIO26` | PN532 `RST` |
 | `GPIO4` | IR TX |
 | `GPIO34` | IR RX |
-| `GPIO16` | Pico `TX` naar ESP32 `RX2` |
-| `GPIO17` | Pico `RX` naar ESP32 `TX2` |
+| `GPIO16` | Pico `TX` to ESP32 `RX2` |
+| `GPIO17` | Pico `RX` to ESP32 `TX2` |
 
 ### Firmware defaults
 
@@ -712,15 +712,15 @@ Belangrijkste firmwarebestanden:
 - Default SoftAP channel: `6`
 - Default IR blast payload: `NEC 0x20DF 0x10EF 38`
 
-### Firmware-capabilities die nu in code zitten
+### Firmware capabilities currently present in code
 
-De ESP32 bridge print bij boot o.a.:
+The ESP32 bridge prints, among other things, on boot:
 
 - `GUPPY_READY`
 - `FW:esp32-bridge-v2`
 - `CAPS:NFC_CLONE,NFC_READ,IR_BLAST,IR_SEND,GPIO_CTRL,WIFI_SCAN,WIFI_AUDIT,WIFI_AP_START,WIFI_AP_STOP,WIFI_AP_STATUS,BADUSB_INJECT,SHELL`
 
-### Handige companion docs
+### Useful companion docs
 
 - [docs/DIYGUPPY_QUICKSTART.md](docs/DIYGUPPY_QUICKSTART.md)
 - [docs/AI_ARCADE_PLATFORM_ARCHITECTURE.md](docs/AI_ARCADE_PLATFORM_ARCHITECTURE.md)
@@ -729,37 +729,37 @@ De ESP32 bridge print bij boot o.a.:
 
 ---
 
-<a id="platform--en-runtime-notes"></a>
+<a id="platform-and-runtime-notes"></a>
 
-## Platform- en runtime-notes
+## Platform and runtime notes
 
-### OS support in de praktijk
+### OS support in practice
 
-| Onderdeel | Opmerking |
+| Component | Note |
 | --- | --- |
-| Electron app shell | werkt in principe cross-platform |
-| Python-games | werken waar Python + `pygame` beschikbaar is |
-| Java-games | vereisen Java runtime |
-| `mame.exe` | is een Windows-native executable |
-| host Wi-Fi fallback | alleen Linux |
-| macOS window placement | gebruikt `osascript` / Accessibility |
+| Electron app shell | basically works cross-platform |
+| Python games | work wherever Python + `pygame` are available |
+| Java games | require a Java runtime |
+| `mame.exe` | is a Windows-native executable |
+| host Wi-Fi fallback | Linux only |
+| macOS window placement | uses `osascript` / Accessibility |
 
-### Belangrijke runtime details
+### Important runtime details
 
-- Op **Windows** zet de renderer-`webContents` automatisch een zoom factor van `0.85`.
-- Op **macOS** probeert de app child windows te positioneren/fullscreenen via `osascript`.
-- Wanneer een game crasht of afsluit, wordt het arcade window hersteld en wordt `game-exited` naar de renderer gestuurd.
-- `npm run build` maakt een build-output, maar maakt **geen installer of distributiepakket**.
+- On **Windows**, the renderer `webContents` automatically sets a zoom factor of `0.85`.
+- On **macOS**, the app tries to position/fullscreen child windows through `osascript`.
+- When a game crashes or exits, the arcade window is restored and `game-exited` is sent to the renderer.
+- `npm run build` produces build output, but **does not create an installer or distribution package**.
 
 ### Troubleshooting
 
-| Probleem | Waarschijnlijke oorzaak |
+| Problem | Likely cause |
 | --- | --- |
-| Python game start niet | `pygame` ontbreekt of verkeerde interpreter |
-| Java game start niet | Java runtime ontbreekt of `ARCADE_JAVA`/`JAVA_HOME` is fout |
-| Guppy blijft offline | geen serial device, geen handshake, firmware ontbreekt of poortrechten ontbreken |
-| Wi-Fi host fallback start niet | geen Linux monitor interface of `packetsender.py` dependencies ontbreken |
-| macOS embedded windowing werkt niet | Accessibility permissions voor Terminal/Electron ontbreken |
+| Python game does not start | missing `pygame` or wrong interpreter |
+| Java game does not start | missing Java runtime or incorrect `ARCADE_JAVA`/`JAVA_HOME` |
+| Guppy stays offline | no serial device, no handshake, missing firmware, or insufficient port permissions |
+| Wi-Fi host fallback does not start | no Linux monitor interface or missing `packetsender.py` dependencies |
+| macOS embedded windowing does not work | missing Accessibility permissions for Terminal/Electron |
 
 ---
 
@@ -767,55 +767,55 @@ De ESP32 bridge print bij boot o.a.:
 
 ## Responsible use
 
-Dit project bevat tooling voor:
+This project contains tooling for:
 
 - hardware prototyping,
-- NFC/IR experimenten,
+- NFC/IR experiments,
 - Wi-Fi scanning,
-- en lab-georiënteerde security features.
+- and lab-oriented security features.
 
-Gebruik deze onderdelen **alleen in een gecontroleerde omgeving en met expliciete toestemming**. De Wi-Fi deauth/jammer functionaliteit hoort thuis in een testlab, klasomgeving of geautoriseerde demo-opstelling, niet op netwerken of apparaten waarvoor je geen toestemming hebt.
+Use these parts **only in a controlled environment and with explicit permission**. The Wi-Fi deauth/jammer functionality belongs in a test lab, classroom environment, or authorized demo setup, not on networks or devices for which you do not have permission.
 
 ---
 
-<a id="roadmap-docs-en-teamcontext"></a>
+<a id="roadmap-docs-and-team-context"></a>
 
-## Roadmap, docs en teamcontext
+## Roadmap, docs, and team context
 
-### Huidige focus
+### Current focus
 
-De huidige repo is al een werkende combinatie van:
+The current repo is already a working combination of:
 
 - retro arcade launcher;
-- lokale gamebibliotheek;
+- local game library;
 - hardware bridge;
-- terminal-stijl tooling;
-- AI assist via Ollama.
+- terminal-style tooling;
+- AI assistance through Ollama.
 
-### Toekomstvisie
+### Future vision
 
-De architectuur-roadmap mikt op:
+The architecture roadmap targets:
 
-- multiplayer sessies;
-- realtime score-sync;
+- multiplayer sessions;
+- realtime score sync;
 - AI orchestration via local + GCP;
 - sandboxed cyber challenges;
-- observability en backend services.
+- observability and backend services.
 
-Zie:
+See:
 
 - [docs/AI_ARCADE_PLATFORM_ARCHITECTURE.md](docs/AI_ARCADE_PLATFORM_ARCHITECTURE.md)
 
-### Teamcontext
+### Team context
 
 The Lab Graduation Project:
 
-- Younes: arcade platform, launcher en interface
-- Rayan: hardware, arcade cabinet, knoppen en computer setup
+- Younes: arcade platform, launcher, and interface
+- Rayan: hardware, arcade cabinet, buttons, and computer setup
 - Matthias: Raspberry Pi Pico hacking tool
 
 ---
 
-## Samenvatting in één zin
+## Summary in one sentence
 
-**Dit project is een lokale arcade- en hardware-hacking desktopomgeving waarin Electron de UI en orchestration doet, lokale games lanceert, ESP32-hardware via serial aanstuurt, Wi-Fi/NFC/IR workflows exposeert en optioneel Ollama gebruikt voor AI-speelhints.**
+**This project is a local arcade and hardware-hacking desktop environment where Electron handles the UI and orchestration, launches local games, controls ESP32 hardware over serial, exposes Wi-Fi/NFC/IR workflows, and optionally uses Ollama for AI gameplay hints.**

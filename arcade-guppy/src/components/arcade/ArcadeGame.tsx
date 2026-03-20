@@ -83,6 +83,8 @@ export function ArcadeGame({ gameId, onExit, prefetchedHint, onHintReady }: Arca
   const neonOpacity = marqueeFlicker ? 0.62 : 0.95
   const waitForLayoutCommit = React.useCallback(
     () => new Promise<void>(resolve => {
+      // Two frames give React time to commit and the browser time to paint so the
+      // measured embedded viewport matches the final cabinet layout.
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     }), []
   )

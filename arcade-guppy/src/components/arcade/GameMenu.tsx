@@ -45,6 +45,11 @@ const panelInnerStyle: React.CSSProperties = {
   overflow: 'hidden',
 }
 
+const LAUNCH_REPEAT_GUARD_MS = 800
+const LAUNCH_UNLOCK_DELAY_MS = 700
+const GAMEPAD_INPUT_ARM_DELAY_MS = 220
+const GAMEPAD_ACTION_COOLDOWN_MS = 400
+
 const games: GameCard[] = [
   { id: 'pong', title: 'PONG', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Face a live AI paddle with a softer speed ramp.', image: '../assets/pong.png', accent: '#00ccff', executable: 'games/pong.py', difficulty: '★★☆', players: '1P vs AI', year: '1972' },
   { id: 'pac-man', title: 'PAC-MAN', genre: 'ARCADE', badge: 'ARCADE', tagline: 'Eat all pellets and dodge the ghosts.', image: '../assets/TrollPacMan.png', accent: '#ffde00', executable: 'games/PacMan/pacman.py', difficulty: '★★☆', players: '1P', year: '1980' },
@@ -100,14 +105,14 @@ export function MenuScreen({ particles, onSelectGame, onBack }: MenuProps) {
     if (!targetId) return
     if (isLaunching) return
     const now = Date.now()
-    if (now - lastStartRef.current < 800) return
+    if (now - lastStartRef.current < LAUNCH_REPEAT_GUARD_MS) return
     lastStartRef.current = now
     setIsLaunching(true)
     setSelectedId(targetId)
     onSelectGame?.(targetId)
 
     // small window to block double fire
-    window.setTimeout(() => setIsLaunching(false), 700)
+    window.setTimeout(() => setIsLaunching(false), LAUNCH_UNLOCK_DELAY_MS)
   }, [isLaunching, onSelectGame])
 
   const startSelected = React.useCallback(() => {
@@ -217,12 +222,13 @@ export function MenuScreen({ particles, onSelectGame, onBack }: MenuProps) {
         const fire = isArcadeConfirmButtonPressed(gamepad)
         const leave = isArcadeLeaveButtonPressed(gamepad)
         const now = Date.now()
-        // Ignore held start/select from boot screen until we see a clean release.
+        // Arm the menu only after Start/Back are released once so held buttons
+        // from the boot screen cannot immediately launch or close the menu.
         if (!gamepadStartArmedRef.current || !gamepadLeaveArmedRef.current) {
-          if (!gamepadStartArmedRef.current && !fire && now - menuMountedAtRef.current > 220) {
+          if (!gamepadStartArmedRef.current && !fire && now - menuMountedAtRef.current > GAMEPAD_INPUT_ARM_DELAY_MS) {
             gamepadStartArmedRef.current = true
           }
-          if (!gamepadLeaveArmedRef.current && !leave && now - menuMountedAtRef.current > 220) {
+          if (!gamepadLeaveArmedRef.current && !leave && now - menuMountedAtRef.current > GAMEPAD_INPUT_ARM_DELAY_MS) {
             gamepadLeaveArmedRef.current = true
           }
           gamepadFireRef.current = fire
@@ -231,11 +237,11 @@ export function MenuScreen({ particles, onSelectGame, onBack }: MenuProps) {
           return
         }
 
-        if (dir === 0 && fire && !gamepadFireRef.current && now - gamepadLastFireRef.current > 400) {
+        if (dir === 0 && fire && !gamepadFireRef.current && now - gamepadLastFireRef.current > GAMEPAD_ACTION_COOLDOWN_MS) {
           startSelected()
           gamepadLastFireRef.current = now
         }
-        if (leave && !gamepadLeavePressedRef.current && now - gamepadLastLeaveRef.current > 400) {
+        if (leave && !gamepadLeavePressedRef.current && now - gamepadLastLeaveRef.current > GAMEPAD_ACTION_COOLDOWN_MS) {
           onBack?.()
           gamepadLastLeaveRef.current = now
         }

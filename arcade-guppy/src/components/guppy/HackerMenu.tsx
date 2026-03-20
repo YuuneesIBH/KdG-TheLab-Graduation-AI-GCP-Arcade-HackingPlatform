@@ -27,15 +27,20 @@ type ViewKey = (typeof VIEW_ITEMS)[number]['key']
 type ControlId = string
 type WifiResultsSelectionMode = 'network' | 'close'
 type GamepadNavDirection = 'up' | 'down' | 'left' | 'right' | null
+type WifiApDraft = {
+  ssid: string
+  password: string
+  channel: number
+}
+type ToolActionResult = {
+  success: boolean
+  message: string
+}
 type WifiApPreset = {
   id: string
   label: string
   description: string
-  profile: {
-    ssid: string
-    password: string
-    channel: number
-  }
+  profile: WifiApDraft
 }
 type JammerPreset = {
   id: string
@@ -136,7 +141,7 @@ function cycleIndex(current: number, length: number, direction: 1 | -1) {
   return (safeIndex + direction + length) % length
 }
 
-function formatWifiApSummary(profile: { ssid: string; password: string; channel: number }) {
+function formatWifiApSummary(profile: WifiApDraft) {
   return `${profile.ssid} / CH${profile.channel} / ${profile.password ? 'SECURED' : 'OPEN'}`
 }
 
@@ -156,14 +161,14 @@ type HackerMenuProps = {
   onClearSerialLog?: () => void
   onReconnect?: () => void
   wifiApProfile?: WifiApProfile | null
-  onWifiApSaveProfile?: (profile: { ssid: string; password: string; channel: number }) => void
+  onWifiApSaveProfile?: (profile: WifiApDraft) => void
   onWifiApLoadProfile?: () => void
-  onWifiApStart?: (profile: { ssid: string; password: string; channel: number }) => void
+  onWifiApStart?: (profile: WifiApDraft) => void
   onWifiApStop?: () => void
   wifiJammerState?: WifiJammerState | null
   wifiJammerLog?: string[]
-  onWifiJammerStart?: (payload: WifiJammerPayload) => Promise<{success: boolean, message: string}> | void
-  onWifiJammerStop?: () => Promise<{success: boolean, message: string}> | void
+  onWifiJammerStart?: (payload: WifiJammerPayload) => Promise<ToolActionResult> | void
+  onWifiJammerStop?: () => Promise<ToolActionResult> | void
   onSetToolStatus?: (message: string) => void
 }
 
@@ -446,6 +451,8 @@ export default function HackerMenu({
       return
     }
     if (wifiResultsSelectionMode === 'close') return
+    // Scan lines can keep streaming while the modal is open, so selection is
+    // re-clamped here to stay on the same network when possible.
     setWifiResultSelectionIndex((current) => {
       if (current >= 0 && current < wifiScanNetworks.length) return current
       const targetIndex = selectedScanNetwork

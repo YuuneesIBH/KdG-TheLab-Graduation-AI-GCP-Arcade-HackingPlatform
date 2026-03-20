@@ -110,12 +110,6 @@ function quoteForCmd(value: string) {
   return `"${value.replace(/"/g, '""')}"`
 }
 
-function resolvePongAiLogPath(fullGamePath: string, env: NodeJS.ProcessEnv) {
-  const explicitPath = env.PONG_AI_LOG_PATH?.trim()
-  if (explicitPath) return path.resolve(explicitPath)
-  return path.resolve(path.dirname(fullGamePath), '..', '..', 'logs', 'pong-ai.jsonl')
-}
-
 function resolvePongConsoleLogPath(fullGamePath: string, env: NodeJS.ProcessEnv) {
   const explicitPath = env.PONG_CONSOLE_LOG_PATH?.trim()
   if (explicitPath) return path.resolve(explicitPath)
@@ -401,6 +395,7 @@ const GUPPY_SCAN_INTERVAL_MS = 3000
 const GUPPY_WIFI_AP_PROFILE_PATH = path.join(app.getPath('userData'), 'guppy', 'wifi-ap-profile.json')
 const WINDOWS_USB_POLL_INTERVAL_MS = 1000
 const WINDOWS_USB_SCAN_DEBOUNCE_MS = 1800
+const WINDOWS_USB_REPEAT_SUPPRESSION_MS = 5000
 const WINDOWS_WM_DEVICECHANGE = 0x0219
 const WINDOWS_DBT_DEVICEARRIVAL = 0x8000
 const WINDOWS_DBT_DEVNODES_CHANGED = 0x0007
@@ -504,7 +499,7 @@ async function handleWindowsUsbInserted(drives: string[], source: WindowsUsbInse
     .filter((drive, index, list) => list.indexOf(drive) === index)
     .filter((drive) => {
       const lastHandledAt = windowsUsbRecentlyHandledAt.get(drive) ?? 0
-      return now - lastHandledAt > 5000
+      return now - lastHandledAt > WINDOWS_USB_REPEAT_SUPPRESSION_MS
     })
 
   if (!normalizedDrives.length) return
@@ -513,6 +508,8 @@ async function handleWindowsUsbInserted(drives: string[], source: WindowsUsbInse
     windowsUsbRecentlyHandledAt.set(drive, now)
   }
 
+  // A USB insert is treated like an operator override: stop the active game,
+  // restore the shell window, then let the renderer jump straight to the hacker UI.
   if (activeGameProcess) {
     const stopResult = await stopActiveGameProcess(true)
     if (!stopResult.success) {
@@ -679,6 +676,8 @@ type FirmwareJammerCommands = {
 function resolveFirmwareJammerCommands(): FirmwareJammerCommands | null {
   const caps = Array.from(guppyCapabilities)
 
+  // Prefer explicit START/STOP capability pairs from the firmware banner so the
+  // desktop app follows whatever command names the current build exposes.
   const explicitStarts = caps.filter(
     (cap) => /(WIFI_).*(DEAUTH|JAM)/.test(cap) && cap.endsWith('_START')
   )
@@ -889,6 +888,8 @@ function scheduleMacWindowPlacement(
   let attempts = 0
   const maxAttempts = 10
 
+  // Child apps can create their native macOS window after Electron has already
+  // handed off launch control, so we retry positioning briefly until AX sees it.
   const positionWindow = setInterval(() => {
     attempts++
 

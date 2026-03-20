@@ -15,6 +15,10 @@ import type {
 } from './electron'
 
 type Screen = 'boot' | 'arcade-menu' | 'arcade-game' | 'hacker-menu'
+type AiHintState = {
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  content?: string
+}
 
 const INITIAL_GUPPY_STATUS: GuppyStatus = {
   connected: false,
@@ -38,6 +42,14 @@ const BOOT_LINES = [
 ]
 
 const MENU_MUSIC_VOLUME = 0.4
+const MAX_GUPPY_SERIAL_LINES = 140
+const MAX_WIFI_JAMMER_LOG_LINES = 120
+const ELECTRON_API_UNAVAILABLE = 'Electron API unavailable'
+
+function appendCappedEntry(entries: string[], entry: string, maxEntries: number) {
+  const next = [...entries, entry]
+  return next.length > maxEntries ? next.slice(next.length - maxEntries) : next
+}
 
 function App() {
   const [screen, setScreen] = useState<Screen>('boot')
@@ -71,7 +83,7 @@ function App() {
   const [coinBlink, setCoinBlink] = useState(false)
   const [glitchLine, setGlitchLine] = useState(-1)
   const [logoShake, setLogoShake] = useState({ x: 0, y: 0 })
-  const [aiHints, setAiHints] = useState<Record<string, { status: 'idle' | 'loading' | 'ready' | 'error'; content?: string }>>({})
+  const [aiHints, setAiHints] = useState<Record<string, AiHintState>>({})
 
   const bootLineCount = Math.min(BOOT_LINES.length, Math.floor(time / 7))
   const progress = Math.min(100, coins * 10)
@@ -143,6 +155,8 @@ function App() {
 
     if (!isBootScreen) return
 
+    // The boot screen uses several small timers on purpose so the CRT effects stay
+    // slightly out of sync instead of feeling like one perfectly synchronized loop.
     const logoShakeInterval = setInterval(() => {
       if (Math.random() > 0.7) {
         setLogoShake({ x: (Math.random() - 0.5) * 6, y: (Math.random() - 0.5) * 6 })
@@ -218,12 +232,14 @@ function App() {
   useEffect(() => {
     const api = window.electron
     if (!api) {
-      setToolStatus('Electron API unavailable')
+      setToolStatus(ELECTRON_API_UNAVAILABLE)
       return
     }
 
     let isMounted = true
 
+    // Hydrate once from the bridge on mount, then keep state live via IPC so the
+    // renderer follows reconnects and serial output without extra polling.
     const readInitialStatus = async () => {
       try {
         const status = await api.guppyGetStatus()
@@ -268,10 +284,7 @@ function App() {
     const unsubscribeLine = api.onGuppyLine((line) => {
       setGuppyLastLine(line)
       const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
-      setGuppySerialLines((prev) => {
-        const next = [...prev, `[${stamp}] ${line}`]
-        return next.length > 140 ? next.slice(next.length - 140) : next
-      })
+      setGuppySerialLines((prev) => appendCappedEntry(prev, `[${stamp}] ${line}`, MAX_GUPPY_SERIAL_LINES))
     })
 
     const unsubscribeJammerState = api.onWifiJammerState((state) => {
@@ -279,10 +292,7 @@ function App() {
     })
 
     const unsubscribeJammerLog = api.onWifiJammerLog((line) => {
-      setWifiJammerLog((prev) => {
-        const next = [...prev, line]
-        return next.length > 120 ? next.slice(next.length - 120) : next
-      })
+      setWifiJammerLog((prev) => appendCappedEntry(prev, line, MAX_WIFI_JAMMER_LOG_LINES))
     })
 
     void readInitialStatus()
@@ -326,6 +336,8 @@ function App() {
 
     if (!guppyStatus.connected) return
 
+    // Only auto-open the hacker screen for a fresh connect or port switch so
+    // steady-state status updates do not keep hijacking the current screen.
     const becameConnected = !previous.connected
     const connectedOnNewPort = Boolean(
       previous.connected
@@ -349,7 +361,7 @@ function App() {
   const handleModuleSelect = useCallback(async (key: string) => {
     const api = window.electron
     if (!api) {
-      setToolStatus('Electron API unavailable')
+      setToolStatus(ELECTRON_API_UNAVAILABLE)
       return
     }
 
@@ -372,7 +384,7 @@ function App() {
   useEffect(() => {
     const api = window.electron
     if (!api) {
-      setToolStatus('Electron API unavailable')
+      setToolStatus(ELECTRON_API_UNAVAILABLE)
       return
     }
     if (!guppyStatus.connected) return
@@ -482,7 +494,7 @@ function App() {
   const handleWifiJammerStart = useCallback(async (payload: WifiJammerPayload) => {
     const api = window.electron
     if (!api) {
-      const fallback: { success: boolean; message: string } = { success: false, message: 'Electron API unavailable' }
+      const fallback: { success: boolean; message: string } = { success: false, message: ELECTRON_API_UNAVAILABLE }
       setToolStatus(fallback.message)
       return fallback
     }
@@ -497,7 +509,7 @@ function App() {
   const handleWifiJammerStop = useCallback(async () => {
     const api = window.electron
     if (!api) {
-      const fallback: { success: boolean; message: string } = { success: false, message: 'Electron API unavailable' }
+      const fallback: { success: boolean; message: string } = { success: false, message: ELECTRON_API_UNAVAILABLE }
       setToolStatus(fallback.message)
       return fallback
     }

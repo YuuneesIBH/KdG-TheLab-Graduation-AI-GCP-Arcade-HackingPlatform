@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { isArcadeActionInput, isArcadeConfirmButtonPressed } from '../../shared/arcade-controls'
-import hackingBootSoundSrc from '../../assets/hackingboot_sound.mp3'
 
 type Phase = 'idle' | 'crt-roll' | 'matrix' | 'breach' | 'done'
-const HACK_BOOT_SOUND_VOLUME = 0.72
 
 function MatrixCanvas({ active }: { active: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -247,7 +245,7 @@ export function HackButton({ onClick }: { onClick: () => void }) {
     </button>
   )
 }
-export function HackTransition({ onComplete }: { onComplete: () => void }) {
+export function HackTransition({ onComplete, onStart }: { onComplete: () => void; onStart?: () => void }) {
   const [phase, setPhase]           = useState<Phase>('idle')
   const [removed, setRemoved]       = useState(false)
   const [rollHeight, setRollHeight] = useState(0)
@@ -255,24 +253,16 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
   const rollRef                     = useRef<number | null>(null)
   const phaseRef                    = useRef(phase)
   const activePadIndexRef           = useRef<number | null>(null)
-  const hackBootSoundRef            = useRef<HTMLAudioElement | null>(null)
+  const onStartRef                  = useRef(onStart)
   phaseRef.current = phase
 
   useEffect(() => {
-    const audio = new Audio(hackingBootSoundSrc)
-    audio.preload = 'auto'
-    audio.volume = HACK_BOOT_SOUND_VOLUME
-    hackBootSoundRef.current = audio
-
-    return () => {
-      audio.pause()
-      audio.src = ''
-      hackBootSoundRef.current = null
-    }
-  }, [])
+    onStartRef.current = onStart
+  }, [onStart])
 
   const trigger = () => {
     if (phaseRef.current !== 'idle' && phaseRef.current !== 'done') return
+    onStartRef.current?.()
     setRemoved(false)
     setRollHeight(0)
     setScanlines(0)
@@ -283,27 +273,6 @@ export function HackTransition({ onComplete }: { onComplete: () => void }) {
     window.__hackTransitionTrigger = trigger
     return () => { delete window.__hackTransitionTrigger }
   }, [])
-  useEffect(() => {
-    if (phase !== 'crt-roll') return
-
-    const audio = hackBootSoundRef.current
-    if (!audio) return
-
-    audio.pause()
-    audio.currentTime = 0
-    audio.volume = HACK_BOOT_SOUND_VOLUME
-
-    const playback = audio.play()
-    if (!playback) return
-
-    playback.catch((error: unknown) => {
-      const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
-      if (message.includes('interact') || message.includes('gesture') || message.includes('abort')) {
-        return
-      }
-      console.warn('[AUDIO] Hack boot sound playback failed:', error)
-    })
-  }, [phase])
   useEffect(() => {
     if (phase !== 'crt-roll') return
     let h = 0

@@ -5,6 +5,7 @@ import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
 import HackerMenu from './components/guppy/HackerMenu'
 import { HackTransition } from './components/guppy/HackTransition'
+import hackingSoundSrc from './assets/hackingboot_sound.mp3'
 import menuMusicSrc from './assets/menumusic.mp3'
 import type {
   GuppyStatus,
@@ -43,6 +44,7 @@ const BOOT_LINES = [
 ]
 
 const MENU_MUSIC_VOLUME = 0.4
+const HACKING_MUSIC_VOLUME = 0.72
 const MAX_GUPPY_SERIAL_LINES = 140
 const MAX_WIFI_JAMMER_LOG_LINES = 120
 const ELECTRON_API_UNAVAILABLE = 'Electron API unavailable'
@@ -56,12 +58,16 @@ function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const isBootScreen = screen === 'boot'
-  const shouldPlayMenuMusic = screen === 'boot' || screen === 'arcade-menu'
+  const [hackTransitionActive, setHackTransitionActive] = useState(false)
+  const shouldPlayMenuMusic = !hackTransitionActive && (screen === 'boot' || screen === 'arcade-menu')
+  const shouldPlayHackingMusic = hackTransitionActive || screen === 'hacker-menu'
   const previousGuppyConnectionRef = useRef<{ connected: boolean; portPath?: string }>({
     connected: false,
     portPath: undefined,
   })
   const menuMusicRef = useRef<HTMLAudioElement | null>(null)
+  const hackingMusicRef = useRef<HTMLAudioElement | null>(null)
+  const hackerOpenInFlightRef = useRef(false)
 
   const [guppyStatus, setGuppyStatus] = useState<GuppyStatus>(INITIAL_GUPPY_STATUS)
   const [guppyLastLine, setGuppyLastLine] = useState<string>('')
@@ -90,30 +96,12 @@ function App() {
   const progress = Math.min(100, coins * 10)
 
   const completeHackerMenuOpen = useCallback(() => {
+    setHackTransitionActive(false)
     setSelectedGame(null)
     setScreen('hacker-menu')
   }, [])
 
-  const openHackerMenuWithTransition = useCallback((statusMessage?: string) => {
-    if (statusMessage) {
-      setToolStatus(statusMessage)
-    }
-
-    const triggerHackTransition = window.__hackTransitionTrigger
-    if (typeof triggerHackTransition === 'function') {
-      triggerHackTransition()
-      return
-    }
-
-    completeHackerMenuOpen()
-  }, [completeHackerMenuOpen])
-
-  const handleOpenHackerFromUi = useCallback(() => {
-    openHackerMenuWithTransition()
-  }, [openHackerMenuWithTransition])
-
-  const playMenuMusic = useCallback(() => {
-    const audio = menuMusicRef.current
+  const playAudio = useCallback((audio: HTMLAudioElement | null, label: string) => {
     if (!audio || !audio.paused) return
 
     const playback = audio.play()
@@ -124,9 +112,62 @@ function App() {
       if (message.includes('interact') || message.includes('gesture') || message.includes('abort')) {
         return
       }
-      console.warn('[AUDIO] Menu music playback failed:', error)
+      console.warn(`[AUDIO] ${label} playback failed:`, error)
     })
   }, [])
+
+  const openHackerMenuWithTransition = useCallback((statusMessage?: string) => {
+    if (statusMessage) {
+      setToolStatus(statusMessage)
+    }
+
+    if (screen === 'hacker-menu' || hackTransitionActive || hackerOpenInFlightRef.current) {
+      return
+    }
+
+    hackerOpenInFlightRef.current = true
+
+    void (async () => {
+      try {
+        const api = window.electron
+        if (api) {
+          const stopResult = await api.stopGame()
+          if (!stopResult.success) {
+            const killResult = await api.killGame()
+            if (!killResult.success) {
+              console.warn('[ARCADE] Failed to fully stop active game before opening hacker mode:', killResult.message)
+            }
+          }
+          await api.setFullscreen(true)
+        }
+
+        const triggerHackTransition = window.__hackTransitionTrigger
+        if (typeof triggerHackTransition === 'function') {
+          triggerHackTransition()
+          return
+        }
+
+        completeHackerMenuOpen()
+      } catch (error) {
+        console.error('[HACKER] Failed to prepare hacker mode:', error)
+        completeHackerMenuOpen()
+      } finally {
+        hackerOpenInFlightRef.current = false
+      }
+    })()
+  }, [completeHackerMenuOpen, hackTransitionActive, screen])
+
+  const handleOpenHackerFromUi = useCallback(() => {
+    openHackerMenuWithTransition()
+  }, [openHackerMenuWithTransition])
+
+  const playMenuMusic = useCallback(() => {
+    playAudio(menuMusicRef.current, 'Menu music')
+  }, [playAudio])
+
+  const playHackingMusic = useCallback(() => {
+    playAudio(hackingMusicRef.current, 'Hacking music')
+  }, [playAudio])
 
   useEffect(() => {
     const audio = new Audio(menuMusicSrc)
@@ -139,6 +180,20 @@ function App() {
       audio.pause()
       audio.src = ''
       menuMusicRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const audio = new Audio(hackingSoundSrc)
+    audio.loop = true
+    audio.preload = 'auto'
+    audio.volume = HACKING_MUSIC_VOLUME
+    hackingMusicRef.current = audio
+
+    return () => {
+      audio.pause()
+      audio.src = ''
+      hackingMusicRef.current = null
     }
   }, [])
 
@@ -169,6 +224,35 @@ function App() {
       window.removeEventListener('focus', retryPlayback)
     }
   }, [playMenuMusic, shouldPlayMenuMusic])
+
+  useEffect(() => {
+    const audio = hackingMusicRef.current
+    if (!audio) return
+
+    audio.loop = true
+    audio.volume = HACKING_MUSIC_VOLUME
+
+    if (!shouldPlayHackingMusic) {
+      audio.pause()
+      audio.currentTime = 0
+      return
+    }
+
+    const retryPlayback = () => playHackingMusic()
+    playHackingMusic()
+
+    window.addEventListener('keydown', retryPlayback)
+    window.addEventListener('pointerdown', retryPlayback)
+    window.addEventListener('touchstart', retryPlayback, { passive: true })
+    window.addEventListener('focus', retryPlayback)
+
+    return () => {
+      window.removeEventListener('keydown', retryPlayback)
+      window.removeEventListener('pointerdown', retryPlayback)
+      window.removeEventListener('touchstart', retryPlayback)
+      window.removeEventListener('focus', retryPlayback)
+    }
+  }, [playHackingMusic, shouldPlayHackingMusic])
 
   useEffect(() => {
     document.body.style.margin = '0'
@@ -612,7 +696,10 @@ function App() {
   return (
     <>
       {screenContent}
-      <HackTransition onComplete={completeHackerMenuOpen} />
+      <HackTransition
+        onStart={() => setHackTransitionActive(true)}
+        onComplete={completeHackerMenuOpen}
+      />
     </>
   )
 }

@@ -95,6 +95,12 @@ const WIFI_AP_FALLBACK_PRESETS: WifiApPreset[] = [
     profile: { ssid: 'LAB_SECURE', password: 'arcade123', channel: 11 },
   },
   {
+    id: 'preset-kdg',
+    label: 'KDG',
+    description: 'Open KdG hotspot preset on channel 6.',
+    profile: { ssid: 'KdG', password: '', channel: 6 },
+  },
+  {
     id: 'preset-guppy-link',
     label: 'GUPPY LINK',
     description: 'Default Guppy demo AP on channel 1.',

@@ -4,6 +4,7 @@ import { BootScreen } from './components/arcade/boot'
 import { MenuScreen } from './components/arcade/GameMenu'
 import { ArcadeGame } from './components/arcade/ArcadeGame'
 import HackerMenu from './components/guppy/HackerMenu'
+import { HackTransition } from './components/guppy/HackTransition'
 import menuMusicSrc from './assets/menumusic.mp3'
 import type {
   GuppyStatus,
@@ -87,6 +88,29 @@ function App() {
 
   const bootLineCount = Math.min(BOOT_LINES.length, Math.floor(time / 7))
   const progress = Math.min(100, coins * 10)
+
+  const completeHackerMenuOpen = useCallback(() => {
+    setSelectedGame(null)
+    setScreen('hacker-menu')
+  }, [])
+
+  const openHackerMenuWithTransition = useCallback((statusMessage?: string) => {
+    if (statusMessage) {
+      setToolStatus(statusMessage)
+    }
+
+    const triggerHackTransition = window.__hackTransitionTrigger
+    if (typeof triggerHackTransition === 'function') {
+      triggerHackTransition()
+      return
+    }
+
+    completeHackerMenuOpen()
+  }, [completeHackerMenuOpen])
+
+  const handleOpenHackerFromUi = useCallback(() => {
+    openHackerMenuWithTransition()
+  }, [openHackerMenuWithTransition])
 
   const playMenuMusic = useCallback(() => {
     const audio = menuMusicRef.current
@@ -311,21 +335,18 @@ function App() {
     if (!api) return
 
     const unsubscribeUsbInserted = api.onWindowsUsbInserted((event: WindowsUsbInsertEvent) => {
-      setSelectedGame(null)
-      setScreen('hacker-menu')
-
       const driveList = event.drives.join(', ')
-      setToolStatus(
+      openHackerMenuWithTransition(
         driveList
-          ? `USB detected on ${driveList}. Hacker screen opened.`
-          : 'USB detected. Hacker screen opened.'
+          ? `USB detected on ${driveList}. Hack transition started.`
+          : 'USB detected. Hack transition started.'
       )
     })
 
     return () => {
       unsubscribeUsbInserted()
     }
-  }, [])
+  }, [openHackerMenuWithTransition])
 
   useEffect(() => {
     const previous = previousGuppyConnectionRef.current
@@ -347,16 +368,12 @@ function App() {
 
     if (!becameConnected && !connectedOnNewPort) return
 
-    setSelectedGame(null)
-    setScreen('hacker-menu')
-    setToolStatus(
+    openHackerMenuWithTransition(
       guppyStatus.portPath
-        ? `Pico connected on ${guppyStatus.portPath}. Hacker screen opened.`
-        : 'Pico connected. Hacker screen opened.'
+        ? `Pico connected on ${guppyStatus.portPath}. Hack transition started.`
+        : 'Pico connected. Hack transition started.'
     )
-  }, [guppyStatus.connected, guppyStatus.portPath])
-
-  const goToHackerMenu = useCallback(() => setScreen('hacker-menu'), [])
+  }, [guppyStatus.connected, guppyStatus.portPath, openHackerMenuWithTransition])
 
   const handleModuleSelect = useCallback(async (key: string) => {
     const api = window.electron
@@ -522,8 +539,10 @@ function App() {
   }, [setToolStatus])
 
   // ── render ────────────────────────────────────────────────────
-  if (screen === 'hacker-menu')
-    return (
+  let screenContent
+
+  if (screen === 'hacker-menu') {
+    screenContent = (
       <HackerMenu
         onSelect={handleModuleSelect}
         onBack={() => setScreen('boot')}
@@ -551,9 +570,8 @@ function App() {
         onSetToolStatus={setToolStatus}
       />
     )
-
-  if (screen === 'arcade-game' && selectedGame)
-    return (
+  } else if (screen === 'arcade-game' && selectedGame) {
+    screenContent = (
       <ArcadeGame
         gameId={selectedGame}
         prefetchedHint={aiHints[selectedGame]?.content}
@@ -566,9 +584,8 @@ function App() {
         }}
       />
     )
-
-  if (screen === 'arcade-menu')
-    return (
+  } else if (screen === 'arcade-menu') {
+    screenContent = (
       <MenuScreen
         particles={particles}
         onBack={() => setScreen('boot')}
@@ -578,16 +595,25 @@ function App() {
         }}
       />
     )
+  } else {
+    screenContent = (
+      <BootScreen
+        coins={coins} scrollText={scrollText}
+        explosions={explosions} particles={particles} crtFlicker={crtFlicker}
+        scanlineOffset={scanlineOffset} pixelShift={pixelShift}
+        coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
+        bootLines={BOOT_LINES} bootLineCount={bootLineCount} progress={progress}
+        onStart={() => setScreen('arcade-menu')}
+        onOpenHacker={handleOpenHackerFromUi}
+      />
+    )
+  }
+
   return (
-    <BootScreen
-      coins={coins} scrollText={scrollText}
-      explosions={explosions} particles={particles} crtFlicker={crtFlicker}
-      scanlineOffset={scanlineOffset} pixelShift={pixelShift}
-      coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
-      bootLines={BOOT_LINES} bootLineCount={bootLineCount} progress={progress}
-      onStart={() => setScreen('arcade-menu')}
-      onGoToHacker={goToHackerMenu}
-    />
+    <>
+      {screenContent}
+      <HackTransition onComplete={completeHackerMenuOpen} />
+    </>
   )
 }
 

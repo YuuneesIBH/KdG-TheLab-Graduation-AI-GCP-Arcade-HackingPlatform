@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { HackButton, HackTransition } from '../guppy/HackTransition'
+import { HackButton } from '../guppy/HackTransition'
 import { isArcadeActionInput, isArcadeConfirmButtonPressed } from '../../shared/arcade-controls'
 
 type BootProps = {
@@ -17,7 +17,7 @@ type BootProps = {
   bootLineCount: number
   progress: number
   onStart: () => void
-  onGoToHacker: () => void
+  onOpenHacker: () => void
 }
 
 export function BootScreen({
@@ -35,7 +35,7 @@ export function BootScreen({
   bootLineCount,
   progress,
   onStart,
-  onGoToHacker
+  onOpenHacker
 }: BootProps) {
   const readyToStart = progress >= 100
   const activePadIndex = useRef<number | null>(null)
@@ -256,7 +256,7 @@ export function BootScreen({
           alignItems: 'center',
           boxShadow: '0 0 20px rgba(0,136,255,0.35), 0 6px 0 #001133'
         }}>
-          <HackButton onClick={() => window.__hackTransitionTrigger?.()} />
+          <HackButton onClick={onOpenHacker} />
         </div>
 <div style={{
           position: 'absolute',
@@ -618,7 +618,6 @@ export function BootScreen({
           }
         `}</style>
       </div>
-<HackTransition onComplete={onGoToHacker} />
     </>
   )
 }

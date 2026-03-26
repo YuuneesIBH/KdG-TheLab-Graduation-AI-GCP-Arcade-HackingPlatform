@@ -59,7 +59,9 @@ function App() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
   const isBootScreen = screen === 'boot'
   const [hackTransitionActive, setHackTransitionActive] = useState(false)
-  const shouldPlayMenuMusic = !hackTransitionActive && (screen === 'boot' || screen === 'arcade-menu')
+  const [hackerOpenPending, setHackerOpenPending] = useState(false)
+  const isHackerFlowActive = hackTransitionActive || hackerOpenPending
+  const shouldPlayMenuMusic = !isHackerFlowActive && (screen === 'boot' || screen === 'arcade-menu')
   const shouldPlayHackingMusic = hackTransitionActive || screen === 'hacker-menu'
   const previousGuppyConnectionRef = useRef<{ connected: boolean; portPath?: string }>({
     connected: false,
@@ -96,6 +98,7 @@ function App() {
   const progress = Math.min(100, coins * 10)
 
   const completeHackerMenuOpen = useCallback(() => {
+    setHackerOpenPending(false)
     setHackTransitionActive(false)
     setSelectedGame(null)
     setScreen('hacker-menu')
@@ -121,11 +124,12 @@ function App() {
       setToolStatus(statusMessage)
     }
 
-    if (screen === 'hacker-menu' || hackTransitionActive || hackerOpenInFlightRef.current) {
+    if (screen === 'hacker-menu' || isHackerFlowActive || hackerOpenInFlightRef.current) {
       return
     }
 
     hackerOpenInFlightRef.current = true
+    setHackerOpenPending(true)
 
     void (async () => {
       try {
@@ -153,9 +157,10 @@ function App() {
         completeHackerMenuOpen()
       } finally {
         hackerOpenInFlightRef.current = false
+        setHackerOpenPending(false)
       }
     })()
-  }, [completeHackerMenuOpen, hackTransitionActive, screen])
+  }, [completeHackerMenuOpen, isHackerFlowActive, screen])
 
   const handleOpenHackerFromUi = useCallback(() => {
     openHackerMenuWithTransition()
@@ -687,6 +692,7 @@ function App() {
         scanlineOffset={scanlineOffset} pixelShift={pixelShift}
         coinBlink={coinBlink} glitchLine={glitchLine} logoShake={logoShake}
         bootLines={BOOT_LINES} bootLineCount={bootLineCount} progress={progress}
+        inputLocked={isHackerFlowActive}
         onStart={() => setScreen('arcade-menu')}
         onOpenHacker={handleOpenHackerFromUi}
       />

@@ -16,6 +16,7 @@ type BootProps = {
   bootLines: string[]
   bootLineCount: number
   progress: number
+  inputLocked?: boolean
   onStart: () => void
   onOpenHacker: () => void
 }
@@ -34,6 +35,7 @@ export function BootScreen({
   bootLines,
   bootLineCount,
   progress,
+  inputLocked = false,
   onStart,
   onOpenHacker
 }: BootProps) {
@@ -42,6 +44,7 @@ export function BootScreen({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (inputLocked || e.defaultPrevented) return
       if (e.repeat) return
       if (isArcadeActionInput(e)) {
         if (readyToStart) {
@@ -52,7 +55,7 @@ export function BootScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onStart, readyToStart])
+  }, [inputLocked, onStart, readyToStart])
 
   useEffect(() => {
     let raf = 0
@@ -77,7 +80,7 @@ export function BootScreen({
       }
 
       const gamepad = pads.find((p) => p.index === activePadIndex.current)
-      if (gamepad && readyToStart) {
+      if (gamepad && readyToStart && !inputLocked) {
         const now = Date.now()
         if (now >= cooldownUntil && isArcadeConfirmButtonPressed(gamepad)) {
           onStart()
@@ -89,7 +92,7 @@ export function BootScreen({
 
     poll()
     return () => cancelAnimationFrame(raf)
-  }, [onStart, readyToStart])
+  }, [inputLocked, onStart, readyToStart])
 
   return (
     <>
@@ -521,7 +524,7 @@ export function BootScreen({
                       ? '0 -3px 20px rgba(0,136,255,0.5)'
                       : '0 -3px 20px rgba(0,255,136,0.5)'
                   }}
-                  onClick={readyToStart ? onStart : undefined}
+                  onClick={readyToStart && !inputLocked ? onStart : undefined}
                 >
                   <div style={{
                     position: 'absolute', inset: 0,
@@ -543,7 +546,7 @@ export function BootScreen({
                   ) : (
                     <button
                       type="button"
-                      onClick={onStart}
+                      onClick={inputLocked ? undefined : onStart}
                       style={{
                         fontSize: '30px', fontWeight: 'bold', color: '#ffffff',
                         letterSpacing: '5px',
